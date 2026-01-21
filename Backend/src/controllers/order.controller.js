@@ -271,7 +271,7 @@ export const updateOrderStatus = asyncHandler(async (req, res) => {
   const { status, reason, ...additionalData } = req.body;
   
   // Get current order status before update
-  const currentOrder = await orderService.getById(req.params.id);
+  const currentOrder = await orderService.getOrderById(req.params.id);
   const oldStatus = currentOrder?.status;
   
   // Service handles validation via OrderStateMachine

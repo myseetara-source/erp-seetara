@@ -170,6 +170,70 @@ class VendorService {
     logger.info('Vendor deactivated', { vendorId: id });
   }
 
+  /**
+   * Toggle vendor active status
+   * @param {string} id - Vendor UUID
+   * @returns {Object} Updated vendor
+   */
+  async toggleStatus(id) {
+    // Get current status
+    const vendor = await this.getVendorById(id);
+    
+    // Toggle
+    const newStatus = !vendor.is_active;
+    
+    const { data: updatedVendor, error } = await supabaseAdmin
+      .from('vendors')
+      .update({ is_active: newStatus })
+      .eq('id', id)
+      .select()
+      .single();
+
+    if (error) {
+      throw new DatabaseError('Failed to toggle vendor status', error);
+    }
+
+    logger.info('Vendor status toggled', { vendorId: id, isActive: newStatus });
+    return updatedVendor;
+  }
+
+  /**
+   * Get vendor stats
+   * @param {string} id - Vendor UUID
+   * @returns {Object} Vendor statistics
+   */
+  async getVendorStats(id) {
+    // Get supply count and total
+    const { data: supplies } = await supabaseAdmin
+      .from('vendor_supplies')
+      .select('total_amount, created_at')
+      .eq('vendor_id', id);
+
+    // Get payment total
+    const { data: payments } = await supabaseAdmin
+      .from('transactions')
+      .select('amount, created_at')
+      .eq('vendor_id', id)
+      .eq('type', 'vendor_payment');
+
+    const totalSupplyValue = (supplies || []).reduce((sum, s) => sum + (s.total_amount || 0), 0);
+    const totalPayments = (payments || []).reduce((sum, p) => sum + (p.amount || 0), 0);
+
+    // Get latest dates
+    const lastSupply = supplies?.sort((a, b) => new Date(b.created_at) - new Date(a.created_at))[0];
+    const lastPayment = payments?.sort((a, b) => new Date(b.created_at) - new Date(a.created_at))[0];
+
+    return {
+      total_supplies: supplies?.length || 0,
+      total_purchase_value: totalSupplyValue,
+      total_payments: totalPayments,
+      outstanding_balance: totalSupplyValue - totalPayments,
+      average_order_value: supplies?.length > 0 ? totalSupplyValue / supplies.length : 0,
+      last_supply_date: lastSupply?.created_at || null,
+      last_payment_date: lastPayment?.created_at || null,
+    };
+  }
+
   // ===========================================================================
   // VENDOR SUPPLIES (Purchase Orders)
   // ===========================================================================

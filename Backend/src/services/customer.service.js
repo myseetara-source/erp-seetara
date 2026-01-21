@@ -778,5 +778,11 @@ class CustomerService {
   }
 }
 
-export const customerService = new CustomerService();
+// Create singleton instance
+const customerServiceInstance = new CustomerService();
+
+// Add alias for backward compatibility
+customerServiceInstance.findOrCreate = customerServiceInstance.findOrCreateCustomer;
+
+export const customerService = customerServiceInstance;
 export default customerService;

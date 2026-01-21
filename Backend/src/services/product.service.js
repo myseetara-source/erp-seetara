@@ -185,6 +185,33 @@ class ProductService {
     logger.info('Product soft deleted', { productId: id });
   }
 
+  /**
+   * Toggle product active status
+   * @param {string} id - Product UUID
+   * @returns {Object} Updated product
+   */
+  async toggleStatus(id) {
+    // Get current status
+    const product = await this.getProductById(id);
+    
+    // Toggle
+    const newStatus = !product.is_active;
+    
+    const { data: updatedProduct, error } = await supabaseAdmin
+      .from('products')
+      .update({ is_active: newStatus })
+      .eq('id', id)
+      .select()
+      .single();
+
+    if (error) {
+      throw new DatabaseError('Failed to toggle product status', error);
+    }
+
+    logger.info('Product status toggled', { productId: id, isActive: newStatus });
+    return updatedProduct;
+  }
+
   // ===========================================================================
   // VARIANT OPERATIONS
   // ===========================================================================

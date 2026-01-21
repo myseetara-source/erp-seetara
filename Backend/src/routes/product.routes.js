@@ -72,4 +72,12 @@ router.delete(
   productController.deleteProduct
 );
 
+// Toggle product status
+router.patch(
+  '/:id/toggle-status',
+  authorize('admin', 'manager'),
+  validateParams(productIdSchema),
+  productController.toggleProductStatus
+);
+
 export default router;
