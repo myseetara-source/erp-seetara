@@ -20,18 +20,20 @@ export const OrderSource = z.enum([
   'manual', 'todaytrend', 'seetara', 'shopify', 'woocommerce', 'api'
 ]);
 
+// MUST MATCH: Backend/database/000_schema_final.sql enums exactly
 export const OrderStatus = z.enum([
-  'intake', 'converted', 'followup', 'hold', 'packed', 'shipped',
-  'delivered', 'cancelled', 'refund', 'return',
+  'intake', 'follow_up', 'converted', 'hold', 'packed', 
+  'assigned', 'out_for_delivery', 'handover_to_courier', 'in_transit',
+  'store_sale', 'delivered', 'cancelled', 'rejected', 'return_initiated', 'returned',
 ]);
 
 export const FulfillmentType = z.enum([
-  'inside_valley', 'outside_valley', 'store_pickup'
+  'inside_valley', 'outside_valley', 'store'  // FIXED: was 'store_pickup'
 ]);
 
-export const PaymentStatus = z.enum(['pending', 'partial', 'paid', 'refunded']);
+export const PaymentStatus = z.enum(['pending', 'paid', 'partial', 'refunded', 'cod']);
 
-export const PaymentMethod = z.enum(['cod', 'prepaid', 'partial']);
+export const PaymentMethod = z.enum(['cod', 'esewa', 'khalti', 'bank_transfer', 'cash']);
 
 // =============================================================================
 // NEPAL PHONE NUMBER VALIDATION

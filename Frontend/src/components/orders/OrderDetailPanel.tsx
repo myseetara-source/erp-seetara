@@ -26,16 +26,23 @@ interface OrderDetailPanelProps {
   onStatusChange: (orderId: number, status: string) => void
 }
 
+// MUST MATCH: Backend/database/000_schema_final.sql order_status enum
 const STATUS_OPTIONS = [
   { id: 'intake', label: 'Intake', color: 'bg-blue-500' },
+  { id: 'follow_up', label: 'Follow Up', color: 'bg-yellow-500' },
   { id: 'converted', label: 'Converted', color: 'bg-green-500' },
-  { id: 'followup', label: 'Follow Up', color: 'bg-yellow-500' },
-  { id: 'hold', label: 'Hold', color: 'bg-gray-500' },
+  { id: 'hold', label: 'On Hold', color: 'bg-gray-500' },
   { id: 'packed', label: 'Packed', color: 'bg-indigo-500' },
-  { id: 'delivered', label: 'Delivered', color: 'bg-purple-500' },
+  { id: 'assigned', label: 'Assigned', color: 'bg-blue-600' },
+  { id: 'out_for_delivery', label: 'Out for Delivery', color: 'bg-orange-500' },
+  { id: 'handover_to_courier', label: 'Handover to Courier', color: 'bg-purple-500' },
+  { id: 'in_transit', label: 'In Transit', color: 'bg-cyan-500' },
+  { id: 'store_sale', label: 'Store Sale', color: 'bg-teal-500' },
+  { id: 'delivered', label: 'Delivered', color: 'bg-emerald-500' },
   { id: 'cancelled', label: 'Cancelled', color: 'bg-red-500' },
-  { id: 'return', label: 'Return', color: 'bg-pink-500' },
-  { id: 'refund', label: 'Refund', color: 'bg-orange-500' },
+  { id: 'rejected', label: 'Rejected', color: 'bg-red-600' },
+  { id: 'return_initiated', label: 'Return Initiated', color: 'bg-pink-500' },
+  { id: 'returned', label: 'Returned', color: 'bg-gray-600' },
 ]
 
 export default function OrderDetailPanel({

@@ -34,7 +34,7 @@ const REFUND_STATUSES = ['refunded', 'cancelled', 'returned'];
  * POST /orders
  * 
  * Website orders: If City is Kathmandu/Lalitpur/Bhaktapur -> inside_valley
- * Store orders: Set fulfillment_type = 'store_pickup'
+ * Store orders: Set fulfillment_type = 'store'
  * Manual orders: Operator can choose fulfillment_type
  * 
  * FIX: Now uses database-driven delivery_zones table instead of hardcoded values
@@ -47,10 +47,10 @@ export const createOrder = asyncHandler(async (req, res) => {
   // AUTO-DETECT FULFILLMENT TYPE FROM DATABASE
   // ==========================================================================
   
-  // If source is 'store', set fulfillment to store_pickup
+  // If source is 'store', set fulfillment to 'store'
   if (orderData.source === 'store') {
-    orderData.fulfillment_type = FULFILLMENT_TYPES.STORE_PICKUP;
-    logger.debug('Store order detected, setting fulfillment_type to store_pickup');
+    orderData.fulfillment_type = FULFILLMENT_TYPES.STORE;
+    logger.debug('Store order detected, setting fulfillment_type to store');
   }
   
   // If source is 'website' or 'api', auto-detect from customer address using DB

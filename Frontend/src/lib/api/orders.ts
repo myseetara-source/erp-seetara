@@ -19,7 +19,7 @@ export interface OrderListParams {
   limit?: number;
   status?: OrderStatus;
   source?: OrderSource;
-  fulfillment_type?: 'inside_valley' | 'outside_valley' | 'store_pickup';
+  fulfillment_type?: 'inside_valley' | 'outside_valley' | 'store';  // FIXED: was 'store_pickup'
   search?: string;
   start_date?: string;
   end_date?: string;
@@ -113,7 +113,7 @@ const MOCK_ORDERS: OrderListItem[] = [
     customer_city: 'Chitwan',
     customer_address: 'Bharatpur, Chitwan',
     total_amount: 5500,
-    status: 'followup',
+    status: 'follow_up',  // FIXED: was 'followup'
     source: 'shopify',
     fulfillment_type: 'outside_valley',  // Chitwan = Outside Valley
     vendor_name: 'Shopify Store',
@@ -151,7 +151,7 @@ const MOCK_ORDERS: OrderListItem[] = [
     total_amount: 1500,
     status: 'store_sale',
     source: 'store',
-    fulfillment_type: 'store_pickup',  // Walk-in customer
+    fulfillment_type: 'store',  // Walk-in customer (FIXED from store_pickup)
     vendor_name: null,
     item_count: 1,
     payment_status: 'paid',

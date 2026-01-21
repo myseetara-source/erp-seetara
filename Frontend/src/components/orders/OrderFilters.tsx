@@ -43,13 +43,18 @@ const TABS = [
   { id: 'store', label: 'Store', icon: Store },
 ]
 
+// MUST MATCH: Backend/database/000_schema_final.sql order_status enum
 const STATUS_OPTIONS = [
   { id: 'intake', label: 'Intake', icon: Clock, color: 'bg-blue-100 text-blue-700' },
+  { id: 'follow_up', label: 'Follow Up', icon: Clock, color: 'bg-yellow-100 text-yellow-700' },
   { id: 'converted', label: 'Converted', icon: CheckCircle, color: 'bg-green-100 text-green-700' },
-  { id: 'followup', label: 'Follow Up', icon: Clock, color: 'bg-yellow-100 text-yellow-700' },
+  { id: 'hold', label: 'On Hold', icon: Clock, color: 'bg-gray-100 text-gray-700' },
   { id: 'packed', label: 'Packed', icon: Package, color: 'bg-indigo-100 text-indigo-700' },
-  { id: 'delivered', label: 'Delivered', icon: CheckCircle, color: 'bg-purple-100 text-purple-700' },
+  { id: 'assigned', label: 'Assigned', icon: Truck, color: 'bg-blue-100 text-blue-700' },
+  { id: 'out_for_delivery', label: 'Out for Delivery', icon: Truck, color: 'bg-orange-100 text-orange-700' },
+  { id: 'delivered', label: 'Delivered', icon: CheckCircle, color: 'bg-emerald-100 text-emerald-700' },
   { id: 'cancelled', label: 'Cancelled', icon: X, color: 'bg-red-100 text-red-700' },
+  { id: 'returned', label: 'Returned', icon: RefreshCw, color: 'bg-pink-100 text-pink-700' },
 ]
 
 const DATE_OPTIONS = [
