@@ -21,6 +21,7 @@ import ticketRoutes from './ticket.routes.js';
 import riderRoutes from './rider.routes.js';
 import smsRoutes from './sms.routes.js';
 import externalRoutes from './external.routes.js';
+import staticRoutes from './static.routes.js'; // PERF-003: Cached static data
 
 const router = Router();
 
@@ -52,5 +53,6 @@ router.use('/tickets', ticketRoutes);
 router.use('/', riderRoutes); // Mounts /dispatch/* and /rider/*
 router.use('/sms', smsRoutes);
 router.use('/external', externalRoutes); // External website integrations
+router.use('/static', staticRoutes); // PERF-003: Cached static data (categories, zones, config)
 
 export default router;

@@ -82,36 +82,82 @@ const config = {
       : null,
   },
 
+  // ==========================================================================
   // Order Status Configuration
+  // CRITICAL: These MUST match database ENUM 'order_status' exactly!
+  // Database: intake, follow_up, converted, hold, packed, assigned,
+  //           out_for_delivery, handover_to_courier, in_transit, store_sale,
+  //           delivered, cancelled, rejected, return_initiated, returned
+  // ==========================================================================
   orderStatuses: {
     intake: { label: 'Intake', color: '#3B82F6', canEdit: true },
+    follow_up: { label: 'Follow Up', color: '#F59E0B', canEdit: true },
     converted: { label: 'Converted', color: '#10B981', canEdit: true },
-    followup: { label: 'Follow Up', color: '#F59E0B', canEdit: true },
     hold: { label: 'On Hold', color: '#6B7280', canEdit: true },
     packed: { label: 'Packed', color: '#8B5CF6', canEdit: false },
-    shipped: { label: 'Shipped', color: '#06B6D4', canEdit: false },
+    assigned: { label: 'Assigned', color: '#3B82F6', canEdit: false },
+    out_for_delivery: { label: 'Out for Delivery', color: '#F97316', canEdit: false },
+    handover_to_courier: { label: 'Handover to Courier', color: '#A855F7', canEdit: false },
+    in_transit: { label: 'In Transit', color: '#06B6D4', canEdit: false },
+    store_sale: { label: 'Store Sale', color: '#14B8A6', canEdit: false },
     delivered: { label: 'Delivered', color: '#22C55E', canEdit: false },
     cancelled: { label: 'Cancelled', color: '#EF4444', canEdit: false },
-    refund: { label: 'Refund', color: '#F97316', canEdit: false },
-    return: { label: 'Return', color: '#EC4899', canEdit: false },
+    rejected: { label: 'Rejected', color: '#EF4444', canEdit: false },
+    return_initiated: { label: 'Return Initiated', color: '#EC4899', canEdit: false },
+    returned: { label: 'Returned', color: '#6B7280', canEdit: false },
   },
 
-  // Valid status transitions (State Machine)
+  // ==========================================================================
+  // Valid status transitions (State Machine by Fulfillment Type)
+  // CRITICAL: Matches Frontend/src/types/order.ts
+  // ==========================================================================
   statusTransitions: {
-    intake: ['converted', 'followup', 'hold', 'cancelled'],
-    converted: ['packed', 'followup', 'hold', 'cancelled'],
-    followup: ['converted', 'hold', 'cancelled'],
-    hold: ['converted', 'followup', 'cancelled'],
-    packed: ['shipped', 'cancelled'],
-    shipped: ['delivered', 'return'],
-    delivered: ['refund', 'return'],
-    cancelled: [],
-    refund: [],
-    return: ['refund'],
+    // Inside Valley: Self-delivery flow
+    inside_valley: {
+      intake: ['follow_up', 'converted', 'cancelled', 'rejected'],
+      follow_up: ['follow_up', 'converted', 'cancelled', 'rejected'],
+      converted: ['packed', 'cancelled'],
+      hold: ['converted', 'follow_up', 'cancelled'],
+      packed: ['assigned', 'cancelled'],
+      assigned: ['out_for_delivery', 'packed', 'cancelled'],
+      out_for_delivery: ['delivered', 'return_initiated', 'assigned'],
+      delivered: ['return_initiated'],
+      return_initiated: ['returned'],
+      returned: [],
+      cancelled: [],
+      rejected: [],
+    },
+    // Outside Valley: Courier flow
+    outside_valley: {
+      intake: ['follow_up', 'converted', 'cancelled', 'rejected'],
+      follow_up: ['follow_up', 'converted', 'cancelled', 'rejected'],
+      converted: ['packed', 'cancelled'],
+      hold: ['converted', 'follow_up', 'cancelled'],
+      packed: ['handover_to_courier', 'cancelled'],
+      handover_to_courier: ['in_transit', 'delivered', 'return_initiated'],
+      in_transit: ['delivered', 'return_initiated'],
+      delivered: ['return_initiated'],
+      return_initiated: ['returned'],
+      returned: [],
+      cancelled: [],
+      rejected: [],
+    },
+    // Store Pickup: Walk-in flow
+    store: {
+      intake: ['converted', 'store_sale', 'cancelled', 'rejected'],
+      converted: ['packed', 'store_sale', 'cancelled'],
+      packed: ['store_sale', 'cancelled'],
+      store_sale: ['delivered'],
+      delivered: ['return_initiated'],
+      return_initiated: ['returned'],
+      returned: [],
+      cancelled: [],
+      rejected: [],
+    },
   },
 
   // Statuses that restore stock when transitioned to
-  stockRestoringStatuses: ['cancelled', 'return', 'refund'],
+  stockRestoringStatuses: ['cancelled', 'rejected', 'returned'],
 
   // Order sources
   orderSources: ['manual', 'todaytrend', 'seetara', 'shopify', 'woocommerce', 'api'],

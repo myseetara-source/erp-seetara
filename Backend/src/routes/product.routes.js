@@ -80,4 +80,19 @@ router.patch(
   productController.toggleProductStatus
 );
 
+/**
+ * Get product variants (Lazy Loading - PERF-002)
+ * GET /products/:id/variants
+ * 
+ * Returns full variant data for a specific product.
+ * Use this for lazy loading when user expands/selects a product.
+ * 
+ * @query mode - 'SALES' (only in-stock) | 'INVENTORY' (all variants)
+ */
+router.get(
+  '/:id/variants',
+  validateParams(productIdSchema),
+  productController.getProductVariants
+);
+
 export default router;

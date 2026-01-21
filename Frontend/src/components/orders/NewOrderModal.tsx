@@ -7,17 +7,16 @@
  * - Left column: Customer info + Order settings
  * - Right column: Product selection
  * 
- * Based on reference design with orange header and clean layout.
+ * Uses unified ProductVariantSelect component for consistency.
  */
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import {
   X,
   User,
   Phone,
   MapPin,
-  Search,
   Plus,
   Minus,
   Trash2,
@@ -29,6 +28,7 @@ import {
   Check,
   Loader2,
   Send,
+  Sparkles,
 } from 'lucide-react';
 import {
   Dialog,
@@ -42,7 +42,9 @@ import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
 import { useQuickOrderForm, ProductOption } from '@/hooks/useOrderForm';
-import { useDebounce } from '@/hooks/useDebounce';
+import { ProductVariantSelect, VariantOption } from '@/components/form/ProductVariantSelect';
+import { calculateShipping } from '@/lib/utils/shippingCalculator';
+import type { FulfillmentType } from '@/types/order';
 
 // =============================================================================
 // TYPES
@@ -57,85 +59,23 @@ type FulfillmentType = 'inside_valley' | 'outside_valley' | 'store';
 type OrderStatus = 'intake' | 'converted';
 
 // =============================================================================
-// PRODUCT SEARCH
+// HELPER: Convert VariantOption to ProductOption
 // =============================================================================
 
-interface ProductSearchInputProps {
-  onSelect: (product: ProductOption) => void;
-  searchProducts: (query: string) => Promise<ProductOption[]>;
-  isSearching: boolean;
-}
-
-function ProductSearchInput({ onSelect, searchProducts, isSearching }: ProductSearchInputProps) {
-  const [query, setQuery] = useState('');
-  const [results, setResults] = useState<ProductOption[]>([]);
-  const [isOpen, setIsOpen] = useState(false);
-  const debouncedQuery = useDebounce(query, 300);
-
-  useEffect(() => {
-    if (debouncedQuery.length >= 2) {
-      searchProducts(debouncedQuery).then(setResults);
-      setIsOpen(true);
-    } else {
-      setResults([]);
-      setIsOpen(false);
-    }
-  }, [debouncedQuery, searchProducts]);
-
-  const handleSelect = (product: ProductOption) => {
-    onSelect(product);
-    setQuery('');
-    setResults([]);
-    setIsOpen(false);
+function variantToProductOption(variant: VariantOption): ProductOption {
+  return {
+    variant_id: variant.variant_id,
+    product_id: variant.product_id,
+    product_name: variant.product_name,
+    variant_name: variant.variant_name,
+    sku: variant.sku,
+    price: variant.price,
+    stock: variant.stock,
+    image_url: variant.image_url,
+    attributes: variant.attributes,
+    shipping_inside: variant.shipping_inside,
+    shipping_outside: variant.shipping_outside,
   };
-
-  return (
-    <div className="relative">
-      <div className="relative">
-        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-        <Input
-          value={query}
-          onChange={(e) => setQuery(e.target.value)}
-          placeholder="Search & add product..."
-          className="pl-9 pr-10"
-        />
-        {isSearching && (
-          <Loader2 className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 animate-spin" />
-        )}
-      </div>
-      
-      {isOpen && results.length > 0 && (
-        <div className="absolute z-50 w-full mt-1 bg-white border border-gray-200 rounded-lg shadow-xl max-h-64 overflow-auto">
-          {results.map((product) => (
-            <button
-              key={product.variant_id}
-              type="button"
-              onClick={() => handleSelect(product)}
-              className="w-full px-3 py-2.5 text-left hover:bg-orange-50 flex items-center gap-3 border-b border-gray-100 last:border-0"
-            >
-              <div className="w-10 h-10 bg-gray-100 rounded flex items-center justify-center">
-                {product.image_url ? (
-                  <img src={product.image_url} alt="" className="w-full h-full object-cover rounded" />
-                ) : (
-                  <Package className="w-5 h-5 text-gray-400" />
-                )}
-              </div>
-              <div className="flex-1 min-w-0">
-                <p className="font-medium text-gray-900 text-sm truncate">{product.product_name}</p>
-                <p className="text-xs text-gray-500">{product.variant_name} · {product.sku}</p>
-              </div>
-              <div className="text-right">
-                <p className="font-semibold text-orange-600">Rs. {product.price}</p>
-                <p className={cn('text-xs', product.stock > 0 ? 'text-green-600' : 'text-red-500')}>
-                  {product.stock > 0 ? `${product.stock} pcs` : 'Out of stock'}
-                </p>
-              </div>
-            </button>
-          ))}
-        </div>
-      )}
-    </div>
-  );
 }
 
 // =============================================================================
@@ -193,9 +133,39 @@ export function NewOrderModal({ trigger, onSuccess }: NewOrderModalProps) {
         sku: product.sku,
         quantity: 1,
         unit_price: product.price,
+        // Include shipping rates for "Highest Shipping" calculation
+        shipping_inside: product.shipping_inside ?? 100,
+        shipping_outside: product.shipping_outside ?? 150,
       });
     }
   };
+
+  // ==========================================================================
+  // HIGHEST SHIPPING RATE LOGIC (Centralized - DRY Principle)
+  // ==========================================================================
+  // Uses lib/utils/shippingCalculator.ts for consistency across app
+  // - Shipping is FLAT RATE per ORDER (not per quantity/item)
+  // - When multiple products: Use the HIGHEST shipping cost (Heavy Item Rule)
+  // - Store pickup = 0
+  // - User can manually override the suggested value
+  // ==========================================================================
+  
+  useEffect(() => {
+    // Skip if no items selected
+    if (!watchedItems || watchedItems.length === 0) {
+      return;
+    }
+
+    // Use centralized shipping calculator
+    const suggestedShipping = calculateShipping(
+      watchedItems as { shipping_inside?: number; shipping_outside?: number }[],
+      fulfillmentType as FulfillmentType
+    );
+
+    // Auto-update the delivery charge field
+    // Note: User can still manually override this value
+    setValue('delivery_charge', suggestedShipping);
+  }, [watchedItems, fulfillmentType, setValue]);
 
   // Reset when modal closes
   const handleOpenChange = (open: boolean) => {
@@ -350,12 +320,23 @@ export function NewOrderModal({ trigger, onSuccess }: NewOrderModalProps) {
               <label className="text-xs font-medium text-gray-700 block">Adjustments</label>
               <div className="grid grid-cols-3 gap-3">
                 <div>
-                  <label className="text-xs text-gray-500 mb-1 block">Delivery</label>
+                  <label className="text-xs text-gray-500 mb-1 flex items-center gap-1">
+                    Delivery
+                    <span 
+                      title="Auto-calculated based on highest shipping among selected products. You can override this value."
+                      className="text-orange-400 cursor-help"
+                    >
+                      ✨
+                    </span>
+                  </label>
                   <Input
                     type="number"
                     {...register('delivery_charge', { valueAsNumber: true })}
                     placeholder="0"
-                    className="text-center"
+                    className={cn(
+                      'text-center',
+                      deliveryCharge > 0 && 'border-orange-300 bg-orange-50/50'
+                    )}
                   />
                 </div>
                 <div>
@@ -399,11 +380,11 @@ export function NewOrderModal({ trigger, onSuccess }: NewOrderModalProps) {
               </Button>
             </div>
 
-            {/* Search */}
-            <ProductSearchInput
-              onSelect={handleProductSelect}
-              searchProducts={searchProducts}
-              isSearching={isSearching}
+            {/* Product Search - Using Unified Component */}
+            <ProductVariantSelect
+              onChange={(variant) => handleProductSelect(variantToProductOption(variant))}
+              placeholder="Search by product name, SKU, or attribute..."
+              autoFocus={false}
             />
 
             {/* Product List */}

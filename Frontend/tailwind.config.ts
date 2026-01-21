@@ -75,7 +75,10 @@ const config: Config = {
   			'slide-in-bottom': 'slideInBottom 0.3s cubic-bezier(0.16, 1, 0.3, 1)',
   			'page-fade-in': 'pageFadeIn 0.4s ease-out',
   			'sidebar-slide-in': 'sidebarSlideIn 0.3s ease-out',
-  			'pulse-slow': 'pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite'
+  			'pulse-slow': 'pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite',
+  			'shimmer': 'shimmer 2s infinite',
+  			'bounce-subtle': 'bounceSubtle 0.3s ease-out',
+  			'scale-in': 'scaleIn 0.15s ease-out',
   		},
   		keyframes: {
   			fadeIn: {
@@ -133,6 +136,29 @@ const config: Config = {
   				},
   				'100%': {
   					transform: 'translateX(0)',
+  					opacity: '1'
+  				}
+  			},
+  			shimmer: {
+  				'100%': {
+  					transform: 'translateX(100%)'
+  				}
+  			},
+  			bounceSubtle: {
+  				'0%, 100%': {
+  					transform: 'translateY(0)'
+  				},
+  				'50%': {
+  					transform: 'translateY(-2px)'
+  				}
+  			},
+  			scaleIn: {
+  				'0%': {
+  					transform: 'scale(0.95)',
+  					opacity: '0'
+  				},
+  				'100%': {
+  					transform: 'scale(1)',
   					opacity: '1'
   				}
   			}

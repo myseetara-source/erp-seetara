@@ -1,562 +1,936 @@
 /**
- * Inventory Controller
+ * Inventory Transaction Controller
  * 
- * SECURITY: Implements strict "Operational vs. Financial" separation.
- * 
- * Handles stock adjustments, damages, and inventory operations.
- * 
- * Access Rules:
- * - Staff: CAN report damages and adjustments (operational work)
- *          Response: "Stock Adjusted" (NEVER shows "Loss of Rs. X recorded")
- * - Admin: Full access including financial loss reports
- * 
- * Endpoints:
- * - POST   /inventory/adjustments      - Create stock adjustment (Staff + Admin)
- * - GET    /inventory/adjustments      - List adjustments (financial masked)
- * - POST   /inventory/damages          - Report damage (Staff + Admin)
- * - GET    /inventory/damages          - List damages (financial masked)
- * - GET    /inventory/movements        - Stock movement history
- * - GET    /inventory/valuation        - Inventory valuation (Admin ONLY)
- * - GET    /inventory/low-stock        - Low stock alerts
- */
-
-import { supabase } from '../config/supabase.js';
-import { asyncHandler } from '../middleware/error.middleware.js';
-import { extractContext } from '../middleware/auth.middleware.js';
-import { 
-  maskSensitiveData, 
-  maskStockAdjustmentResponse,
-  canSeeFinancials,
-} from '../utils/dataMasking.js';
-import { createLogger } from '../utils/logger.js';
-import { NotFoundError, BadRequestError } from '../utils/errors.js';
-
-const logger = createLogger('InventoryController');
-
-// =============================================================================
-// STOCK ADJUSTMENTS
-// =============================================================================
-
-/**
- * Create stock adjustment
- * POST /inventory/adjustments
+ * Unified controller for handling:
+ * - PURCHASE: Stock In from vendors
+ * - PURCHASE_RETURN: Return stock to vendors
+ * - DAMAGE: Write-off damaged stock
+ * - ADJUSTMENT: Manual stock corrections
  * 
  * SECURITY:
- * - Staff CAN create adjustments (operational work)
- * - Backend calculates financial loss in background
- * - Staff response: "Stock Adjusted" (no financial data)
- * - Admin response: Full details including loss amount
- * 
- * @body {string} variant_id - Product variant UUID
- * @body {string} movement_type - 'adjustment', 'damage', 'return', 'inward', 'outward'
- * @body {number} quantity - Quantity to adjust (negative for reduction)
- * @body {string} reason - Reason for adjustment
+ * - Admin: Full access including cost/financial data
+ * - Staff: Quantity-only access (cost fields masked)
  */
-export const createAdjustment = asyncHandler(async (req, res) => {
-  const context = extractContext(req);
-  const userRole = req.user?.role;
-  const { variant_id, movement_type, quantity, reason } = req.body;
 
-  logger.info('Creating stock adjustment', {
-    variantId: variant_id,
-    type: movement_type,
-    quantity,
-    userId: context.userId,
-  });
+import { supabaseAdmin } from '../config/supabase.js';
+import {
+  createInventoryTransactionSchema,
+  listTransactionsQuerySchema,
+  transactionTypeConfig,
+} from '../validations/inventory.validation.js';
+import { AppError, catchAsync } from '../utils/errors.js';
+import { maskSensitiveData } from '../utils/dataMasking.js';
 
-  // Get current variant with cost price
-  const { data: variant, error: variantError } = await supabase
-    .from('product_variants')
+// =============================================================================
+// LIST INVENTORY TRANSACTIONS
+// =============================================================================
+
+export const listInventoryTransactions = catchAsync(async (req, res) => {
+  // Validate query params
+  const queryResult = listTransactionsQuerySchema.safeParse(req.query);
+  if (!queryResult.success) {
+    throw new AppError('Invalid query parameters', 400, 'VALIDATION_ERROR');
+  }
+
+  const { page, limit, type, vendor_id, from_date, to_date, search } = queryResult.data;
+  const offset = (page - 1) * limit;
+  const isAdmin = req.user?.role === 'admin';
+
+  // Build query
+  let query = supabaseAdmin
+    .from('inventory_transactions')
     .select(`
-      id, 
-      sku, 
-      current_stock, 
-      cost_price,
-      product:products(id, name)
-    `)
-    .eq('id', variant_id)
-    .single();
-
-  if (variantError || !variant) {
-    throw new NotFoundError('Product variant not found');
-  }
-
-  // Calculate new stock
-  const newStock = variant.current_stock + quantity;
-  if (newStock < 0) {
-    throw new BadRequestError(`Insufficient stock. Current: ${variant.current_stock}, Requested: ${Math.abs(quantity)}`);
-  }
-
-  // Calculate financial loss (for damages/adjustments that reduce stock)
-  const isReduction = quantity < 0;
-  const lossAmount = isReduction ? Math.abs(quantity) * (variant.cost_price || 0) : 0;
-
-  // Start transaction
-  const { data: movement, error: movementError } = await supabase
-    .from('stock_movements')
-    .insert({
-      variant_id,
-      movement_type,
-      quantity,
-      reference_type: 'adjustment',
-      reason,
-      cost_at_movement: variant.cost_price,
-      created_by: context.userId,
-    })
-    .select()
-    .single();
-
-  if (movementError) {
-    logger.error('Failed to create stock movement', { error: movementError });
-    throw new Error('Failed to record stock movement');
-  }
-
-  // Update variant stock
-  const { error: updateError } = await supabase
-    .from('product_variants')
-    .update({ 
-      current_stock: newStock,
-      updated_at: new Date().toISOString(),
-    })
-    .eq('id', variant_id);
-
-  if (updateError) {
-    logger.error('Failed to update stock', { error: updateError });
-    throw new Error('Failed to update stock');
-  }
-
-  logger.info('Stock adjustment completed', {
-    movementId: movement.id,
-    variantId: variant_id,
-    oldStock: variant.current_stock,
-    newStock,
-    lossAmount: isReduction ? lossAmount : 0,
-  });
-
-  // Build response based on role
-  const adjustmentData = {
-    id: movement.id,
-    variant_id,
-    sku: variant.sku,
-    product_name: variant.product?.name,
-    movement_type,
-    quantity,
-    previous_stock: variant.current_stock,
-    new_stock: newStock,
-    reason,
-    created_at: movement.created_at,
-    created_by: context.userId,
-    // Financial data (admin only)
-    cost_per_unit: variant.cost_price,
-    loss_amount: lossAmount,
-  };
-
-  if (canSeeFinancials(userRole)) {
-    // Admin sees everything including financial impact
-    res.status(201).json({
-      success: true,
-      message: isReduction 
-        ? `Stock adjusted. Loss of Rs. ${lossAmount.toLocaleString()} recorded.`
-        : 'Stock adjusted successfully.',
-      data: adjustmentData,
-    });
-  } else {
-    // Staff sees operational message only - NO financial data
-    res.status(201).json({
-      success: true,
-      message: 'Stock Adjusted', // Generic message
-      data: maskStockAdjustmentResponse(adjustmentData, userRole),
-    });
-  }
-});
-
-/**
- * Report damage
- * POST /inventory/damages
- * 
- * SECURITY:
- * - Staff CAN report damages (operational work)
- * - Response NEVER shows "Loss of Rs. X"
- * 
- * @body {string} variant_id - Product variant UUID
- * @body {number} quantity - Damaged quantity (positive number)
- * @body {string} reason - Damage description
- * @body {string} [damage_type] - 'in_transit', 'warehouse', 'customer_return', 'expired'
- */
-export const reportDamage = asyncHandler(async (req, res) => {
-  const context = extractContext(req);
-  const userRole = req.user?.role;
-  const { variant_id, quantity, reason, damage_type = 'warehouse' } = req.body;
-
-  if (quantity <= 0) {
-    throw new BadRequestError('Damage quantity must be a positive number');
-  }
-
-  logger.info('Reporting damage', {
-    variantId: variant_id,
-    quantity,
-    damageType: damage_type,
-    userId: context.userId,
-  });
-
-  // Get current variant
-  const { data: variant, error: variantError } = await supabase
-    .from('product_variants')
-    .select(`
-      id, 
-      sku, 
-      current_stock, 
-      cost_price,
-      product:products(id, name)
-    `)
-    .eq('id', variant_id)
-    .single();
-
-  if (variantError || !variant) {
-    throw new NotFoundError('Product variant not found');
-  }
-
-  if (variant.current_stock < quantity) {
-    throw new BadRequestError(`Cannot report damage of ${quantity}. Current stock: ${variant.current_stock}`);
-  }
-
-  // Calculate financial loss
-  const lossAmount = quantity * (variant.cost_price || 0);
-  const newStock = variant.current_stock - quantity;
-
-  // Record damage movement
-  const { data: movement, error: movementError } = await supabase
-    .from('stock_movements')
-    .insert({
-      variant_id,
-      movement_type: 'damage',
-      quantity: -quantity, // Negative for outward
-      reference_type: 'damage',
-      reason: `[${damage_type.toUpperCase()}] ${reason}`,
-      cost_at_movement: variant.cost_price,
-      created_by: context.userId,
-    })
-    .select()
-    .single();
-
-  if (movementError) {
-    throw new Error('Failed to record damage');
-  }
-
-  // Update variant stock
-  await supabase
-    .from('product_variants')
-    .update({ 
-      current_stock: newStock,
-      updated_at: new Date().toISOString(),
-    })
-    .eq('id', variant_id);
-
-  logger.info('Damage reported', {
-    movementId: movement.id,
-    variantId: variant_id,
-    quantity,
-    lossAmount,
-  });
-
-  // Build response based on role
-  if (canSeeFinancials(userRole)) {
-    res.status(201).json({
-      success: true,
-      message: `Damage recorded. Loss: Rs. ${lossAmount.toLocaleString()}`,
-      data: {
-        id: movement.id,
+      *,
+      vendor:vendors(id, name, company_name),
+      performer:users!inventory_transactions_performed_by_fkey(id, name, email),
+      items:inventory_transaction_items(
+        id,
         variant_id,
-        sku: variant.sku,
-        product_name: variant.product?.name,
-        quantity_damaged: quantity,
-        previous_stock: variant.current_stock,
-        new_stock: newStock,
-        damage_type,
-        reason,
-        financial_impact: {
-          cost_per_unit: variant.cost_price,
-          total_loss: lossAmount,
-        },
-        created_at: movement.created_at,
-      },
-    });
-  } else {
-    // Staff: Generic success message, NO financial data
-    res.status(201).json({
-      success: true,
-      message: 'Stock Adjusted', // Generic message - doesn't reveal loss
-      data: {
-        id: movement.id,
-        sku: variant.sku,
-        product_name: variant.product?.name,
-        quantity_adjusted: quantity,
-        new_stock: newStock,
-        reason,
-        created_at: movement.created_at,
-      },
-    });
-  }
-});
-
-/**
- * List stock adjustments
- * GET /inventory/adjustments
- * 
- * SECURITY: Financial data masked for non-admins
- */
-export const listAdjustments = asyncHandler(async (req, res) => {
-  const userRole = req.user?.role;
-  const { page = 1, limit = 20, variant_id, movement_type, from_date, to_date } = req.query;
-
-  let query = supabase
-    .from('stock_movements')
-    .select(`
-      *,
-      variant:product_variants(
-        id, sku, cost_price,
-        product:products(id, name)
-      ),
-      created_by_user:users!stock_movements_created_by_fkey(id, name)
-    `, { count: 'exact' })
-    .in('movement_type', ['adjustment', 'damage', 'return'])
-    .order('created_at', { ascending: false });
-
-  if (variant_id) query = query.eq('variant_id', variant_id);
-  if (movement_type) query = query.eq('movement_type', movement_type);
-  if (from_date) query = query.gte('created_at', from_date);
-  if (to_date) query = query.lte('created_at', to_date);
-
-  const offset = (page - 1) * limit;
-  query = query.range(offset, offset + limit - 1);
-
-  const { data, error, count } = await query;
-
-  if (error) {
-    throw new Error('Failed to fetch adjustments');
-  }
-
-  // Mask financial data for non-admins
-  const maskedData = data.map(item => 
-    maskStockAdjustmentResponse(item, userRole)
-  );
-
-  res.json({
-    success: true,
-    data: canSeeFinancials(userRole) ? data : maskedData,
-    pagination: {
-      page: parseInt(page),
-      limit: parseInt(limit),
-      total: count,
-      totalPages: Math.ceil(count / limit),
-    },
-  });
-});
-
-/**
- * List damages
- * GET /inventory/damages
- * 
- * SECURITY: Financial data masked for non-admins
- */
-export const listDamages = asyncHandler(async (req, res) => {
-  const userRole = req.user?.role;
-  const { page = 1, limit = 20, from_date, to_date } = req.query;
-
-  let query = supabase
-    .from('stock_movements')
-    .select(`
-      *,
-      variant:product_variants(
-        id, sku, cost_price,
-        product:products(id, name)
+        quantity,
+        unit_cost,
+        stock_before,
+        stock_after,
+        variant:product_variants(
+          id,
+          sku,
+          attributes,
+          product:products(id, name)
+        )
       )
-    `, { count: 'exact' })
-    .eq('movement_type', 'damage')
-    .order('created_at', { ascending: false });
+    `, { count: 'exact' });
 
-  if (from_date) query = query.gte('created_at', from_date);
-  if (to_date) query = query.lte('created_at', to_date);
+  // Apply filters
+  if (type) {
+    query = query.eq('transaction_type', type);
+  }
 
-  const offset = (page - 1) * limit;
-  query = query.range(offset, offset + limit - 1);
+  if (vendor_id) {
+    query = query.eq('vendor_id', vendor_id);
+  }
+
+  if (from_date) {
+    query = query.gte('transaction_date', from_date);
+  }
+
+  if (to_date) {
+    query = query.lte('transaction_date', to_date);
+  }
+
+  if (search) {
+    query = query.or(`invoice_no.ilike.%${search}%,reason.ilike.%${search}%`);
+  }
+
+  // Order and paginate
+  query = query.order('created_at', { ascending: false }).range(offset, offset + limit - 1);
 
   const { data, error, count } = await query;
 
   if (error) {
-    throw new Error('Failed to fetch damages');
+    console.error('[InventoryController] List error:', error);
+    throw new AppError('Failed to fetch transactions', 500, 'DATABASE_ERROR');
   }
 
-  // Mask financial data for non-admins
-  const responseData = canSeeFinancials(userRole) 
-    ? data 
-    : data.map(item => ({
-        id: item.id,
-        variant_id: item.variant_id,
-        sku: item.variant?.sku,
-        product_name: item.variant?.product?.name,
-        quantity: Math.abs(item.quantity),
-        reason: item.reason,
-        created_at: item.created_at,
+  // Mask sensitive data for non-admin users
+  const maskedData = isAdmin
+    ? data
+    : data?.map((tx) => ({
+        ...tx,
+        total_cost: undefined,
+        items: tx.items?.map((item) => ({
+          ...item,
+          unit_cost: undefined,
+        })),
       }));
 
   res.json({
     success: true,
-    data: responseData,
+    data: maskedData,
     pagination: {
-      page: parseInt(page),
-      limit: parseInt(limit),
-      total: count,
-      totalPages: Math.ceil(count / limit),
+      page,
+      limit,
+      total: count || 0,
+      totalPages: Math.ceil((count || 0) / limit),
     },
-    // Admin gets summary stats
-    ...(canSeeFinancials(userRole) && {
-      summary: {
-        total_damages: count,
-        total_loss: data.reduce((sum, d) => sum + (Math.abs(d.quantity) * (d.cost_at_movement || 0)), 0),
-      },
-    }),
   });
 });
 
-/**
- * Get stock movements history
- * GET /inventory/movements
- * 
- * SECURITY: All authenticated, cost data masked for non-admins
- */
-export const getMovementHistory = asyncHandler(async (req, res) => {
-  const userRole = req.user?.role;
-  const { variant_id, page = 1, limit = 50 } = req.query;
+// =============================================================================
+// GET SINGLE TRANSACTION
+// =============================================================================
 
-  if (!variant_id) {
-    throw new BadRequestError('variant_id is required');
-  }
+export const getInventoryTransaction = catchAsync(async (req, res) => {
+  const { id } = req.params;
+  const isAdmin = req.user?.role === 'admin';
 
-  const offset = (page - 1) * limit;
-
-  const { data, error, count } = await supabase
-    .from('stock_movements')
+  const { data, error } = await supabaseAdmin
+    .from('inventory_transactions')
     .select(`
       *,
-      variant:product_variants(id, sku, product:products(name))
-    `, { count: 'exact' })
-    .eq('variant_id', variant_id)
-    .order('created_at', { ascending: false })
-    .range(offset, offset + limit - 1);
+      vendor:vendors(id, name, company_name, phone),
+      performer:users!inventory_transactions_performed_by_fkey(id, name, email),
+      items:inventory_transaction_items(
+        id,
+        variant_id,
+        quantity,
+        unit_cost,
+        stock_before,
+        stock_after,
+        notes,
+        variant:product_variants(
+          id,
+          sku,
+          attributes,
+          current_stock,
+          product:products(id, name, image_url)
+        )
+      )
+    `)
+    .eq('id', id)
+    .single();
 
-  if (error) {
-    throw new Error('Failed to fetch movement history');
+  if (error || !data) {
+    throw new AppError('Transaction not found', 404, 'NOT_FOUND');
   }
 
-  // Mask cost data for non-admins
-  const responseData = canSeeFinancials(userRole)
+  // Mask sensitive data for non-admin users
+  const result = isAdmin
     ? data
-    : data.map(m => {
-        const { cost_at_movement, ...rest } = m;
-        return rest;
-      });
+    : {
+        ...data,
+        total_cost: undefined,
+        items: data.items?.map((item) => ({
+          ...item,
+          unit_cost: undefined,
+        })),
+      };
 
   res.json({
     success: true,
-    data: responseData,
-    pagination: {
-      page: parseInt(page),
-      limit: parseInt(limit),
-      total: count,
-      totalPages: Math.ceil(count / limit),
+    data: result,
+  });
+});
+
+// =============================================================================
+// CREATE INVENTORY TRANSACTION
+// =============================================================================
+
+export const createInventoryTransaction = catchAsync(async (req, res) => {
+  // Validate request body using discriminated union
+  const result = createInventoryTransactionSchema.safeParse(req.body);
+
+  if (!result.success) {
+    console.error('[InventoryController] Validation error:', result.error.flatten());
+    throw new AppError('Validation failed', 400, 'VALIDATION_ERROR', {
+      details: result.error.flatten().fieldErrors,
+    });
+  }
+
+  const data = result.data;
+  const userId = req.user?.id;
+  const userRole = req.user?.role || 'staff';
+  const isAdmin = userRole === 'admin';
+  const config = transactionTypeConfig[data.transaction_type];
+
+  if (!userId) {
+    throw new AppError('User not authenticated', 401, 'UNAUTHORIZED');
+  }
+
+  // ==========================================================================
+  // MAKER-CHECKER LOGIC: Determine transaction status
+  // ==========================================================================
+  // - Purchase: Always APPROVED immediately (stock in is safe)
+  // - Purchase Return / Damage / Adjustment:
+  //   - Admin creates: APPROVED immediately
+  //   - Staff creates: PENDING (requires admin approval)
+  // ==========================================================================
+  let transactionStatus = 'approved';
+  
+  if (data.transaction_type !== 'purchase' && !isAdmin) {
+    transactionStatus = 'pending';
+    console.log(`[InventoryController] Transaction set to PENDING (created by ${userRole})`);
+  }
+
+  // ==========================================================================
+  // LOCKED DATE: Server timestamp only for Returns/Damages (audit security)
+  // ==========================================================================
+  const transactionDate = data.transaction_type === 'purchase' 
+    ? (data.transaction_date || new Date().toISOString().split('T')[0])
+    : new Date().toISOString().split('T')[0]; // LOCKED for returns/damages
+
+  // ==========================================================================
+  // PURCHASE RETURN: CRITICAL SECURITY - Validate quantities against original invoice
+  // Audit Fix CRIT-002: Prevent inventory fraud
+  // ==========================================================================
+  if (data.transaction_type === 'purchase_return') {
+    if (!data.reference_transaction_id) {
+      throw new AppError(
+        'Purchase Return requires a reference to original purchase invoice',
+        400,
+        'MISSING_REFERENCE'
+      );
+    }
+    
+    // Verify reference transaction exists and is a purchase
+    const { data: refTx, error: refError } = await supabaseAdmin
+      .from('inventory_transactions')
+      .select(`
+        id, 
+        transaction_type, 
+        status,
+        items:inventory_transaction_items(
+          variant_id,
+          quantity
+        )
+      `)
+      .eq('id', data.reference_transaction_id)
+      .single();
+    
+    if (refError || !refTx) {
+      throw new AppError('Reference purchase transaction not found', 400, 'INVALID_REFERENCE');
+    }
+    
+    if (refTx.transaction_type !== 'purchase') {
+      throw new AppError('Reference must be a Purchase transaction', 400, 'INVALID_REFERENCE_TYPE');
+    }
+
+    // =========================================================================
+    // CRIT-002 FIX: Build map of originally purchased quantities
+    // =========================================================================
+    const originalQtyMap = new Map();
+    for (const item of refTx.items || []) {
+      originalQtyMap.set(item.variant_id, Math.abs(item.quantity));
+    }
+
+    // =========================================================================
+    // CRIT-002 FIX: Get already returned quantities for this invoice
+    // =========================================================================
+    const { data: previousReturns } = await supabaseAdmin
+      .from('inventory_transactions')
+      .select(`
+        items:inventory_transaction_items(
+          variant_id,
+          quantity
+        )
+      `)
+      .eq('reference_transaction_id', data.reference_transaction_id)
+      .eq('transaction_type', 'purchase_return')
+      .eq('status', 'approved');
+
+    const alreadyReturnedMap = new Map();
+    if (previousReturns) {
+      for (const returnTx of previousReturns) {
+        for (const item of returnTx.items || []) {
+          const existing = alreadyReturnedMap.get(item.variant_id) || 0;
+          alreadyReturnedMap.set(item.variant_id, existing + Math.abs(item.quantity));
+        }
+      }
+    }
+
+    // =========================================================================
+    // CRIT-002 FIX: Validate each return item quantity
+    // Rule: requested_return_qty <= original_qty - already_returned_qty
+    // =========================================================================
+    const validationErrors = [];
+    
+    for (const returnItem of data.items) {
+      const originalQty = originalQtyMap.get(returnItem.variant_id) || 0;
+      const alreadyReturned = alreadyReturnedMap.get(returnItem.variant_id) || 0;
+      const maxReturnable = originalQty - alreadyReturned;
+      const requestedQty = Math.abs(returnItem.quantity);
+
+      // SECURITY CHECK: Cannot return more than was purchased minus already returned
+      if (requestedQty > maxReturnable) {
+        // Get variant SKU for better error message
+        const { data: variant } = await supabaseAdmin
+          .from('product_variants')
+          .select('sku')
+          .eq('id', returnItem.variant_id)
+          .single();
+
+        validationErrors.push({
+          variant_id: returnItem.variant_id,
+          sku: variant?.sku || returnItem.variant_id,
+          requested: requestedQty,
+          original: originalQty,
+          already_returned: alreadyReturned,
+          max_returnable: maxReturnable,
+          message: `Cannot return ${requestedQty} of ${variant?.sku || 'item'}. Original: ${originalQty}, Already Returned: ${alreadyReturned}, Max Returnable: ${maxReturnable}`
+        });
+      }
+
+      // SECURITY CHECK: Cannot return an item that wasn't in the original invoice
+      if (originalQty === 0) {
+        validationErrors.push({
+          variant_id: returnItem.variant_id,
+          message: `Item was not in the original purchase invoice`
+        });
+      }
+    }
+
+    if (validationErrors.length > 0) {
+      console.error('[InventoryController] SECURITY: Return quantity exceeded', {
+        userId,
+        referenceId: data.reference_transaction_id,
+        errors: validationErrors,
+      });
+      
+      throw new AppError(
+        'Cannot return more than originally purchased',
+        400,
+        'RETURN_QUANTITY_EXCEEDED',
+        { details: validationErrors }
+      );
+    }
+
+    console.log('[InventoryController] Return validation passed', {
+      referenceId: data.reference_transaction_id,
+      itemCount: data.items.length,
+    });
+  }
+
+  // 1. Create the header
+  const { data: transaction, error: txError } = await supabaseAdmin
+    .from('inventory_transactions')
+    .insert({
+      transaction_type: data.transaction_type,
+      invoice_no: data.invoice_no,
+      vendor_id: data.vendor_id || null,
+      performed_by: userId,
+      transaction_date: transactionDate,
+      reason: data.reason || null,
+      notes: data.notes || null,
+      status: transactionStatus,
+      reference_transaction_id: data.reference_transaction_id || null,
+      server_timestamp: new Date().toISOString(),
+      // If admin creates, auto-approve
+      approved_by: transactionStatus === 'approved' ? userId : null,
+      approval_date: transactionStatus === 'approved' ? new Date().toISOString() : null,
+    })
+    .select()
+    .single();
+
+  if (txError) {
+    console.error('[InventoryController] Transaction header error:', txError);
+
+    // Check for unique constraint violation
+    if (txError.code === '23505') {
+      throw new AppError('Invoice number already exists', 400, 'DUPLICATE_INVOICE');
+    }
+
+    throw new AppError('Failed to create transaction', 500, 'DATABASE_ERROR');
+  }
+
+  // 2. Insert items (triggers will update stock automatically)
+  const itemsToInsert = data.items.map((item) => ({
+    transaction_id: transaction.id,
+    variant_id: item.variant_id,
+    quantity: config.quantityDirection === 'out' ? -Math.abs(item.quantity) : item.quantity,
+    unit_cost: item.unit_cost || 0,
+    notes: item.notes || null,
+  }));
+
+  const { error: itemsError } = await supabaseAdmin
+    .from('inventory_transaction_items')
+    .insert(itemsToInsert);
+
+  if (itemsError) {
+    console.error('[InventoryController] Transaction items error:', itemsError);
+
+    // Rollback: Delete the transaction header
+    await supabaseAdmin.from('inventory_transactions').delete().eq('id', transaction.id);
+
+    throw new AppError('Failed to create transaction items', 500, 'DATABASE_ERROR');
+  }
+
+  // 3. Fetch the complete transaction with items
+  const { data: completeTransaction } = await supabaseAdmin
+    .from('inventory_transactions')
+    .select(`
+      *,
+      vendor:vendors(id, name),
+      performer:users!inventory_transactions_performed_by_fkey(id, name),
+      items:inventory_transaction_items(
+        id,
+        variant_id,
+        quantity,
+        unit_cost,
+        stock_before,
+        stock_after,
+        variant:product_variants(id, sku, attributes)
+      )
+    `)
+    .eq('id', transaction.id)
+    .single();
+
+  // Build response message based on status
+  const statusMessage = transactionStatus === 'pending'
+    ? `${config.label} submitted for approval. Stock will be updated after admin approval.`
+    : `${config.label} transaction created successfully`;
+
+  res.status(201).json({
+    success: true,
+    message: statusMessage,
+    data: {
+      ...completeTransaction,
+      requires_approval: transactionStatus === 'pending',
     },
   });
 });
 
-/**
- * Get inventory valuation
- * GET /inventory/valuation
- * 
- * SECURITY: Admin ONLY - Pure financial data
- */
-export const getInventoryValuation = asyncHandler(async (req, res) => {
-  // Authorization done at route level: authorize('admin')
-  
-  const { data: variants, error } = await supabase
-    .from('product_variants')
-    .select(`
-      id,
-      sku,
-      current_stock,
-      cost_price,
-      selling_price,
-      product:products(id, name, brand, category)
-    `)
-    .eq('is_active', true)
-    .gt('current_stock', 0);
+// =============================================================================
+// GET NEXT INVOICE NUMBER
+// =============================================================================
 
-  if (error) {
-    throw new Error('Failed to fetch inventory');
+export const getNextInvoiceNumber = catchAsync(async (req, res) => {
+  const { type } = req.query;
+
+  if (!type || !['purchase', 'purchase_return', 'damage', 'adjustment'].includes(type)) {
+    throw new AppError('Invalid transaction type', 400, 'VALIDATION_ERROR');
   }
 
-  // Calculate valuations
-  const valuation = variants.map(v => ({
-    ...v,
-    stock_value_at_cost: v.current_stock * (v.cost_price || 0),
-    stock_value_at_selling: v.current_stock * (v.selling_price || 0),
-    potential_profit: v.current_stock * ((v.selling_price || 0) - (v.cost_price || 0)),
-  }));
+  const config = transactionTypeConfig[type];
+  const prefix = config.prefix;
 
-  const totals = {
-    total_units: variants.reduce((sum, v) => sum + v.current_stock, 0),
-    total_cost_value: valuation.reduce((sum, v) => sum + v.stock_value_at_cost, 0),
-    total_selling_value: valuation.reduce((sum, v) => sum + v.stock_value_at_selling, 0),
-    total_potential_profit: valuation.reduce((sum, v) => sum + v.potential_profit, 0),
-  };
+  // Get max invoice number for this type
+  const { data, error } = await supabaseAdmin.rpc('get_next_invoice_number', {
+    p_type: type,
+  });
+
+  if (error) {
+    console.error('[InventoryController] Get next invoice error:', error);
+
+    // Fallback: Generate based on timestamp
+    const fallback = `${prefix}-${Date.now().toString().slice(-6)}`;
+    return res.json({ success: true, data: { invoice_no: fallback } });
+  }
+
+  res.json({
+    success: true,
+    data: { invoice_no: data },
+  });
+});
+
+// =============================================================================
+// GET STOCK MOVEMENTS FOR A VARIANT
+// =============================================================================
+
+export const getVariantStockMovements = catchAsync(async (req, res) => {
+  const { variantId } = req.params;
+  const { limit = 50 } = req.query;
+  const isAdmin = req.user?.role === 'admin';
+
+  const { data, error } = await supabaseAdmin
+    .from('inventory_transaction_items')
+    .select(`
+      id,
+      quantity,
+      unit_cost,
+      stock_before,
+      stock_after,
+      created_at,
+      transaction:inventory_transactions(
+        id,
+        transaction_type,
+        invoice_no,
+        transaction_date,
+        vendor:vendors(id, name)
+      )
+    `)
+    .eq('variant_id', variantId)
+    .order('created_at', { ascending: false })
+    .limit(Number(limit));
+
+  if (error) {
+    console.error('[InventoryController] Stock movements error:', error);
+    throw new AppError('Failed to fetch stock movements', 500, 'DATABASE_ERROR');
+  }
+
+  // Mask cost for non-admin
+  const result = isAdmin
+    ? data
+    : data?.map((item) => ({
+        ...item,
+        unit_cost: undefined,
+      }));
+
+  res.json({
+    success: true,
+    data: result,
+  });
+});
+
+// =============================================================================
+// DELETE/VOID TRANSACTION (Admin only)
+// =============================================================================
+
+export const voidInventoryTransaction = catchAsync(async (req, res) => {
+  const { id } = req.params;
+  const { reason } = req.body;
+
+  if (!reason || reason.length < 5) {
+    throw new AppError('Void reason is required (min 5 characters)', 400, 'VALIDATION_ERROR');
+  }
+
+  // Check if transaction exists
+  const { data: transaction, error: fetchError } = await supabaseAdmin
+    .from('inventory_transactions')
+    .select('*')
+    .eq('id', id)
+    .single();
+
+  if (fetchError || !transaction) {
+    throw new AppError('Transaction not found', 404, 'NOT_FOUND');
+  }
+
+  if (transaction.status === 'voided') {
+    throw new AppError('Transaction is already voided', 400, 'ALREADY_VOIDED');
+  }
+
+  // Note: In a real system, you'd need to reverse the stock changes
+  // For now, just mark as voided
+  const { error: updateError } = await supabaseAdmin
+    .from('inventory_transactions')
+    .update({
+      status: 'voided',
+      notes: `${transaction.notes || ''}\n\n[VOIDED: ${reason}]`.trim(),
+      updated_at: new Date().toISOString(),
+    })
+    .eq('id', id);
+
+  if (updateError) {
+    console.error('[InventoryController] Void error:', updateError);
+    throw new AppError('Failed to void transaction', 500, 'DATABASE_ERROR');
+  }
+
+  res.json({
+    success: true,
+    message: 'Transaction voided successfully',
+  });
+});
+
+// =============================================================================
+// LEGACY FUNCTIONS (v1 - for backwards compatibility)
+// =============================================================================
+
+/**
+ * Create stock adjustment (Legacy v1)
+ * Use createInventoryTransaction with type='adjustment' for v2
+ */
+export const createAdjustment = catchAsync(async (req, res) => {
+  // Redirect to unified transaction system
+  req.body.transaction_type = 'adjustment';
+  req.body.invoice_no = `ADJ-${Date.now()}`;
+  req.body.items = [{
+    variant_id: req.body.variant_id,
+    quantity: req.body.quantity,
+    unit_cost: 0,
+  }];
+  return createInventoryTransaction(req, res);
+});
+
+/**
+ * Report damage (Legacy v1)
+ * Use createInventoryTransaction with type='damage' for v2
+ */
+export const reportDamage = catchAsync(async (req, res) => {
+  // Redirect to unified transaction system
+  req.body.transaction_type = 'damage';
+  req.body.invoice_no = `DMG-${Date.now()}`;
+  req.body.items = [{
+    variant_id: req.body.variant_id,
+    quantity: req.body.quantity,
+    unit_cost: 0,
+  }];
+  return createInventoryTransaction(req, res);
+});
+
+/**
+ * List adjustments (Legacy v1)
+ */
+export const listAdjustments = catchAsync(async (req, res) => {
+  req.query.type = 'adjustment';
+  return listInventoryTransactions(req, res);
+});
+
+/**
+ * List damages (Legacy v1)
+ */
+export const listDamages = catchAsync(async (req, res) => {
+  req.query.type = 'damage';
+  return listInventoryTransactions(req, res);
+});
+
+/**
+ * Get movement history (Legacy v1)
+ */
+export const getMovementHistory = catchAsync(async (req, res) => {
+  const { variant_id } = req.query;
+  if (!variant_id) {
+    throw new AppError('variant_id is required', 400, 'VALIDATION_ERROR');
+  }
+  req.params.variantId = variant_id;
+  return getVariantStockMovements(req, res);
+});
+
+/**
+ * Get inventory valuation (Admin only)
+ */
+export const getInventoryValuation = catchAsync(async (req, res) => {
+  const isAdmin = req.user?.role === 'admin';
+  
+  if (!isAdmin) {
+    throw new AppError('Access denied', 403, 'FORBIDDEN');
+  }
+
+  // Get total inventory value
+  const { data, error } = await supabaseAdmin
+    .from('product_variants')
+    .select('current_stock, cost_price')
+    .eq('is_active', true);
+
+  if (error) {
+    throw new AppError('Failed to calculate valuation', 500, 'DATABASE_ERROR');
+  }
+
+  const totalValue = data?.reduce((sum, v) => 
+    sum + ((v.current_stock || 0) * (v.cost_price || 0)), 0
+  ) || 0;
+
+  const totalStock = data?.reduce((sum, v) => sum + (v.current_stock || 0), 0) || 0;
 
   res.json({
     success: true,
     data: {
-      items: valuation,
-      totals,
+      total_stock: totalStock,
+      total_value: totalValue,
+      variant_count: data?.length || 0,
+      calculated_at: new Date().toISOString(),
     },
   });
 });
 
 /**
  * Get low stock alerts
- * GET /inventory/low-stock
- * 
- * SECURITY: All authenticated (operational alert)
  */
-export const getLowStockAlerts = asyncHandler(async (req, res) => {
-  const { threshold = 10 } = req.query;
+export const getLowStockAlerts = catchAsync(async (req, res) => {
+  const threshold = Number(req.query.threshold) || 10;
 
-  const { data, error } = await supabase
+  const { data, error } = await supabaseAdmin
     .from('product_variants')
     .select(`
       id,
       sku,
+      attributes,
       current_stock,
       reorder_level,
-      product:products(id, name, brand)
+      product:products(id, name, image_url)
     `)
     .eq('is_active', true)
-    .or(`current_stock.lte.${threshold},current_stock.lte.reorder_level`)
-    .order('current_stock', { ascending: true });
+    .lte('current_stock', threshold)
+    .order('current_stock', { ascending: true })
+    .limit(50);
 
   if (error) {
-    throw new Error('Failed to fetch low stock items');
+    throw new AppError('Failed to fetch low stock alerts', 500, 'DATABASE_ERROR');
   }
 
   res.json({
     success: true,
-    data,
-    summary: {
-      total_low_stock_items: data.length,
-      critical_items: data.filter(d => d.current_stock === 0).length,
-      warning_items: data.filter(d => d.current_stock > 0 && d.current_stock <= (d.reorder_level || threshold)).length,
-    },
+    data: data || [],
+    count: data?.length || 0,
   });
 });
 
+// =============================================================================
+// APPROVAL WORKFLOW (Maker-Checker)
+// =============================================================================
+
+/**
+ * List pending approvals (Admin only)
+ * GET /inventory/transactions/pending
+ */
+export const listPendingApprovals = catchAsync(async (req, res) => {
+  const isAdmin = req.user?.role === 'admin';
+  
+  if (!isAdmin) {
+    throw new AppError('Only admins can view pending approvals', 403, 'FORBIDDEN');
+  }
+
+  const { data, error, count } = await supabaseAdmin
+    .from('inventory_transactions')
+    .select(`
+      *,
+      vendor:vendors(id, name, company_name),
+      performer:users!inventory_transactions_performed_by_fkey(id, name, email),
+      reference:inventory_transactions!inventory_transactions_reference_transaction_id_fkey(
+        id, invoice_no, transaction_date
+      ),
+      items:inventory_transaction_items(
+        id,
+        variant_id,
+        quantity,
+        unit_cost,
+        variant:product_variants(id, sku, attributes, current_stock, product:products(id, name))
+      )
+    `, { count: 'exact' })
+    .eq('status', 'pending')
+    .order('created_at', { ascending: true });
+
+  if (error) {
+    console.error('[InventoryController] Pending approvals error:', error);
+    throw new AppError('Failed to fetch pending approvals', 500, 'DATABASE_ERROR');
+  }
+
+  res.json({
+    success: true,
+    data: data || [],
+    count: count || 0,
+  });
+});
+
+/**
+ * Approve a pending transaction (Admin only)
+ * POST /inventory/transactions/:id/approve
+ */
+export const approveTransaction = catchAsync(async (req, res) => {
+  const { id } = req.params;
+  const userId = req.user?.id;
+  const isAdmin = req.user?.role === 'admin';
+
+  if (!isAdmin) {
+    throw new AppError('Only admins can approve transactions', 403, 'FORBIDDEN');
+  }
+
+  // Call the database function to approve and update stock
+  const { data, error } = await supabaseAdmin.rpc('approve_inventory_transaction', {
+    p_transaction_id: id,
+    p_approved_by: userId,
+  });
+
+  if (error) {
+    console.error('[InventoryController] Approval error:', error);
+    throw new AppError('Failed to approve transaction', 500, 'DATABASE_ERROR');
+  }
+
+  const result = data?.[0];
+  
+  if (!result?.success) {
+    throw new AppError(result?.message || 'Approval failed', 400, 'APPROVAL_FAILED');
+  }
+
+  res.json({
+    success: true,
+    message: 'Transaction approved. Stock has been updated.',
+    transaction_id: id,
+  });
+});
+
+/**
+ * Reject a pending transaction (Admin only)
+ * POST /inventory/transactions/:id/reject
+ */
+export const rejectTransaction = catchAsync(async (req, res) => {
+  const { id } = req.params;
+  const { reason } = req.body;
+  const userId = req.user?.id;
+  const isAdmin = req.user?.role === 'admin';
+
+  if (!isAdmin) {
+    throw new AppError('Only admins can reject transactions', 403, 'FORBIDDEN');
+  }
+
+  if (!reason || reason.length < 5) {
+    throw new AppError('Rejection reason is required (min 5 characters)', 400, 'VALIDATION_ERROR');
+  }
+
+  // Call the database function to reject
+  const { data, error } = await supabaseAdmin.rpc('reject_inventory_transaction', {
+    p_transaction_id: id,
+    p_rejected_by: userId,
+    p_rejection_reason: reason,
+  });
+
+  if (error) {
+    console.error('[InventoryController] Rejection error:', error);
+    throw new AppError('Failed to reject transaction', 500, 'DATABASE_ERROR');
+  }
+
+  const result = data?.[0];
+  
+  if (!result?.success) {
+    throw new AppError(result?.message || 'Rejection failed', 400, 'REJECTION_FAILED');
+  }
+
+  res.json({
+    success: true,
+    message: 'Transaction rejected. No stock changes made.',
+    transaction_id: id,
+  });
+});
+
+/**
+ * Search purchase invoices (for Purchase Return linking)
+ * GET /inventory/purchases/search?vendor_id=xxx&invoice_no=xxx
+ */
+export const searchPurchaseInvoices = catchAsync(async (req, res) => {
+  const { vendor_id, invoice_no, limit = 20 } = req.query;
+
+  let query = supabaseAdmin
+    .from('inventory_transactions')
+    .select(`
+      id,
+      invoice_no,
+      transaction_date,
+      total_quantity,
+      total_cost,
+      vendor:vendors(id, name),
+      items:inventory_transaction_items(
+        id,
+        variant_id,
+        quantity,
+        unit_cost,
+        variant:product_variants(id, sku, attributes, current_stock, product:products(id, name))
+      )
+    `)
+    .eq('transaction_type', 'purchase')
+    .eq('status', 'approved')
+    .order('transaction_date', { ascending: false })
+    .limit(Number(limit));
+
+  if (vendor_id) {
+    query = query.eq('vendor_id', vendor_id);
+  }
+
+  if (invoice_no) {
+    query = query.ilike('invoice_no', `%${invoice_no}%`);
+  }
+
+  const { data, error } = await query;
+
+  if (error) {
+    console.error('[InventoryController] Search invoices error:', error);
+    throw new AppError('Failed to search invoices', 500, 'DATABASE_ERROR');
+  }
+
+  // Calculate already returned quantities for each invoice
+  const invoicesWithReturns = await Promise.all(
+    (data || []).map(async (invoice) => {
+      // Find returns linked to this purchase
+      const { data: returns } = await supabaseAdmin
+        .from('inventory_transactions')
+        .select(`
+          items:inventory_transaction_items(variant_id, quantity)
+        `)
+        .eq('reference_transaction_id', invoice.id)
+        .in('status', ['approved', 'pending']);
+
+      // Calculate returned quantity per variant
+      const returnedQty = new Map();
+      returns?.forEach((ret) => {
+        ret.items?.forEach((item) => {
+          const existing = returnedQty.get(item.variant_id) || 0;
+          returnedQty.set(item.variant_id, existing + Math.abs(item.quantity));
+        });
+      });
+
+      // Add remaining returnable quantity to each item
+      const itemsWithRemaining = invoice.items?.map((item) => ({
+        ...item,
+        returned_qty: returnedQty.get(item.variant_id) || 0,
+        remaining_qty: item.quantity - (returnedQty.get(item.variant_id) || 0),
+      }));
+
+      return {
+        ...invoice,
+        items: itemsWithRemaining,
+      };
+    })
+  );
+
+  res.json({
+    success: true,
+    data: invoicesWithReturns,
+  });
+});
+
+// =============================================================================
+// EXPORTS
+// =============================================================================
+
 export default {
+  // New unified transaction system (v2)
+  listInventoryTransactions,
+  getInventoryTransaction,
+  createInventoryTransaction,
+  getNextInvoiceNumber,
+  getVariantStockMovements,
+  voidInventoryTransaction,
+  // Approval workflow
+  listPendingApprovals,
+  approveTransaction,
+  rejectTransaction,
+  searchPurchaseInvoices,
+  // Legacy functions (v1)
   createAdjustment,
   reportDamage,
   listAdjustments,

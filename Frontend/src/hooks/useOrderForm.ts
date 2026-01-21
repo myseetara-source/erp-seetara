@@ -36,6 +36,9 @@ export const QuickOrderSchema = z.object({
     sku: z.string().optional(),
     quantity: z.number().int().min(1, 'Min 1'),
     unit_price: z.number().min(0),
+    // Shipping rates for "Highest Shipping" calculation
+    shipping_inside: z.number().min(0).optional().default(100),
+    shipping_outside: z.number().min(0).optional().default(150),
   })).min(1, 'Add at least one product'),
   delivery_charge: z.number().min(0).default(0),
   discount_amount: z.number().min(0).default(0),
@@ -141,6 +144,9 @@ export interface ProductOption {
   stock: number;
   image_url?: string;
   attributes?: Record<string, string>;
+  // Shipping rates per product
+  shipping_inside?: number;
+  shipping_outside?: number;
 }
 
 // =============================================================================
@@ -217,19 +223,73 @@ function transformToPayload(data: QuickOrderFormData | FullOrderFormData, mode: 
 }
 
 // =============================================================================
-// MAIN HOOK
+// MAIN HOOK - Type Safe (Audit Fix CRIT-006)
 // =============================================================================
+
+import type { 
+  OrderStatus,
+  FulfillmentType,
+  PaymentMethod,
+  VariantAttributes 
+} from '@/types';
+
+/**
+ * Created Order Response from API
+ */
+export interface CreatedOrderResponse {
+  id: string;
+  order_number: string;
+  status: OrderStatus;
+  total: number;
+  created_at: string;
+  customer?: {
+    id: string;
+    name: string;
+    phone: string;
+  };
+}
+
+/**
+ * Order Item for form field array
+ */
+export interface OrderFormItem {
+  variant_id: string;
+  product_name?: string;
+  variant_name?: string;
+  sku?: string;
+  quantity: number;
+  unit_price: number;
+  discount_percent?: number;
+  shipping_inside?: number;
+  shipping_outside?: number;
+  attributes?: VariantAttributes;
+}
+
+/**
+ * Axios Error shape for type-safe error handling
+ */
+interface AxiosErrorShape {
+  code?: string;
+  message?: string;
+  response?: {
+    status?: number;
+    data?: {
+      message?: string;
+      error?: { code?: string; message?: string };
+    };
+  };
+}
 
 interface UseOrderFormOptions {
   mode: OrderFormMode;
-  onSuccess?: (order: any) => void;
+  onSuccess?: (order: CreatedOrderResponse) => void;
   onError?: (error: Error) => void;
 }
 
-interface UseOrderFormReturn<T> {
+interface UseOrderFormReturn<T extends QuickOrderFormData | FullOrderFormData> {
   form: UseFormReturn<T>;
-  items: any;
-  appendItem: (item: any) => void;
+  items: OrderFormItem[];
+  appendItem: (item: OrderFormItem) => void;
   removeItem: (index: number) => void;
   updateItemQuantity: (index: number, quantity: number) => void;
   
@@ -247,12 +307,15 @@ interface UseOrderFormReturn<T> {
   isSubmitting: boolean;
   isSuccess: boolean;
   error: string | null;
-  createdOrder: any | null;
+  createdOrder: CreatedOrderResponse | null;
   
   // Utils
   resetForm: () => void;
   mode: OrderFormMode;
 }
+
+// Type guard for item arrays
+type FormItemArray = QuickOrderFormData['items'] | FullOrderFormData['items'];
 
 export function useOrderForm<T extends QuickOrderFormData | FullOrderFormData>(
   options: UseOrderFormOptions
@@ -261,38 +324,42 @@ export function useOrderForm<T extends QuickOrderFormData | FullOrderFormData>(
   
   // Determine schema and defaults based on mode
   const schema = mode === 'quick' ? QuickOrderSchema : FullOrderSchema;
-  const defaultValues = mode === 'quick' ? quickOrderDefaults : fullOrderDefaults;
+  const defaultValues = (mode === 'quick' ? quickOrderDefaults : fullOrderDefaults) as T;
   
   // Form state
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isSuccess, setIsSuccess] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [createdOrder, setCreatedOrder] = useState<any | null>(null);
+  const [createdOrder, setCreatedOrder] = useState<CreatedOrderResponse | null>(null);
   const [isSearching, setIsSearching] = useState(false);
   
-  // Initialize form
+  // Initialize form with explicit typing
+  // Note: zodResolver type inference is complex, using type assertion for compatibility
   const form = useForm<T>({
-    resolver: zodResolver(schema as any),
-    defaultValues: defaultValues as any,
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    resolver: zodResolver(schema) as any,
+    defaultValues,
     mode: 'onChange',
   });
   
-  // Items array management
+  // Items array management with explicit path typing
   const { fields: items, append, remove, update } = useFieldArray({
     control: form.control,
-    name: 'items' as any,
+    name: 'items' as const,
   });
   
-  // Watch items for calculations
-  const watchedItems = form.watch('items' as any) || [];
-  const watchedDelivery = form.watch('delivery_charge' as any) || 0;
-  const watchedDiscount = form.watch('discount_amount' as any) || 0;
-  const watchedPrepaid = form.watch('prepaid_amount' as any) || 0;
+  // Watch items for calculations with type safety
+  const watchedItems = (form.watch('items' as keyof T) || []) as FormItemArray;
+  const watchedDelivery = (form.watch('delivery_charge' as keyof T) || 0) as number;
+  const watchedDiscount = (form.watch('discount_amount' as keyof T) || 0) as number;
+  const watchedPrepaid = (form.watch('prepaid_amount' as keyof T) || 0) as number;
   
-  // Calculations
+  // Calculations with proper typing
   const subtotal = useMemo(() => {
-    return (watchedItems as any[]).reduce((sum, item) => {
-      return sum + ((item?.quantity || 0) * (item?.unit_price || 0));
+    return watchedItems.reduce((sum: number, item) => {
+      const qty = item?.quantity || 0;
+      const price = item?.unit_price || 0;
+      return sum + (qty * price);
     }, 0);
   }, [watchedItems]);
   
@@ -304,16 +371,20 @@ export function useOrderForm<T extends QuickOrderFormData | FullOrderFormData>(
     return Math.max(0, total - watchedPrepaid);
   }, [total, watchedPrepaid]);
   
-  // Append item helper
-  const appendItem = useCallback((item: {
-    variant_id: string;
-    product_name?: string;
-    variant_name?: string;
-    sku?: string;
-    quantity: number;
-    unit_price: number;
-  }) => {
-    append(item as any);
+  // Append item helper with proper typing
+  const appendItem = useCallback((item: OrderFormItem) => {
+    const formItem = {
+      variant_id: item.variant_id,
+      product_name: item.product_name,
+      variant_name: item.variant_name,
+      sku: item.sku,
+      quantity: item.quantity,
+      unit_price: item.unit_price,
+      shipping_inside: item.shipping_inside ?? 100,
+      shipping_outside: item.shipping_outside ?? 150,
+    };
+    // Type assertion needed due to react-hook-form generics complexity
+    append(formItem as Parameters<typeof append>[0]);
   }, [append]);
   
   // Remove item
@@ -321,11 +392,11 @@ export function useOrderForm<T extends QuickOrderFormData | FullOrderFormData>(
     remove(index);
   }, [remove]);
   
-  // Update item quantity
+  // Update item quantity with proper typing
   const updateItemQuantity = useCallback((index: number, quantity: number) => {
     const currentItem = watchedItems[index];
     if (currentItem) {
-      update(index, { ...currentItem, quantity } as any);
+      update(index, { ...currentItem, quantity } as Parameters<typeof update>[1]);
     }
   }, [update, watchedItems]);
   
@@ -356,6 +427,9 @@ export function useOrderForm<T extends QuickOrderFormData | FullOrderFormData>(
               stock: variant.current_stock || 0,
               image_url: product.image_url,
               attributes: variant.attributes,
+              // Include product-level shipping rates for "Highest Shipping" calculation
+              shipping_inside: product.shipping_inside ?? 100,
+              shipping_outside: product.shipping_outside ?? 150,
             });
           }
         }
@@ -405,22 +479,25 @@ export function useOrderForm<T extends QuickOrderFormData | FullOrderFormData>(
       } else {
         throw new Error(response.data.message || 'Failed to create order');
       }
-    } catch (err: any) {
+    } catch (err: unknown) {
+      // Type-safe error handling (Audit Fix CRIT-006)
+      const axiosError = err as AxiosErrorShape;
+      
       let errorMessage: string;
       
-      if (err.code === 'ERR_NETWORK') {
+      if (axiosError.code === 'ERR_NETWORK') {
         errorMessage = 'Connection failed. Order NOT saved.';
-      } else if (err.response?.status === 400) {
-        errorMessage = err.response?.data?.message || 'Validation failed';
-      } else if (err.response?.data?.error?.code === 'INSUFFICIENT_STOCK') {
+      } else if (axiosError.response?.status === 400) {
+        errorMessage = axiosError.response?.data?.message || 'Validation failed';
+      } else if (axiosError.response?.data?.error?.code === 'INSUFFICIENT_STOCK') {
         errorMessage = 'Insufficient stock available';
       } else {
-        errorMessage = err.message || 'Failed to create order';
+        errorMessage = axiosError.message || 'Failed to create order';
       }
       
       setError(errorMessage);
       toast.error('Order Failed', { description: errorMessage });
-      onError?.(err);
+      onError?.(err instanceof Error ? err : new Error(errorMessage));
     } finally {
       setIsSubmitting(false);
     }
@@ -428,7 +505,7 @@ export function useOrderForm<T extends QuickOrderFormData | FullOrderFormData>(
   
   // Reset form
   const resetForm = useCallback(() => {
-    form.reset(defaultValues as any);
+    form.reset(defaultValues);
     setIsSuccess(false);
     setError(null);
     setCreatedOrder(null);

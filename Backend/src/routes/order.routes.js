@@ -24,13 +24,13 @@ import { paginationSchema } from '../validations/common.validation.js';
 const router = Router();
 
 // =============================================================================
-// PUBLIC ROUTES (for development/demo - move these behind auth in production)
+// PROTECTED ROUTES - All order routes require authentication
 // =============================================================================
 
-// List orders - PUBLIC for demo purposes
-// In production, move this behind authenticate middleware
+// List orders - PROTECTED (Audit Fix CRIT-001)
 router.get(
   '/',
+  authenticate,
   validateQuery(orderListQuerySchema),
   orderController.listOrders
 );

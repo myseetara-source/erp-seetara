@@ -10,7 +10,7 @@ import {
   uploadMultipleFiles,
   deleteFile,
 } from '../controllers/upload.controller.js';
-// import { authenticate } from '../middleware/auth.middleware.js';
+import { authenticate } from '../middleware/auth.middleware.js'; // Audit Fix CRIT-005: Enabled auth
 
 const router = Router();
 
@@ -53,8 +53,8 @@ const upload = multer({
 // ROUTES
 // =============================================================================
 
-// All routes require authentication in production
-// router.use(authenticate);
+// Audit Fix CRIT-005: All upload routes require authentication
+router.use(authenticate);
 
 /**
  * @route   POST /upload

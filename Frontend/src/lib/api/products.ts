@@ -43,6 +43,9 @@ export interface Product {
   variants?: ProductVariant[];
   total_stock?: number;
   variant_count?: number;
+  // Shipping rates (null = use global defaults)
+  shipping_inside?: number | null;
+  shipping_outside?: number | null;
 }
 
 export interface CreateProductData {

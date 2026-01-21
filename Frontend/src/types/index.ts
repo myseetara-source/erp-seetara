@@ -170,22 +170,24 @@ export interface AttributeField {
 /**
  * Order Status - State machine values
  * Extended for Nepal logistics
+ * MUST MATCH: Backend/database/FINAL_PRODUCTION_SCHEMA.sql order_status enum
  */
 export type OrderStatus = 
   | 'intake'
+  | 'follow_up'              // FIXED: was 'followup'
   | 'converted'
-  | 'followup'
   | 'hold'
   | 'packed'
-  | 'out_for_delivery'      // Inside Valley: Rider has the order
-  | 'handover_to_courier'   // Outside Valley: Given to logistics
-  | 'in_transit'            // Outside Valley: Courier is delivering
-  | 'shipped'               // Legacy status
-  | 'store_sale'            // Store: Immediate sale
+  | 'assigned'               // Rider assigned
+  | 'out_for_delivery'       // Inside Valley: Rider has the order
+  | 'handover_to_courier'    // Outside Valley: Given to logistics
+  | 'in_transit'             // Outside Valley: Courier is delivering
+  | 'store_sale'             // Store: Immediate sale
   | 'delivered'
   | 'cancelled'
-  | 'refund'
-  | 'return';
+  | 'rejected'               // Customer rejected
+  | 'return_initiated'       // Return requested
+  | 'returned';              // Return completed
 
 /**
  * Order Source - Channel where order originated
@@ -193,6 +195,8 @@ export type OrderStatus =
 export type OrderSource = 
   | 'manual'
   | 'website'
+  | 'facebook'
+  | 'instagram'
   | 'store'
   | 'todaytrend'
   | 'seetara'
@@ -202,16 +206,22 @@ export type OrderSource =
 
 /**
  * Fulfillment Type - Nepal logistics context
+ * MUST MATCH: Backend config.fulfillmentTypes
  */
 export type FulfillmentType = 
   | 'inside_valley'   // Delivered by our own riders (Kathmandu, Lalitpur, Bhaktapur)
   | 'outside_valley'  // Handed over to 3rd party courier
-  | 'store_pickup';   // Walk-in customers, immediate handover
+  | 'store';          // FIXED: was 'store_pickup' - Walk-in customers
 
 /**
  * Payment Status
  */
-export type PaymentStatus = 'pending' | 'partial' | 'paid' | 'refunded';
+export type PaymentStatus = 'pending' | 'partial' | 'paid' | 'refunded' | 'cod';
+
+/**
+ * Payment Method
+ */
+export type PaymentMethod = 'cod' | 'esewa' | 'khalti' | 'bank_transfer' | 'cash';
 
 /**
  * Order Item - Line item in an order
@@ -454,4 +464,296 @@ export interface ColumnDef<T> {
   className?: string;
   sortable?: boolean;
   hidden?: boolean;
+}
+
+// =============================================================================
+// INVENTORY TRANSACTION TYPES
+// =============================================================================
+
+/**
+ * Transaction Type
+ * MUST MATCH: Backend inventory_transaction_type enum
+ */
+export type TransactionType = 
+  | 'purchase'
+  | 'purchase_return'
+  | 'damage'
+  | 'adjustment';
+
+/**
+ * Transaction Status (Maker-Checker workflow)
+ */
+export type TransactionStatus = 
+  | 'pending'
+  | 'approved'
+  | 'rejected'
+  | 'voided';
+
+/**
+ * Stock Source Type (Dual-Bucket)
+ */
+export type StockSourceType = 'fresh' | 'damaged';
+
+/**
+ * Inventory Transaction Item
+ */
+export interface InventoryTransactionItem {
+  id: string;
+  transaction_id: string;
+  variant_id: string;
+  quantity: number;
+  unit_cost?: number;
+  stock_before?: number;
+  stock_after?: number;
+  source_type?: StockSourceType;
+  notes?: string | null;
+  
+  // Joined data
+  variant?: ProductVariant & {
+    product?: Product;
+  };
+}
+
+/**
+ * Inventory Transaction
+ */
+export interface InventoryTransaction {
+  id: string;
+  transaction_type: TransactionType;
+  invoice_no: string;
+  vendor_id?: string | null;
+  performed_by: string;
+  transaction_date: string;
+  reason?: string | null;
+  notes?: string | null;
+  status: TransactionStatus;
+  reference_transaction_id?: string | null;
+  total_quantity?: number;
+  total_cost?: number;
+  server_timestamp: string;
+  approved_by?: string | null;
+  approval_date?: string | null;
+  rejection_reason?: string | null;
+  created_at: string;
+  updated_at?: string;
+  
+  // Joined data
+  vendor?: Vendor;
+  performer?: User;
+  approver?: User;
+  items?: InventoryTransactionItem[];
+  reference?: InventoryTransaction;
+}
+
+// =============================================================================
+// USER TYPES
+// =============================================================================
+
+/**
+ * User Role
+ */
+export type UserRole = 'admin' | 'manager' | 'operator' | 'vendor' | 'rider' | 'viewer';
+
+/**
+ * User
+ */
+export interface User {
+  id: string;
+  email: string;
+  name: string;
+  role: UserRole;
+  phone?: string | null;
+  avatar_url?: string | null;
+  is_active: boolean;
+  created_at: string;
+  updated_at?: string;
+}
+
+// =============================================================================
+// FORM TYPES (Type-safe form handling)
+// =============================================================================
+
+/**
+ * Order Form Item - Used in order creation forms
+ */
+export interface OrderFormItem {
+  variant_id: string;
+  product_id?: string;
+  product_name: string;
+  variant_name?: string;
+  sku?: string;
+  quantity: number;
+  unit_price: number;
+  attributes?: VariantAttributes;
+  current_stock?: number;
+  shipping_inside?: number;
+  shipping_outside?: number;
+}
+
+/**
+ * Order Form Values - Complete order form state
+ */
+export interface OrderFormValues {
+  // Customer
+  customer_id?: string;
+  customer_name: string;
+  customer_phone: string;
+  customer_alt_phone?: string;
+  customer_email?: string;
+  
+  // Address
+  address_line1?: string;
+  address_line2?: string;
+  city?: string;
+  state?: string;
+  pincode?: string;
+  
+  // Order
+  source: OrderSource;
+  fulfillment_type: FulfillmentType;
+  items: OrderFormItem[];
+  
+  // Pricing
+  subtotal: number;
+  discount_amount?: number;
+  discount_code?: string;
+  delivery_charge: number;
+  cod_charge?: number;
+  total_amount: number;
+  
+  // Payment
+  payment_method: PaymentMethod;
+  payment_status: PaymentStatus;
+  
+  // Notes
+  customer_notes?: string;
+  internal_notes?: string;
+}
+
+/**
+ * Created Order Response - API response after order creation
+ */
+export interface CreatedOrderResponse {
+  id: string;
+  order_number: string;
+  status: OrderStatus;
+  total: number;
+  customer?: {
+    id: string;
+    name: string;
+    phone: string;
+  };
+}
+
+/**
+ * Inventory Transaction Form Item
+ */
+export interface TransactionFormItem {
+  variant_id: string;
+  variant_name?: string;
+  sku?: string;
+  product_name?: string;
+  quantity: number;
+  unit_cost?: number;
+  source_type?: StockSourceType;
+  current_stock?: number;
+  damaged_stock?: number;
+  notes?: string;
+}
+
+/**
+ * Inventory Transaction Form Values
+ */
+export interface TransactionFormValues {
+  transaction_type: TransactionType;
+  invoice_no: string;
+  vendor_id?: string;
+  transaction_date: string;
+  reason?: string;
+  notes?: string;
+  reference_transaction_id?: string;
+  items: TransactionFormItem[];
+}
+
+/**
+ * Product Form Variant - Used in product creation/edit
+ */
+export interface ProductFormVariant {
+  id?: string;
+  sku: string;
+  attributes: VariantAttributes;
+  cost_price: number;
+  selling_price: number;
+  mrp?: number;
+  current_stock?: number;
+  reorder_level?: number;
+  is_active?: boolean;
+}
+
+/**
+ * Product Form Values
+ */
+export interface ProductFormValues {
+  name: string;
+  description?: string;
+  brand?: string;
+  category?: string;
+  image_url?: string;
+  shipping_inside?: number | null;
+  shipping_outside?: number | null;
+  is_custom_shipping?: boolean;
+  is_active?: boolean;
+  variants: ProductFormVariant[];
+}
+
+// =============================================================================
+// SEARCH / AUTOCOMPLETE TYPES
+// =============================================================================
+
+/**
+ * Product Search Result (Lightweight - PERF-002)
+ */
+export interface ProductSearchResult {
+  id: string;
+  name: string;
+  brand?: string | null;
+  image_url?: string | null;
+  category?: string | null;
+  shipping_inside?: number | null;
+  shipping_outside?: number | null;
+  variant_count: number;
+  total_stock: number;
+  in_stock_count: number;
+  price_range: string;
+  _matched_sku?: string;
+}
+
+/**
+ * Variant Search Result (for order forms)
+ */
+export interface VariantSearchResult {
+  id: string;
+  sku: string;
+  attributes: VariantAttributes;
+  selling_price: number;
+  current_stock: number;
+  product: {
+    id: string;
+    name: string;
+    image_url?: string | null;
+    shipping_inside?: number | null;
+    shipping_outside?: number | null;
+  };
+}
+
+/**
+ * Customer Search Result
+ */
+export interface CustomerSearchResult {
+  id: string;
+  name: string;
+  phone: string;
+  email?: string | null;
+  city?: string | null;
+  total_orders: number;
 }

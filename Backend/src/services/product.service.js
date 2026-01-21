@@ -219,8 +219,11 @@ class ProductService {
 
   /**
    * List products with filtering and pagination
+   * 
+   * IMPORTANT: Includes full variant data for price range calculation
+   * 
    * @param {Object} options - Query options
-   * @returns {Object} Paginated products list
+   * @returns {Object} Paginated products list with variants
    */
   async listProducts(options = {}) {
     const {
@@ -237,9 +240,27 @@ class ProductService {
     const from = (page - 1) * limit;
     const to = from + limit - 1;
 
+    // =========================================================================
+    // FIX: Include FULL variant data, not just count
+    // This allows frontend to calculate price ranges
+    // =========================================================================
     let query = supabaseAdmin
       .from('products')
-      .select('*, variants:product_variants(count)', { count: 'exact' });
+      .select(`
+        *,
+        variants:product_variants(
+          id,
+          sku,
+          attributes,
+          cost_price,
+          selling_price,
+          mrp,
+          current_stock,
+          reserved_stock,
+          reorder_level,
+          is_active
+        )
+      `, { count: 'exact' });
 
     // Apply filters
     if (brand) query = query.eq('brand', brand);
@@ -255,11 +276,26 @@ class ProductService {
       .range(from, to);
 
     if (error) {
+      logger.error('Failed to list products', { error });
       throw new DatabaseError('Failed to list products', error);
     }
 
+    // =========================================================================
+    // Compute aggregates: variant_count, total_stock
+    // =========================================================================
+    const enrichedData = (data || []).map(product => {
+      const variants = product.variants || [];
+      const activeVariants = variants.filter(v => v.is_active !== false);
+      
+      return {
+        ...product,
+        variant_count: activeVariants.length,
+        total_stock: activeVariants.reduce((sum, v) => sum + (Number(v.current_stock) || 0), 0),
+      };
+    });
+
     return {
-      data,
+      data: enrichedData,
       pagination: {
         page,
         limit,

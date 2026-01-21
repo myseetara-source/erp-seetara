@@ -14,7 +14,7 @@
  * Uses the same useOrderForm hook as QuickCreate for consistency.
  */
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import {
   ArrowLeft,
@@ -28,7 +28,6 @@ import {
   Store,
   Clock,
   Check,
-  Search,
   Plus,
   Minus,
   Trash2,
@@ -49,98 +48,26 @@ import {
 } from '@/components/ui/select';
 import { cn } from '@/lib/utils';
 import { useFullOrderForm, ProductOption } from '@/hooks/useOrderForm';
-import { useDebounce } from '@/hooks/useDebounce';
+import { ProductVariantSelect, VariantOption } from '@/components/form/ProductVariantSelect';
 
 // =============================================================================
-// PRODUCT SEARCH COMPONENT
+// HELPER: Convert VariantOption to ProductOption
 // =============================================================================
 
-interface ProductSearchProps {
-  onSelect: (product: ProductOption) => void;
-  searchProducts: (query: string) => Promise<ProductOption[]>;
-  isSearching: boolean;
-}
-
-function ProductSearchBox({ onSelect, searchProducts, isSearching }: ProductSearchProps) {
-  const [query, setQuery] = useState('');
-  const [results, setResults] = useState<ProductOption[]>([]);
-  const [isOpen, setIsOpen] = useState(false);
-  const debouncedQuery = useDebounce(query, 300);
-
-  useEffect(() => {
-    if (debouncedQuery.length >= 2) {
-      searchProducts(debouncedQuery).then(setResults);
-      setIsOpen(true);
-    } else {
-      setResults([]);
-      setIsOpen(false);
-    }
-  }, [debouncedQuery, searchProducts]);
-
-  const handleSelect = (product: ProductOption) => {
-    onSelect(product);
-    setQuery('');
-    setResults([]);
-    setIsOpen(false);
+function variantToProductOption(variant: VariantOption): ProductOption {
+  return {
+    variant_id: variant.variant_id,
+    product_id: variant.product_id,
+    product_name: variant.product_name,
+    variant_name: variant.variant_name,
+    sku: variant.sku,
+    price: variant.price,
+    stock: variant.stock,
+    image_url: variant.image_url,
+    attributes: variant.attributes,
+    shipping_inside: variant.shipping_inside,
+    shipping_outside: variant.shipping_outside,
   };
-
-  return (
-    <div className="relative">
-      <div className="relative">
-        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-        <Input
-          value={query}
-          onChange={(e) => setQuery(e.target.value)}
-          placeholder="Search by name, SKU, or attributes..."
-          className="pl-10"
-        />
-        {isSearching && (
-          <Loader2 className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 animate-spin" />
-        )}
-      </div>
-      
-      {isOpen && results.length > 0 && (
-        <div className="absolute z-50 w-full mt-1 bg-white border border-gray-200 rounded-xl shadow-xl max-h-72 overflow-auto">
-          {results.map((product) => (
-            <button
-              key={product.variant_id}
-              type="button"
-              onClick={() => handleSelect(product)}
-              className="w-full px-4 py-3 text-left hover:bg-orange-50 flex items-center gap-4 border-b border-gray-100 last:border-0 transition-colors"
-            >
-              <div className="w-12 h-12 bg-gray-100 rounded-lg flex items-center justify-center overflow-hidden">
-                {product.image_url ? (
-                  <img src={product.image_url} alt="" className="w-full h-full object-cover" />
-                ) : (
-                  <Package className="w-6 h-6 text-gray-400" />
-                )}
-              </div>
-              <div className="flex-1 min-w-0">
-                <p className="font-medium text-gray-900 truncate">{product.product_name}</p>
-                <p className="text-sm text-gray-500">
-                  {product.variant_name} · <span className="text-gray-400">{product.sku}</span>
-                </p>
-              </div>
-              <div className="text-right">
-                <p className="font-bold text-orange-600">Rs. {product.price.toLocaleString()}</p>
-                <Badge 
-                  variant="outline" 
-                  className={cn(
-                    'text-xs',
-                    product.stock > 5 ? 'border-green-200 text-green-700' : 
-                    product.stock > 0 ? 'border-yellow-200 text-yellow-700' : 
-                    'border-red-200 text-red-700'
-                  )}
-                >
-                  {product.stock} in stock
-                </Badge>
-              </div>
-            </button>
-          ))}
-        </div>
-      )}
-    </div>
-  );
 }
 
 // =============================================================================
@@ -425,11 +352,10 @@ export default function NewOrderPage() {
                 </Button>
               </div>
 
-              {/* Product Search */}
-              <ProductSearchBox
-                onSelect={handleProductSelect}
-                searchProducts={searchProducts}
-                isSearching={isSearching}
+              {/* Product Search - Using Unified Component */}
+              <ProductVariantSelect
+                onChange={(variant) => handleProductSelect(variantToProductOption(variant))}
+                placeholder="Search by name, SKU, or attributes..."
               />
 
               {/* Items Table */}

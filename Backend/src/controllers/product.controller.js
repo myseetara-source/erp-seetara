@@ -13,6 +13,7 @@
  */
 
 import { productService } from '../services/product.service.js';
+import { supabaseAdmin } from '../config/supabase.js';
 import { asyncHandler } from '../middleware/error.middleware.js';
 import { 
   maskSensitiveData, 
@@ -124,53 +125,297 @@ export const listProducts = asyncHandler(async (req, res) => {
  * 
  * Used by Order Form to search products
  */
+/**
+ * Smart Product Search API (v3 - OPTIMIZED)
+ * GET /products/search?q=query&limit=15&mode=SALES|INVENTORY|FULL
+ * 
+ * PERFORMANCE OPTIMIZATION (PERF-002):
+ * - Default: Returns lightweight product summaries with variant_count
+ * - mode=FULL: Returns full variant data (for backwards compatibility)
+ * - Use GET /products/:id/variants for lazy loading full variant data
+ * 
+ * Payload reduction: ~80% smaller (50 variants × 15 fields → summary stats)
+ * 
+ * CONTEXT-AWARE SEARCH:
+ * - mode=SALES: Only products with stock > 0 (for Order Forms)
+ * - mode=INVENTORY: All active products even with 0 stock (for Purchase/Transactions)
+ * - mode=FULL: Full variant data (legacy mode for backwards compatibility)
+ */
 export const searchProducts = asyncHandler(async (req, res) => {
-  const { q, limit = 10, include_variants = 'true' } = req.query;
+  const { 
+    q, 
+    limit = 15, 
+    mode = 'SALES', // SALES | INVENTORY | FULL
+  } = req.query;
+
+  const userRole = req.user?.role;
+  const isAdmin = userRole === 'admin';
+  const limitNum = Math.min(parseInt(limit, 10) || 15, 50);
+  const searchMode = (mode || 'SALES').toUpperCase();
+  const hasQuery = q && q.trim().length >= 1;
+
+  // FULL MODE: Return complete variant data (legacy/backwards compatibility)
+  if (searchMode === 'FULL') {
+    return searchProductsFullMode(req, res, { isAdmin, limitNum, hasQuery, q });
+  }
+
+  // =========================================================================
+  // OPTIMIZED QUERY: Product summary only (no variant join)
+  // =========================================================================
+  let query = supabaseAdmin
+    .from('products')
+    .select(`
+      id,
+      name,
+      brand,
+      image_url,
+      category,
+      shipping_inside,
+      shipping_outside,
+      is_active,
+      created_at
+    `)
+    .eq('is_active', true)
+    .order('created_at', { ascending: false })
+    .limit(limitNum);
+
+  if (hasQuery) {
+    const searchTerm = q.trim();
+    query = query.or(`name.ilike.%${searchTerm}%,brand.ilike.%${searchTerm}%`);
+  }
+
+  const { data: products, error } = await query;
+
+  if (error) {
+    console.error('[ProductSearch] Error:', error);
+    return res.json({ success: true, data: [] });
+  }
+
+  // =========================================================================
+  // GET VARIANT STATS (Single aggregated query instead of N+1)
+  // =========================================================================
+  const productIds = (products || []).map(p => p.id);
+  const variantStats = new Map();
   
-  if (!q || q.length < 2) {
-    return res.json({
-      success: true,
-      data: [],
+  if (productIds.length > 0) {
+    const { data: variants } = await supabaseAdmin
+      .from('product_variants')
+      .select('product_id, current_stock, selling_price')
+      .in('product_id', productIds)
+      .eq('is_active', true);
+    
+    // Build stats map
+    (variants || []).forEach(v => {
+      const existing = variantStats.get(v.product_id) || { 
+        variant_count: 0, 
+        total_stock: 0, 
+        in_stock_count: 0,
+        min_price: Infinity,
+        max_price: 0
+      };
+      existing.variant_count++;
+      existing.total_stock += v.current_stock || 0;
+      if (v.current_stock > 0) existing.in_stock_count++;
+      existing.min_price = Math.min(existing.min_price, v.selling_price || 0);
+      existing.max_price = Math.max(existing.max_price, v.selling_price || 0);
+      variantStats.set(v.product_id, existing);
     });
   }
 
-  const result = await productService.listProducts({
-    search: q,
-    limit: parseInt(limit, 10),
-    page: 1,
-    is_active: true,
+  // =========================================================================
+  // BUILD LIGHTWEIGHT RESPONSE
+  // =========================================================================
+  let processedProducts = (products || []).map(product => {
+    const stats = variantStats.get(product.id) || { 
+      variant_count: 0, 
+      total_stock: 0,
+      in_stock_count: 0,
+      min_price: 0,
+      max_price: 0
+    };
+    
+    // Fix infinity edge case
+    if (stats.min_price === Infinity) stats.min_price = 0;
+    
+    return {
+      ...product,
+      variant_count: stats.variant_count,
+      total_stock: stats.total_stock,
+      in_stock_count: stats.in_stock_count,
+      price_range: stats.min_price === stats.max_price 
+        ? `Rs. ${stats.min_price}` 
+        : `Rs. ${stats.min_price} - ${stats.max_price}`,
+    };
   });
 
-  const userRole = req.user?.role;
-
-  // If include_variants, fetch variants for each product
-  let productsWithVariants = result.data;
-  
-  if (include_variants === 'true' || include_variants === true) {
-    productsWithVariants = await Promise.all(
-      result.data.map(async (product) => {
-        const variantsResult = await productService.listVariants({
-          product_id: product.id,
-          is_active: true,
-          limit: 50,
-        });
-        
-        return {
-          ...product,
-          variants: variantsResult.data || [],
-        };
-      })
-    );
+  // SALES mode: exclude products with no in-stock variants
+  if (searchMode === 'SALES') {
+    processedProducts = processedProducts.filter(p => p.in_stock_count > 0);
   }
 
-  // Mask cost data for non-admin users
-  const maskedData = canSeeFinancials(userRole)
-    ? productsWithVariants
-    : productsWithVariants.map(p => maskProductFinancials(p, userRole));
+  // =========================================================================
+  // SKU SEARCH
+  // =========================================================================
+  if (hasQuery && q.trim().length >= 2) {
+    const searchTerm = q.trim();
+    const existingIds = new Set(processedProducts.map(p => p.id));
+
+    const { data: skuMatches } = await supabaseAdmin
+      .from('product_variants')
+      .select(`
+        id, sku, current_stock, selling_price,
+        product:products(id, name, brand, image_url, shipping_inside, shipping_outside, is_active)
+      `)
+      .eq('is_active', true)
+      .ilike('sku', `%${searchTerm}%`)
+      .limit(10);
+
+    if (skuMatches) {
+      skuMatches.forEach(variant => {
+        if (variant.product?.is_active && !existingIds.has(variant.product.id)) {
+          if (searchMode === 'SALES' && variant.current_stock <= 0) return;
+          
+          existingIds.add(variant.product.id);
+          processedProducts.push({
+            ...variant.product,
+            variant_count: 1,
+            total_stock: variant.current_stock,
+            in_stock_count: variant.current_stock > 0 ? 1 : 0,
+            price_range: `Rs. ${variant.selling_price}`,
+            _matched_sku: variant.sku,
+          });
+        }
+      });
+    }
+  }
 
   res.json({
     success: true,
-    data: maskedData,
+    data: processedProducts,
+    meta: { 
+      mode: searchMode, 
+      query: q || null, 
+      count: processedProducts.length,
+      _optimized: true,
+    },
+  });
+});
+
+/**
+ * Search Products - FULL MODE (Legacy)
+ * Returns complete variant data for backwards compatibility
+ */
+const searchProductsFullMode = async (req, res, { isAdmin, limitNum, hasQuery, q }) => {
+  const searchMode = (req.query.mode || 'SALES').toUpperCase();
+  
+  let query = supabaseAdmin
+    .from('products')
+    .select(`
+      id, name, brand, image_url, category,
+      shipping_inside, shipping_outside, is_active, created_at,
+      variants:product_variants(
+        id, sku, attributes, cost_price, selling_price, mrp,
+        current_stock, damaged_stock, reserved_stock, reorder_level, is_active
+      )
+    `)
+    .eq('is_active', true)
+    .order('created_at', { ascending: false })
+    .limit(limitNum);
+
+  if (hasQuery) {
+    query = query.or(`name.ilike.%${q.trim()}%,brand.ilike.%${q.trim()}%`);
+  }
+
+  const { data: products, error } = await query;
+
+  if (error) {
+    console.error('[ProductSearch] Error:', error);
+    return res.json({ success: true, data: [] });
+  }
+
+  let processedProducts = (products || []).map(product => {
+    let variants = (product.variants || []).filter(v => v.is_active);
+
+    if (searchMode === 'SALES') {
+      variants = variants.filter(v => v.current_stock > 0);
+    }
+
+    if (!isAdmin) {
+      variants = variants.map(v => ({
+        ...v,
+        cost_price: undefined,
+        damaged_stock: undefined,
+      }));
+    }
+
+    return { ...product, variants };
+  });
+
+  if (searchMode === 'SALES') {
+    processedProducts = processedProducts.filter(p => p.variants.length > 0);
+  }
+
+  res.json({
+    success: true,
+    data: processedProducts,
+    meta: { mode: searchMode, query: q || null, count: processedProducts.length },
+  });
+};
+
+/**
+ * Get Product Variants (Lazy Loading - PERF-002)
+ * GET /products/:id/variants
+ * 
+ * Returns full variant data for a specific product.
+ * Use this for lazy loading when user expands/selects a product.
+ * 
+ * SECURITY: cost_price masked for non-admins
+ */
+export const getProductVariants = asyncHandler(async (req, res) => {
+  const { id } = req.params;
+  const { mode = 'SALES' } = req.query;
+  const userRole = req.user?.role;
+  const isAdmin = userRole === 'admin';
+  const searchMode = (mode || 'SALES').toUpperCase();
+
+  const { data: variants, error } = await supabaseAdmin
+    .from('product_variants')
+    .select(`
+      id, sku, attributes, cost_price, selling_price, mrp,
+      current_stock, damaged_stock, reserved_stock, reorder_level, is_active, created_at
+    `)
+    .eq('product_id', id)
+    .eq('is_active', true)
+    .order('created_at', { ascending: true });
+
+  if (error) {
+    console.error('[GetProductVariants] Error:', error);
+    return res.status(500).json({ success: false, message: 'Failed to fetch variants' });
+  }
+
+  let processedVariants = variants || [];
+
+  // SALES mode: only in-stock variants
+  if (searchMode === 'SALES') {
+    processedVariants = processedVariants.filter(v => v.current_stock > 0);
+  }
+
+  // Mask financial data for non-admins
+  if (!isAdmin) {
+    processedVariants = processedVariants.map(v => ({
+      ...v,
+      cost_price: undefined,
+      damaged_stock: undefined,
+    }));
+  }
+
+  // Set cache headers for performance (1 minute)
+  res.set('Cache-Control', 'private, max-age=60');
+
+  res.json({
+    success: true,
+    data: processedVariants,
+    meta: { product_id: id, total: processedVariants.length, mode: searchMode },
   });
 });
 

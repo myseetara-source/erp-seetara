@@ -32,6 +32,7 @@ import {
   HeadphonesIcon,
   MessageSquare,
 } from 'lucide-react';
+import { CommandPalette } from '@/components/common/CommandPalette';
 
 interface DashboardLayoutProps {
   children: React.ReactNode;
@@ -309,19 +310,9 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
               </div>
             </div>
 
-            {/* Center - Search */}
+            {/* Center - Command Palette Trigger */}
             <div className="flex-1 max-w-xl mx-4 hidden md:block">
-              <div className="relative">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
-                <input
-                  type="text"
-                  placeholder="Search orders, customers, products..."
-                  className="w-full pl-10 pr-4 py-2.5 bg-gray-100 border-0 rounded-xl text-sm focus:ring-2 focus:ring-orange-500/20 focus:bg-white transition-all"
-                />
-                <kbd className="absolute right-3 top-1/2 -translate-y-1/2 px-2 py-0.5 bg-gray-200 rounded text-xs font-mono text-gray-500">
-                  ⌘K
-                </kbd>
-              </div>
+              <CommandPalette />
             </div>
 
             {/* Right side */}
