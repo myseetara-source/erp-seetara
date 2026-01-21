@@ -23,7 +23,6 @@ import {
   User,
   Phone,
   MapPin,
-  Search,
   Plus,
   Minus,
   X,
@@ -41,7 +40,7 @@ import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
 import { useQuickOrderForm, ProductOption } from '@/hooks/useOrderForm';
-import { useDebounce } from '@/hooks/useDebounce';
+import { AsyncProductSelect } from '@/components/common/AsyncProductSelect';
 
 // =============================================================================
 // TYPES
@@ -55,97 +54,6 @@ interface QuickCreatePanelProps {
 type FulfillmentType = 'inside_valley' | 'outside_valley' | 'store';
 type OrderStatus = 'intake' | 'converted';
 
-// =============================================================================
-// PRODUCT SEARCH COMPONENT
-// =============================================================================
-
-interface ProductSearchProps {
-  onSelect: (product: ProductOption) => void;
-  searchProducts: (query: string) => Promise<ProductOption[]>;
-  isSearching: boolean;
-}
-
-function ProductSearch({ onSelect, searchProducts, isSearching }: ProductSearchProps) {
-  const [query, setQuery] = useState('');
-  const [results, setResults] = useState<ProductOption[]>([]);
-  const [isOpen, setIsOpen] = useState(false);
-  const debouncedQuery = useDebounce(query, 300);
-  const inputRef = useRef<HTMLInputElement>(null);
-
-  useEffect(() => {
-    if (debouncedQuery.length >= 2) {
-      searchProducts(debouncedQuery).then(setResults);
-    } else {
-      setResults([]);
-    }
-  }, [debouncedQuery, searchProducts]);
-
-  const handleSelect = (product: ProductOption) => {
-    onSelect(product);
-    setQuery('');
-    setResults([]);
-    setIsOpen(false);
-  };
-
-  return (
-    <div className="relative flex-1">
-      <div className="relative">
-        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-        <Input
-          ref={inputRef}
-          value={query}
-          onChange={(e) => {
-            setQuery(e.target.value);
-            setIsOpen(true);
-          }}
-          onFocus={() => setIsOpen(true)}
-          placeholder="SKU, name, color..."
-          className="pl-9 h-10"
-        />
-        {isSearching && (
-          <Loader2 className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 animate-spin" />
-        )}
-      </div>
-      
-      {isOpen && results.length > 0 && (
-        <div className="absolute z-50 w-full mt-1 bg-white border border-gray-200 rounded-lg shadow-lg max-h-64 overflow-auto">
-          {results.map((product) => (
-            <button
-              key={product.variant_id}
-              onClick={() => handleSelect(product)}
-              className="w-full px-3 py-2 text-left hover:bg-gray-50 flex items-center gap-3 border-b border-gray-100 last:border-0"
-            >
-              {product.image_url && (
-                <img 
-                  src={product.image_url} 
-                  alt="" 
-                  className="w-10 h-10 object-cover rounded"
-                />
-              )}
-              <div className="flex-1 min-w-0">
-                <p className="font-medium text-gray-900 truncate text-sm">
-                  {product.product_name}
-                </p>
-                <p className="text-xs text-gray-500">
-                  {product.variant_name} · {product.sku}
-                </p>
-              </div>
-              <div className="text-right">
-                <p className="font-semibold text-gray-900">Rs. {product.price}</p>
-                <p className={cn(
-                  'text-xs',
-                  product.stock > 0 ? 'text-green-600' : 'text-red-500'
-                )}>
-                  {product.stock > 0 ? `${product.stock} in stock` : 'Out of stock'}
-                </p>
-              </div>
-            </button>
-          ))}
-        </div>
-      )}
-    </div>
-  );
-}
 
 // =============================================================================
 // MAIN COMPONENT
@@ -162,8 +70,6 @@ export function QuickCreatePanel({ onSuccess, defaultExpanded = false }: QuickCr
     appendItem,
     removeItem,
     updateItemQuantity,
-    searchProducts,
-    isSearching,
     subtotal,
     total,
     codAmount,
@@ -453,13 +359,40 @@ export function QuickCreatePanel({ onSuccess, defaultExpanded = false }: QuickCr
                 </div>
               )}
 
-              {/* Add Product Row */}
+              {/* Add Product Row - Using AsyncProductSelect */}
               <div className="px-4 py-3 bg-gray-50 flex items-center gap-4">
-                <ProductSearch
-                  onSelect={handleProductSelect}
-                  searchProducts={searchProducts}
-                  isSearching={isSearching}
-                />
+                <div className="flex-1">
+                  <AsyncProductSelect
+                    placeholder="Search products by name, SKU..."
+                    direction="up"
+                    usePortal={true}
+                    onSelect={(product, variant) => {
+                      // Check if already in list
+                      const existingIndex = watchedItems.findIndex(
+                        (item: any) => item.variant_id === variant.id
+                      );
+
+                      if (existingIndex >= 0) {
+                        // Increment quantity
+                        updateItemQuantity(existingIndex, (watchedItems[existingIndex]?.quantity || 1) + 1);
+                      } else {
+                        // Add new item
+                        const variantName = variant.attributes 
+                          ? Object.values(variant.attributes).join(' / ')
+                          : [variant.color, variant.size].filter(Boolean).join(' / ') || variant.sku;
+
+                        appendItem({
+                          variant_id: variant.id,
+                          product_name: product.name,
+                          variant_name: variantName,
+                          sku: variant.sku,
+                          quantity: 1,
+                          unit_price: variant.selling_price,
+                        });
+                      }
+                    }}
+                  />
+                </div>
                 <Button
                   type="button"
                   variant="outline"

@@ -19,7 +19,7 @@
  * - payment_method: 'cod'
  */
 
-import { useState, useEffect, useCallback, ReactNode } from 'react';
+import { useState, useCallback, ReactNode } from 'react';
 import { useRouter } from 'next/navigation';
 import {
   Dialog,
@@ -41,14 +41,13 @@ import {
   User,
   Phone,
   Package,
-  Hash,
   MessageSquare,
   ArrowRight,
   Sparkles,
-  Search,
 } from 'lucide-react';
 import { useQuickOrderSubmit } from '@/hooks/useOrderSubmit';
-import { getProducts, type Product, type ProductVariant } from '@/lib/api/products';
+import { type Product, type ProductVariant } from '@/lib/api/products';
+import { AsyncProductSelect } from '@/components/common/AsyncProductSelect';
 import { cn } from '@/lib/utils';
 
 // =============================================================================
@@ -75,9 +74,6 @@ export function QuickOrderDialog({
 }: QuickOrderDialogProps) {
   const router = useRouter();
   const [open, setOpen] = useState(defaultOpen);
-  const [products, setProducts] = useState<Product[]>([]);
-  const [isLoadingProducts, setIsLoadingProducts] = useState(false);
-  const [productSearch, setProductSearch] = useState('');
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
   const [selectedVariant, setSelectedVariant] = useState<ProductVariant | null>(null);
 
@@ -103,54 +99,12 @@ export function QuickOrderDialog({
   const watchQuantity = watch('quantity', 1);
   const watchUnitPrice = watch('unit_price', 0);
 
-  // Load products on mount
-  useEffect(() => {
-    if (open && products.length === 0) {
-      loadProducts();
-    }
-  }, [open]);
-
-  const loadProducts = async () => {
-    setIsLoadingProducts(true);
-    try {
-      const data = await getProducts({ limit: 100 });
-      setProducts(data);
-    } catch (err) {
-      console.error('Failed to load products:', err);
-    } finally {
-      setIsLoadingProducts(false);
-    }
-  };
-
-  // Filter products by search
-  const filteredProducts = products.filter(p => 
-    p.name.toLowerCase().includes(productSearch.toLowerCase()) ||
-    p.brand?.toLowerCase().includes(productSearch.toLowerCase()) ||
-    p.variants?.some(v => v.sku.toLowerCase().includes(productSearch.toLowerCase()))
-  );
-
-  // Handle product selection
-  const handleProductSelect = useCallback((product: Product) => {
-    setSelectedProduct(product);
-    setSelectedVariant(null);
-    setValue('variant_id', '');
-    setValue('unit_price', 0);
-  }, [setValue]);
-
-  // Handle variant selection
-  const handleVariantSelect = useCallback((variant: ProductVariant) => {
-    setSelectedVariant(variant);
-    setValue('variant_id', variant.id);
-    setValue('unit_price', variant.selling_price);
-  }, [setValue]);
-
   // Handle close
   const handleClose = useCallback(() => {
     setOpen(false);
     resetForm();
     setSelectedProduct(null);
     setSelectedVariant(null);
-    setProductSearch('');
   }, [resetForm]);
 
   // Handle switch to full form
@@ -265,7 +219,7 @@ export function QuickOrderDialog({
           </div>
 
           {/* ================================================================= */}
-          {/* PRODUCT SECTION */}
+          {/* PRODUCT SECTION - Using AsyncProductSelect */}
           {/* ================================================================= */}
           <div className="space-y-3">
             <h3 className="text-sm font-medium text-gray-700 flex items-center gap-2">
@@ -273,102 +227,29 @@ export function QuickOrderDialog({
               Product
             </h3>
             
-            {/* Product Search */}
-            <div className="relative">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-              <Input
-                type="text"
-                value={productSearch}
-                onChange={(e) => setProductSearch(e.target.value)}
-                placeholder="Search products..."
-                className="pl-9"
-              />
-            </div>
-
-            {/* Product List */}
-            {isLoadingProducts ? (
-              <div className="flex items-center justify-center py-8">
-                <Loader2 className="w-6 h-6 animate-spin text-orange-500" />
-              </div>
-            ) : filteredProducts.length === 0 ? (
-              <div className="text-center py-6 text-gray-500 text-sm">
-                No products found
-              </div>
-            ) : (
-              <div className="max-h-[200px] overflow-y-auto border border-gray-200 rounded-lg divide-y divide-gray-100">
-                {filteredProducts.slice(0, 10).map((product) => (
-                  <button
-                    key={product.id}
-                    type="button"
-                    onClick={() => handleProductSelect(product)}
-                    className={cn(
-                      'w-full flex items-center gap-3 p-3 text-left hover:bg-gray-50 transition-colors',
-                      selectedProduct?.id === product.id && 'bg-orange-50 hover:bg-orange-50'
-                    )}
-                  >
-                    {/* Product Image */}
-                    <div className="w-10 h-10 bg-gray-100 rounded-lg overflow-hidden flex-shrink-0">
-                      {product.image_url ? (
-                        <img src={product.image_url} alt="" className="w-full h-full object-cover" />
-                      ) : (
-                        <div className="w-full h-full flex items-center justify-center">
-                          <Package className="w-5 h-5 text-gray-400" />
-                        </div>
-                      )}
-                    </div>
-                    
-                    {/* Product Info */}
-                    <div className="flex-1 min-w-0">
-                      <p className="font-medium text-gray-900 truncate">{product.name}</p>
-                      <div className="flex items-center gap-2 text-xs text-gray-500">
-                        {product.brand && <span>{product.brand}</span>}
-                        <span>•</span>
-                        <span>{product.variant_count || product.variants?.length || 0} variants</span>
-                      </div>
-                    </div>
-                    
-                    {/* Selection Indicator */}
-                    {selectedProduct?.id === product.id && (
-                      <CheckCircle2 className="w-5 h-5 text-orange-500 flex-shrink-0" />
-                    )}
-                  </button>
-                ))}
-              </div>
-            )}
-
-            {/* Variant Selection */}
-            {selectedProduct && selectedProduct.variants && selectedProduct.variants.length > 0 && (
-              <div className="space-y-2">
-                <p className="text-xs text-gray-500">Select Variant:</p>
-                <div className="flex flex-wrap gap-2">
-                  {selectedProduct.variants.filter(v => v.is_active).map((variant) => (
-                    <button
-                      key={variant.id}
-                      type="button"
-                      onClick={() => handleVariantSelect(variant)}
-                      disabled={variant.current_stock <= 0}
-                      className={cn(
-                        'px-3 py-2 rounded-lg border text-sm transition-all',
-                        selectedVariant?.id === variant.id
-                          ? 'bg-orange-100 border-orange-500 text-orange-700'
-                          : 'bg-white border-gray-200 hover:border-orange-300',
-                        variant.current_stock <= 0 && 'opacity-50 cursor-not-allowed'
-                      )}
-                    >
-                      <span className="font-medium">{getVariantName(variant)}</span>
-                      <span className="block text-xs text-gray-500">
-                        Rs. {variant.selling_price} • Stock: {variant.current_stock}
-                      </span>
-                    </button>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            {/* Validation Error */}
-            {errors.variant_id && (
-              <p className="text-xs text-red-500">{errors.variant_id.message}</p>
-            )}
+            {/* Smart Product Search with Auto-Positioning */}
+            <AsyncProductSelect
+              placeholder="Search products by name, brand, SKU..."
+              direction="up" // Render upward since Quick Create is at bottom
+              usePortal={true} // Use portal to escape overflow constraints
+              onSelect={(product, variant) => {
+                setSelectedProduct(product);
+                setSelectedVariant(variant);
+                setValue('variant_id', variant.id);
+                setValue('unit_price', variant.selling_price);
+              }}
+              onClear={() => {
+                setSelectedProduct(null);
+                setSelectedVariant(null);
+                setValue('variant_id', '');
+                setValue('unit_price', 0);
+              }}
+              value={selectedVariant ? {
+                productName: selectedProduct?.name || '',
+                variantName: getVariantName(selectedVariant),
+              } : null}
+              error={errors.variant_id?.message}
+            />
           </div>
 
           {/* ================================================================= */}
