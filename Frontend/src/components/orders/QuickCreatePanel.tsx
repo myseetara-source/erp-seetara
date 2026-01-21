@@ -343,7 +343,10 @@ export function QuickCreatePanel({ onSuccess, defaultExpanded = false }: QuickCr
                         </button>
                       </div>
                       <div className="w-28 text-right font-medium text-gray-900">
-                        {(item.quantity * item.unit_price).toLocaleString()}
+                        {(() => {
+                          const total = (item.quantity || 0) * (item.unit_price || 0);
+                          return isNaN(total) ? '0' : total.toLocaleString();
+                        })()}
                       </div>
                       <div className="w-16 flex justify-end">
                         <button
@@ -376,18 +379,32 @@ export function QuickCreatePanel({ onSuccess, defaultExpanded = false }: QuickCr
                         // Increment quantity
                         updateItemQuantity(existingIndex, (watchedItems[existingIndex]?.quantity || 1) + 1);
                       } else {
-                        // Add new item
-                        const variantName = variant.attributes 
-                          ? Object.values(variant.attributes).join(' / ')
-                          : [variant.color, variant.size].filter(Boolean).join(' / ') || variant.sku;
+                        // Build variant name from attributes or legacy fields
+                        let variantName = 'Default';
+                        if (variant.attributes && Object.keys(variant.attributes).length > 0) {
+                          variantName = Object.values(variant.attributes).join(' / ');
+                        } else if (variant.color || variant.size) {
+                          variantName = [variant.color, variant.size].filter(Boolean).join(' / ');
+                        }
+
+                        // Get price - handle undefined/null
+                        const price = Number(variant.selling_price) || 0;
+
+                        console.log('[QuickCreatePanel] Adding item:', {
+                          variant_id: variant.id,
+                          product_name: product.name,
+                          variant_name: variantName,
+                          sku: variant.sku,
+                          unit_price: price,
+                        });
 
                         appendItem({
                           variant_id: variant.id,
                           product_name: product.name,
                           variant_name: variantName,
-                          sku: variant.sku,
+                          sku: variant.sku || 'N/A',
                           quantity: 1,
-                          unit_price: variant.selling_price,
+                          unit_price: price,
                         });
                       }
                     }}

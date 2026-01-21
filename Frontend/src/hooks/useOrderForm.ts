@@ -144,64 +144,75 @@ export interface ProductOption {
 }
 
 // =============================================================================
-// TRANSFORM TO API PAYLOAD
+// TRANSFORM TO API PAYLOAD (Matches Backend createOrderSchema)
 // =============================================================================
 
+/**
+ * Transform form data to the format expected by Backend API
+ * 
+ * Backend expects:
+ * - customer object with address_line1, city, state, pincode (REQUIRED)
+ * - items array with variant_id, quantity, unit_price, discount_per_unit
+ * - source (default: 'manual')
+ * - shipping_charges (default: 100)
+ * - payment_method (default: 'cod')
+ */
 function transformToPayload(data: QuickOrderFormData | FullOrderFormData, mode: OrderFormMode) {
   const isQuick = mode === 'quick';
   const quickData = data as QuickOrderFormData;
   const fullData = data as FullOrderFormData;
   
-  // Calculate totals
-  const subtotal = data.items.reduce((sum, item) => sum + (item.quantity * item.unit_price), 0);
-  const total = subtotal + (data.delivery_charge || 0) - (data.discount_amount || 0);
-  const codAmount = total - (data.prepaid_amount || 0);
+  // Clean phone number
+  const cleanPhone = data.customer_phone.replace(/[\s\-+]/g, '');
+  
+  // Get address - use customer_address for quick mode
+  const address = isQuick 
+    ? (quickData.customer_address || 'To be confirmed') 
+    : fullData.shipping_address;
+  
+  const city = isQuick ? 'Kathmandu' : (fullData.shipping_city || 'Kathmandu');
   
   return {
-    // Customer
+    // Customer - MUST match Backend orderCustomerSchema
     customer: {
-      name: data.customer_name,
-      phone: data.customer_phone,
-      email: isQuick ? '' : fullData.customer_email || '',
-      address: isQuick ? quickData.customer_address || '' : fullData.shipping_address,
+      name: data.customer_name.trim(),
+      phone: cleanPhone,
+      alt_phone: null,
+      email: isQuick ? null : (fullData.customer_email || null),
+      address_line1: address || 'To be confirmed',
+      address_line2: null,
+      city: city,
+      state: 'Bagmati',
+      pincode: '44600',
+      country: 'Nepal',
     },
     
-    // Shipping
-    shipping: {
-      address: isQuick ? quickData.customer_address || '' : fullData.shipping_address,
-      city: isQuick ? '' : fullData.shipping_city,
-      district: isQuick ? '' : fullData.shipping_district || '',
-      landmark: isQuick ? '' : fullData.shipping_landmark || '',
-    },
-    
-    // Items
+    // Items - MUST match Backend orderItemSchema
     items: data.items.map(item => ({
       variant_id: item.variant_id,
-      quantity: item.quantity,
-      unit_price: item.unit_price,
-      discount: 0,
-      total: item.quantity * item.unit_price,
+      quantity: Number(item.quantity) || 1,
+      unit_price: Number(item.unit_price) || 0,
+      discount_per_unit: 0,
     })),
     
     // Order config
-    source: isQuick ? 'manual' : fullData.source,
-    status: data.status,
-    fulfillment_type: data.fulfillment_type,
+    source: 'manual',
+    source_order_id: null,
     
-    // Financial
-    subtotal,
-    discount_amount: data.discount_amount || 0,
-    delivery_charge: data.delivery_charge || 0,
-    total_amount: total,
+    // Pricing
+    discount_amount: Number(data.discount_amount) || 0,
+    discount_code: null,
+    shipping_charges: Number(data.delivery_charge) || 100,
+    cod_charges: 0,
     
     // Payment
-    payment_status: data.prepaid_amount && data.prepaid_amount >= total ? 'paid' : 'pending',
-    payment_method: isQuick ? 'cod' : fullData.payment_method,
-    paid_amount: data.prepaid_amount || 0,
+    payment_method: isQuick ? 'cod' : (fullData.payment_method || 'cod'),
+    paid_amount: Number(data.prepaid_amount) || 0,
     
-    // Notes
-    internal_notes: isQuick ? quickData.notes || '' : fullData.internal_notes || '',
-    customer_notes: isQuick ? '' : fullData.customer_notes || '',
+    // Priority & Notes
+    priority: 0,
+    internal_notes: isQuick ? (quickData.notes || null) : (fullData.internal_notes || null),
+    customer_notes: isQuick ? null : (fullData.customer_notes || null),
   };
 }
 
