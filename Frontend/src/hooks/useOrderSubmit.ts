@@ -116,7 +116,7 @@ export function useOrderSubmit<T extends z.ZodType>(
         }
       } catch (err: any) {
         // =================================================================
-        // PROPER ERROR HANDLING - No demo/simulation mode
+        // ENHANCED ERROR HANDLING - Field-specific validation errors
         // =================================================================
         
         let errorMessage: string;
@@ -133,10 +133,54 @@ export function useOrderSubmit<T extends z.ZodType>(
         else if (err.response?.status >= 500) {
           errorMessage = 'Server error. Order NOT saved. Please try again later.';
         }
-        // Handle validation errors from server
+        // Handle validation errors from server (400/422)
         else if (err.response?.status === 400 || err.response?.status === 422) {
-          const serverMsg = err.response?.data?.message || err.response?.data?.error?.message;
-          errorMessage = serverMsg || 'Validation failed. Please check your input.';
+          const responseData = err.response?.data;
+          
+          // Check for Zod validation errors
+          if (responseData?.errors) {
+            const fieldErrors = responseData.errors;
+            const errorMessages: string[] = [];
+            
+            // Build user-friendly error messages
+            Object.entries(fieldErrors).forEach(([field, messages]) => {
+              const fieldName = field
+                .replace('customer.', '')
+                .replace('items.0.', '')
+                .replace(/_/g, ' ')
+                .replace(/\b\w/g, l => l.toUpperCase());
+              
+              if (Array.isArray(messages)) {
+                errorMessages.push(`${fieldName}: ${messages[0]}`);
+              } else if (typeof messages === 'string') {
+                errorMessages.push(`${fieldName}: ${messages}`);
+              }
+            });
+            
+            // Show each field error as a separate toast
+            errorMessages.slice(0, 3).forEach((msg, index) => {
+              setTimeout(() => {
+                toast.error('Validation Error', { description: msg });
+              }, index * 200);
+            });
+            
+            if (errorMessages.length > 3) {
+              setTimeout(() => {
+                toast.error(`And ${errorMessages.length - 3} more errors...`);
+              }, 700);
+            }
+            
+            errorMessage = errorMessages.join('. ') || 'Validation failed';
+          } else {
+            // Generic validation message
+            errorMessage = responseData?.message || responseData?.error?.message || 'Validation failed. Please check your input.';
+          }
+          
+          // Log detailed validation errors for debugging
+          console.error('[Order Validation Failed]', {
+            errors: responseData?.errors,
+            details: responseData?.error?.details,
+          });
         }
         // Handle auth errors
         else if (err.response?.status === 401) {
@@ -144,7 +188,14 @@ export function useOrderSubmit<T extends z.ZodType>(
         }
         // Handle insufficient stock
         else if (err.response?.data?.error?.code === 'INSUFFICIENT_STOCK') {
-          errorMessage = 'Insufficient stock available. Please reduce quantity.';
+          const item = err.response?.data?.error?.item;
+          errorMessage = item 
+            ? `Insufficient stock for ${item.name}. Only ${item.available} available.`
+            : 'Insufficient stock available. Please reduce quantity.';
+        }
+        // Handle customer phone duplicate
+        else if (err.response?.data?.error?.code === 'DUPLICATE_PHONE') {
+          errorMessage = 'This phone number is already registered. Customer will be linked.';
         }
         // Default error message
         else {
@@ -152,7 +203,12 @@ export function useOrderSubmit<T extends z.ZodType>(
         }
         
         setError(errorMessage);
-        toast.error('Order Failed', { description: errorMessage });
+        
+        // Don't show toast if we already showed field-specific toasts
+        if (!(err.response?.status === 400 && err.response?.data?.errors)) {
+          toast.error('Order Failed', { description: errorMessage });
+        }
+        
         onError?.(err);
         
         console.error('Order submission failed:', {
@@ -160,6 +216,7 @@ export function useOrderSubmit<T extends z.ZodType>(
           code: err.code,
           status: err.response?.status,
           message: err.message,
+          response: err.response?.data,
         });
       } finally {
         setIsSubmitting(false);

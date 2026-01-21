@@ -181,6 +181,9 @@ export function QuickOrderDialog({
             <div className="grid grid-cols-2 gap-3">
               {/* Phone */}
               <div>
+                <label className="text-xs text-gray-500 mb-1 block">
+                  Phone <span className="text-red-500">*</span>
+                </label>
                 <div className="relative">
                   <Phone className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
                   <Input
@@ -200,6 +203,9 @@ export function QuickOrderDialog({
               
               {/* Name */}
               <div>
+                <label className="text-xs text-gray-500 mb-1 block">
+                  Name <span className="text-red-500">*</span>
+                </label>
                 <div className="relative">
                   <User className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
                   <Input
@@ -214,6 +220,32 @@ export function QuickOrderDialog({
                 {errors.customer_name && (
                   <p className="text-xs text-red-500 mt-1">{errors.customer_name.message}</p>
                 )}
+              </div>
+            </div>
+            
+            {/* Address Row */}
+            <div className="grid grid-cols-3 gap-3">
+              {/* Address */}
+              <div className="col-span-2">
+                <label className="text-xs text-gray-500 mb-1 block">
+                  Address
+                </label>
+                <Input
+                  {...register('customer_address')}
+                  placeholder="Tole, Ward, Area"
+                />
+              </div>
+              
+              {/* City */}
+              <div>
+                <label className="text-xs text-gray-500 mb-1 block">
+                  City
+                </label>
+                <Input
+                  {...register('customer_city')}
+                  placeholder="Kathmandu"
+                  defaultValue="Kathmandu"
+                />
               </div>
             </div>
           </div>

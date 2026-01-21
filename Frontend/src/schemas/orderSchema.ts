@@ -4,194 +4,269 @@
  * This is the SINGLE SOURCE OF TRUTH for order validation.
  * Both FullOrderForm and QuickOrderForm use this schema.
  * 
+ * IMPORTANT: This schema MUST match the Backend validation schema
+ * located at: Backend/src/validations/order.validation.js
+ * 
  * Fields with .default() are auto-filled for Quick form.
  */
 
 import { z } from 'zod';
 
-// Enums matching database
-export const OrderSource = z.enum(['website', 'manual', 'store', 'facebook', 'instagram']);
-export const OrderStatus = z.enum([
-  'intake', 
-  'follow_up', 
-  'converted', 
-  'packed', 
-  'out_for_delivery', 
-  'handover_to_courier',
-  'in_transit',
-  'delivered', 
-  'returned', 
-  'cancelled',
-  'store_sale',
-]);
-export const FulfillmentType = z.enum(['inside_valley', 'outside_valley', 'store_pickup']);
-export const PaymentStatus = z.enum(['pending', 'partial', 'paid', 'refunded']);
-export const PaymentMethod = z.enum(['cod', 'esewa', 'khalti', 'bank_transfer', 'cash', 'other']);
+// =============================================================================
+// ENUMS (Must match Backend exactly)
+// =============================================================================
 
-// Customer schema (embedded or referenced)
+export const OrderSource = z.enum([
+  'manual', 'todaytrend', 'seetara', 'shopify', 'woocommerce', 'api'
+]);
+
+export const OrderStatus = z.enum([
+  'intake', 'converted', 'followup', 'hold', 'packed', 'shipped',
+  'delivered', 'cancelled', 'refund', 'return',
+]);
+
+export const FulfillmentType = z.enum([
+  'inside_valley', 'outside_valley', 'store_pickup'
+]);
+
+export const PaymentStatus = z.enum(['pending', 'partial', 'paid', 'refunded']);
+
+export const PaymentMethod = z.enum(['cod', 'prepaid', 'partial']);
+
+// =============================================================================
+// NEPAL PHONE NUMBER VALIDATION
+// =============================================================================
+
+const nepalPhoneRegex = /^(98|97|96|01)[0-9]{7,8}$/;
+
+export const phoneSchema = z.string()
+  .min(10, 'Phone must be at least 10 digits')
+  .max(15, 'Phone number too long')
+  .refine(
+    (val) => nepalPhoneRegex.test(val.replace(/[\s\-+]/g, '')),
+    'Invalid Nepal phone number (must start with 98, 97, 96, or 01)'
+  );
+
+// =============================================================================
+// CUSTOMER SCHEMA (Matches Backend orderCustomerSchema)
+// =============================================================================
+
 export const CustomerSchema = z.object({
   id: z.string().uuid().optional(),
-  name: z.string().min(2, 'Name must be at least 2 characters'),
-  phone: z.string()
-    .min(10, 'Phone must be at least 10 digits')
-    .regex(/^[0-9+\-\s]+$/, 'Invalid phone number format'),
-  email: z.string().email().optional().or(z.literal('')),
-  address: z.string().optional().default(''),
+  name: z.string().min(2, 'Name must be at least 2 characters').max(255),
+  phone: phoneSchema,
+  alt_phone: z.string().optional().nullable(),
+  email: z.string().email('Invalid email').optional().or(z.literal('')).nullable(),
+  
+  // Address - Backend requires these for shipping
+  address_line1: z.string().min(5, 'Address is required').max(500),
+  address_line2: z.string().max(500).optional().nullable(),
+  city: z.string().min(2, 'City is required').max(100),
+  state: z.string().min(2, 'State/Province is required').max(100).default('Bagmati'),
+  pincode: z.string().min(5, 'Postal code required').max(10).default('44600'),
+  country: z.string().default('Nepal'),
+  
+  // Tracking (optional)
+  ip_address: z.string().optional().nullable(),
+  fbid: z.string().optional().nullable(),
+  fbclid: z.string().optional().nullable(),
+  gclid: z.string().optional().nullable(),
+  utm_source: z.string().optional().nullable(),
+  utm_medium: z.string().optional().nullable(),
+  utm_campaign: z.string().optional().nullable(),
 });
 
-// Order item schema
+// =============================================================================
+// ORDER ITEM SCHEMA (Matches Backend orderItemSchema)
+// =============================================================================
+
 export const OrderItemSchema = z.object({
   variant_id: z.string().uuid('Please select a product variant'),
-  product_name: z.string().optional(), // For display
-  variant_name: z.string().optional(), // For display
+  quantity: z.coerce.number().int().min(1, 'Quantity must be at least 1').max(999),
+  unit_price: z.coerce.number().min(0, 'Price cannot be negative').optional(),
+  discount_per_unit: z.coerce.number().min(0).default(0),
+  
+  // Display fields (not sent to API)
+  product_name: z.string().optional(),
+  variant_name: z.string().optional(),
   sku: z.string().optional(),
-  quantity: z.number().int().min(1, 'Quantity must be at least 1'),
-  unit_price: z.number().min(0, 'Price cannot be negative'),
-  discount: z.number().min(0).max(100).default(0), // Percentage
-  total: z.number().optional(), // Calculated
 });
 
-// Shipping schema
+// =============================================================================
+// SHIPPING SCHEMA (For display, merged into customer for API)
+// =============================================================================
+
 export const ShippingSchema = z.object({
-  address: z.string().min(5, 'Address is required').default(''),
+  address_line1: z.string().min(5, 'Address is required').default(''),
+  address_line2: z.string().optional().default(''),
   city: z.string().min(2, 'City is required').default(''),
-  district: z.string().optional().default(''),
+  state: z.string().default('Bagmati'),
+  pincode: z.string().default('44600'),
   landmark: z.string().optional().default(''),
-  postal_code: z.string().optional().default(''),
   notes: z.string().optional().default(''),
 });
 
-// ============================================================================
-// MASTER ORDER SCHEMA
-// ============================================================================
+// =============================================================================
+// MASTER ORDER SCHEMA (Matches Backend createOrderSchema)
+// =============================================================================
 
 export const OrderSchema = z.object({
-  // Customer (Required)
+  // Customer (Required) - Must match Backend orderCustomerSchema
   customer: CustomerSchema,
   
   // Items (At least one required)
-  items: z.array(OrderItemSchema).min(1, 'At least one item is required'),
-  
-  // Shipping (Optional for store pickup)
-  shipping: ShippingSchema.optional(),
+  items: z.array(OrderItemSchema).min(1, 'At least one item is required').max(50),
   
   // Order metadata
   source: OrderSource.default('manual'),
-  status: OrderStatus.default('intake'),
-  fulfillment_type: FulfillmentType.optional(),
+  source_order_id: z.string().max(100).optional().nullable(),
   
-  // Financial
-  subtotal: z.number().min(0).default(0),
-  discount_amount: z.number().min(0).default(0),
-  delivery_charge: z.number().min(0).default(100),
-  total_amount: z.number().min(0).default(0),
+  // Pricing Overrides
+  discount_amount: z.coerce.number().min(0).default(0),
+  discount_code: z.string().max(50).optional().nullable(),
+  shipping_charges: z.coerce.number().min(0).default(100),
+  cod_charges: z.coerce.number().min(0).default(0),
   
   // Payment
-  payment_status: PaymentStatus.default('pending'),
   payment_method: PaymentMethod.default('cod'),
-  paid_amount: z.number().min(0).default(0),
+  paid_amount: z.coerce.number().min(0).default(0),
   
-  // Notes
-  internal_notes: z.string().optional().default(''),
-  customer_notes: z.string().optional().default(''),
-  
-  // Timestamps (auto-set)
-  created_at: z.string().optional(),
+  // Priority and Notes
+  priority: z.coerce.number().int().min(0).max(2).default(0),
+  internal_notes: z.string().max(1000).optional().nullable(),
+  customer_notes: z.string().max(1000).optional().nullable(),
 });
 
-// ============================================================================
-// DERIVED SCHEMAS FOR DIFFERENT FORM VERSIONS
-// ============================================================================
+// =============================================================================
+// QUICK ORDER SCHEMA - Minimal fields for fast entry
+// =============================================================================
 
 /**
- * Quick Order Schema - Minimal fields
- * Used in header modal for fast order entry
+ * Quick Order Schema - Used in header modal
+ * 
+ * IMPORTANT: This is transformed to full order format before API submission
+ * See transformQuickToFullOrder() below
  */
 export const QuickOrderSchema = z.object({
-  // Only essential customer info
-  customer_name: z.string().min(2, 'Name required'),
+  // Essential customer info
+  customer_name: z.string().min(2, 'Name required').max(255),
   customer_phone: z.string().min(10, 'Valid phone required'),
+  customer_address: z.string().optional().default(''),
+  customer_city: z.string().optional().default('Kathmandu'),
   
   // Single product (simplified)
   variant_id: z.string().uuid('Select a product'),
-  quantity: z.number().int().min(1).default(1),
-  unit_price: z.number().min(0).default(0),
+  quantity: z.coerce.number().int().min(1).default(1),
+  unit_price: z.coerce.number().min(0).default(0),
   
-  // Optional
+  // Optional notes
   notes: z.string().optional().default(''),
 });
 
-// Types
+// =============================================================================
+// TYPES
+// =============================================================================
+
 export type OrderFormData = z.infer<typeof OrderSchema>;
 export type QuickOrderFormData = z.infer<typeof QuickOrderSchema>;
 export type OrderItem = z.infer<typeof OrderItemSchema>;
 export type Customer = z.infer<typeof CustomerSchema>;
 
-// ============================================================================
-// HELPER: Transform Quick Form to Full Order
-// ============================================================================
+// =============================================================================
+// API PAYLOAD TYPE (What Backend expects)
+// =============================================================================
 
-export function transformQuickToFullOrder(quickData: QuickOrderFormData): Partial<OrderFormData> {
-  const total = quickData.quantity * quickData.unit_price;
-  
+export interface CreateOrderPayload {
+  customer: {
+    name: string;
+    phone: string;
+    alt_phone?: string | null;
+    email?: string | null;
+    address_line1: string;
+    address_line2?: string | null;
+    city: string;
+    state: string;
+    pincode: string;
+    country: string;
+  };
+  items: Array<{
+    variant_id: string;
+    quantity: number;
+    unit_price?: number;
+    discount_per_unit?: number;
+  }>;
+  source: string;
+  discount_amount?: number;
+  shipping_charges?: number;
+  payment_method?: string;
+  internal_notes?: string;
+}
+
+// =============================================================================
+// HELPER: Transform Quick Form to API Payload
+// =============================================================================
+
+/**
+ * Transforms QuickOrderForm data to the format expected by Backend API
+ * 
+ * The Backend createOrderSchema expects:
+ * - customer object with address_line1, city, state, pincode
+ * - items array with variant_id, quantity, unit_price, discount_per_unit
+ * - source (default: 'manual')
+ * - shipping_charges (default: 100)
+ * - payment_method (default: 'cod')
+ */
+export function transformQuickToFullOrder(quickData: QuickOrderFormData): CreateOrderPayload {
   return {
     customer: {
-      name: quickData.customer_name,
-      phone: quickData.customer_phone,
-      address: '',
+      name: quickData.customer_name.trim(),
+      phone: quickData.customer_phone.replace(/[\s\-+]/g, ''), // Clean phone number
+      address_line1: quickData.customer_address || 'To be confirmed',
+      city: quickData.customer_city || 'Kathmandu',
+      state: 'Bagmati',
+      pincode: '44600',
+      country: 'Nepal',
     },
     items: [
       {
         variant_id: quickData.variant_id,
-        quantity: quickData.quantity,
-        unit_price: quickData.unit_price,
-        discount: 0,
-        total,
+        quantity: Number(quickData.quantity) || 1,
+        unit_price: Number(quickData.unit_price) || 0,
+        discount_per_unit: 0,
       },
     ],
     source: 'manual',
-    status: 'intake',
-    subtotal: total,
     discount_amount: 0,
-    delivery_charge: 100, // Default
-    total_amount: total + 100,
-    payment_status: 'pending',
+    shipping_charges: 100,
     payment_method: 'cod',
-    paid_amount: 0,
     internal_notes: quickData.notes || '',
-    customer_notes: '',
   };
 }
 
-// ============================================================================
+// =============================================================================
 // DEFAULT VALUES
-// ============================================================================
+// =============================================================================
 
 export const defaultOrderValues: Partial<OrderFormData> = {
   customer: {
     name: '',
     phone: '',
     email: '',
-    address: '',
+    address_line1: '',
+    address_line2: '',
+    city: 'Kathmandu',
+    state: 'Bagmati',
+    pincode: '44600',
+    country: 'Nepal',
   },
   items: [],
-  shipping: {
-    address: '',
-    city: '',
-    district: '',
-    landmark: '',
-    postal_code: '',
-    notes: '',
-  },
   source: 'manual',
-  status: 'intake',
-  subtotal: 0,
   discount_amount: 0,
-  delivery_charge: 100,
-  total_amount: 0,
-  payment_status: 'pending',
+  shipping_charges: 100,
+  cod_charges: 0,
   payment_method: 'cod',
   paid_amount: 0,
+  priority: 0,
   internal_notes: '',
   customer_notes: '',
 };
@@ -199,6 +274,8 @@ export const defaultOrderValues: Partial<OrderFormData> = {
 export const defaultQuickOrderValues: QuickOrderFormData = {
   customer_name: '',
   customer_phone: '',
+  customer_address: '',
+  customer_city: 'Kathmandu',
   variant_id: '',
   quantity: 1,
   unit_price: 0,
