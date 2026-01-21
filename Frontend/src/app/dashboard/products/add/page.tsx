@@ -30,10 +30,12 @@ import {
   Copy,
   Tag,
 } from 'lucide-react';
+import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { ImageUploader } from '@/components/common/ImageUploader';
+import { CreatableCategorySelect } from '@/components/common/CreatableCategorySelect';
 import {
   AttributeInput,
   attributeFieldsToObject,
@@ -91,20 +93,6 @@ const defaultVariant = {
   is_active: true,
 };
 
-// Category options with icons
-const categoryOptions = [
-  'Clothing',
-  'Footwear',
-  'Electronics',
-  'Bags',
-  'Jewelry',
-  'Watches',
-  'Accessories',
-  'Home & Living',
-  'Beauty',
-  'Sports',
-  'Other',
-];
 
 // =============================================================================
 // COMPONENT
@@ -125,6 +113,7 @@ export default function AddProductPage() {
     setValue,
     watch,
     getValues,
+    trigger,
   } = useForm<ProductFormData>({
     resolver: zodResolver(productSchema),
     defaultValues: {
@@ -145,6 +134,31 @@ export default function AddProductPage() {
   const variants = watch('variants');
   const productName = watch('name');
   const category = watch('category');
+
+  // ==========================================================================
+  // SEQUENTIAL VARIANT VALIDATION ("Gatekeeper" Logic)
+  // ==========================================================================
+
+  /**
+   * Validates the last variant before allowing a new one to be added.
+   * This ensures data integrity - no empty/incomplete variants.
+   */
+  const handleAddVariant = useCallback(async () => {
+    const lastIndex = fields.length - 1;
+    
+    // Validate the last variant
+    const isValid = await trigger(`variants.${lastIndex}`);
+    
+    if (isValid) {
+      // All good - add new variant
+      append(defaultVariant);
+    } else {
+      // Validation failed - show toast and highlight errors
+      toast.error('Please complete the current variant first', {
+        description: 'Fill in all required fields (SKU, Selling Price) before adding a new variant.',
+      });
+    }
+  }, [fields.length, trigger, append]);
 
   // ==========================================================================
   // HANDLERS
@@ -285,15 +299,17 @@ export default function AddProductPage() {
                     <label className="block text-sm font-medium text-gray-700 mb-1">
                       Category
                     </label>
-                    <select
-                      {...register('category')}
-                      className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
-                    >
-                      <option value="">Select category...</option>
-                      {categoryOptions.map(cat => (
-                        <option key={cat} value={cat}>{cat}</option>
-                      ))}
-                    </select>
+                    <Controller
+                      name="category"
+                      control={control}
+                      render={({ field }) => (
+                        <CreatableCategorySelect
+                          value={field.value}
+                          onChange={field.onChange}
+                          placeholder="Search or create category..."
+                        />
+                      )}
+                    />
                   </div>
                 </div>
 
@@ -325,7 +341,7 @@ export default function AddProductPage() {
                   type="button"
                   variant="outline"
                   size="sm"
-                  onClick={() => append(defaultVariant)}
+                  onClick={handleAddVariant}
                   className="border-orange-300 text-orange-600 hover:bg-orange-50"
                 >
                   <Plus className="w-4 h-4 mr-1" />
