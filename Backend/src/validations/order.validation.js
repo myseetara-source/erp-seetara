@@ -65,21 +65,49 @@ export const paymentStatusSchema = z.enum(['pending', 'partial', 'paid', 'refund
 
 /**
  * Customer Details for Order
+ * 
+ * Flexible validation for Nepal e-commerce:
+ * - Accepts minimal address info for quick orders
+ * - Full address for proper shipping
+ * - Auto-trims and cleans input
  */
 export const orderCustomerSchema = z.object({
-  id: uuidSchema.optional(), // Existing customer ID
-  name: z.string().min(2, 'Name must be at least 2 characters').max(255),
+  // Existing customer ID (optional - for linking)
+  id: uuidSchema.optional().nullable(),
+  
+  // Required fields
+  name: z.string()
+    .min(2, 'Name must be at least 2 characters')
+    .max(255)
+    .trim(),
   phone: phoneSchema,
+  
+  // Optional contact
   alt_phone: optionalPhoneSchema,
   email: optionalEmailSchema,
   
-  // Address
-  address_line1: z.string().min(5).max(500),
+  // Address - Made more flexible for Nepal
+  address_line1: z.string()
+    .min(3, 'Address is required (min 3 chars)')
+    .max(500)
+    .trim()
+    .default('To be confirmed'),
   address_line2: z.string().max(500).optional().nullable(),
-  city: z.string().min(2).max(100),
-  state: z.string().min(2).max(100),
-  pincode: pincodeSchema,
-  country: z.string().default('India'),
+  city: z.string()
+    .min(2, 'City is required')
+    .max(100)
+    .trim()
+    .default('Kathmandu'),
+  state: z.string()
+    .min(2, 'State/Province is required')
+    .max(100)
+    .trim()
+    .default('Bagmati'),
+  pincode: z.string()
+    .min(5, 'Pincode required')
+    .max(10)
+    .default('44600'),
+  country: z.string().trim().default('Nepal'),
   
   // Tracking (for Meta Pixel / Analytics)
   ip_address: z.string().ip().optional().nullable(),
@@ -97,12 +125,26 @@ export const orderCustomerSchema = z.object({
 
 /**
  * Order Item Schema
+ * 
+ * Uses coercion for quantity and price to handle string inputs from forms
  */
 export const orderItemSchema = z.object({
   variant_id: uuidSchema,
-  quantity: positiveIntegerSchema.max(999, 'Quantity cannot exceed 999'),
-  unit_price: priceSchema.optional(), // Optional - will use variant's selling_price if not provided
-  discount_per_unit: priceSchema.optional().default(0),
+  quantity: z.coerce
+    .number({ invalid_type_error: 'Quantity must be a number' })
+    .int('Quantity must be a whole number')
+    .min(1, 'Quantity must be at least 1')
+    .max(999, 'Quantity cannot exceed 999'),
+  unit_price: z.coerce
+    .number({ invalid_type_error: 'Price must be a number' })
+    .min(0, 'Price cannot be negative')
+    .optional()
+    .default(0),
+  discount_per_unit: z.coerce
+    .number()
+    .min(0)
+    .optional()
+    .default(0),
 });
 
 /**
@@ -120,6 +162,8 @@ export const orderItemsArraySchema = z
 /**
  * Create Order Schema
  * Accepts customer details and items for order creation
+ * 
+ * Enhanced with coercion for all numeric fields to handle string inputs from forms
  */
 export const createOrderSchema = z.object({
   // Customer can be new or existing
@@ -132,18 +176,18 @@ export const createOrderSchema = z.object({
   source: orderSourceSchema.default('manual'),
   source_order_id: z.string().max(100).optional().nullable(),
   
-  // Pricing Overrides
-  discount_amount: priceSchema.optional().default(0),
+  // Pricing Overrides (with coercion)
+  discount_amount: z.coerce.number().min(0).default(0),
   discount_code: z.string().max(50).optional().nullable(),
-  shipping_charges: priceSchema.optional().default(0),
-  cod_charges: priceSchema.optional().default(0),
+  shipping_charges: z.coerce.number().min(0).default(100),
+  cod_charges: z.coerce.number().min(0).default(0),
   
   // Payment
   payment_method: paymentMethodSchema.default('cod'),
-  paid_amount: priceSchema.optional().default(0),
+  paid_amount: z.coerce.number().min(0).default(0),
   
-  // Internal
-  priority: z.number().int().min(0).max(2).default(0),
+  // Internal (with coercion for priority)
+  priority: z.coerce.number().int().min(0).max(2).default(0),
   internal_notes: z.string().max(1000).optional().nullable(),
   customer_notes: z.string().max(1000).optional().nullable(),
 });

@@ -43,6 +43,8 @@ export class BadRequestError extends AppError {
 /**
  * Validation Error - 400
  * Used when input validation fails
+ * 
+ * Enhanced to return field-specific errors for frontend form integration
  */
 export class ValidationError extends AppError {
   constructor(message, details = null) {
@@ -50,12 +52,35 @@ export class ValidationError extends AppError {
     this.details = details;
   }
 
+  /**
+   * Convert details array to field-keyed object for frontend
+   * Input: [{ field: 'customer.phone', message: 'Invalid phone' }]
+   * Output: { 'customer.phone': ['Invalid phone'] }
+   */
+  getFieldErrors() {
+    if (!Array.isArray(this.details)) return {};
+    
+    const fields = {};
+    for (const detail of this.details) {
+      const fieldName = detail.field || 'general';
+      if (!fields[fieldName]) {
+        fields[fieldName] = [];
+      }
+      fields[fieldName].push(detail.message);
+    }
+    return fields;
+  }
+
   toJSON() {
     return {
-      ...super.toJSON(),
+      success: false,
       error: {
-        ...super.toJSON().error,
+        code: this.code,
+        message: this.message,
+        timestamp: this.timestamp,
         details: this.details,
+        // Field-keyed errors for frontend form integration
+        fields: this.getFieldErrors(),
       },
     };
   }

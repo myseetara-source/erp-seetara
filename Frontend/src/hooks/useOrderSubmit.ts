@@ -137,49 +137,70 @@ export function useOrderSubmit<T extends z.ZodType>(
         else if (err.response?.status === 400 || err.response?.status === 422) {
           const responseData = err.response?.data;
           
-          // Check for Zod validation errors
-          if (responseData?.errors) {
-            const fieldErrors = responseData.errors;
+          // Extract field errors from either format:
+          // - responseData.errors (old format)
+          // - responseData.error.fields (new format)
+          const fieldErrors = responseData?.errors || responseData?.error?.fields || {};
+          const errorDetails = responseData?.error?.details || [];
+          const hasFieldErrors = Object.keys(fieldErrors).length > 0;
+          
+          if (hasFieldErrors) {
             const errorMessages: string[] = [];
             
             // Build user-friendly error messages
             Object.entries(fieldErrors).forEach(([field, messages]) => {
+              // Clean up field name for display
               const fieldName = field
-                .replace('customer.', '')
-                .replace('items.0.', '')
+                .replace('customer.', '👤 ')
+                .replace('items.0.', '📦 ')
+                .replace('items.', '📦 Item ')
+                .replace('shipping.', '🚚 ')
                 .replace(/_/g, ' ')
                 .replace(/\b\w/g, l => l.toUpperCase());
               
-              if (Array.isArray(messages)) {
-                errorMessages.push(`${fieldName}: ${messages[0]}`);
-              } else if (typeof messages === 'string') {
-                errorMessages.push(`${fieldName}: ${messages}`);
+              const msg = Array.isArray(messages) ? messages[0] : String(messages);
+              errorMessages.push(`${fieldName}: ${msg}`);
+              
+              // Set error on form field for red border
+              try {
+                form.setError(field as any, {
+                  type: 'server',
+                  message: msg,
+                });
+              } catch (e) {
+                // Field path might not exist in form
               }
             });
             
-            // Show each field error as a separate toast
-            errorMessages.slice(0, 3).forEach((msg, index) => {
+            // Show field errors as toasts
+            errorMessages.slice(0, 4).forEach((msg, index) => {
               setTimeout(() => {
                 toast.error('Validation Error', { description: msg });
-              }, index * 200);
+              }, index * 150);
             });
             
-            if (errorMessages.length > 3) {
+            if (errorMessages.length > 4) {
               setTimeout(() => {
-                toast.error(`And ${errorMessages.length - 3} more errors...`);
+                toast.warning(`+${errorMessages.length - 4} more validation errors`);
               }, 700);
             }
             
-            errorMessage = errorMessages.join('. ') || 'Validation failed';
+            errorMessage = 'Please fix the highlighted fields.';
+          } else if (errorDetails.length > 0) {
+            // Use error details if no field map
+            errorMessage = errorDetails.map((e: any) => e.message).join('. ');
+            toast.error('Validation Failed', { description: errorMessage });
           } else {
             // Generic validation message
             errorMessage = responseData?.message || responseData?.error?.message || 'Validation failed. Please check your input.';
+            toast.error('Validation Failed', { description: errorMessage });
           }
           
           // Log detailed validation errors for debugging
           console.error('[Order Validation Failed]', {
-            errors: responseData?.errors,
-            details: responseData?.error?.details,
+            fields: fieldErrors,
+            details: errorDetails,
+            rawResponse: responseData,
           });
         }
         // Handle auth errors

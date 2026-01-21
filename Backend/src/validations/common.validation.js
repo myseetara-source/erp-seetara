@@ -59,39 +59,50 @@ export const optionalEmailSchema = z.preprocess(
 );
 
 /**
- * Indian Pincode validation
+ * Pincode validation (Nepal/India compatible)
+ * Nepal: 5 digits (e.g., 44600)
+ * India: 6 digits (e.g., 110001)
  */
 export const pincodeSchema = z
   .string()
-  .regex(/^[1-9][0-9]{5}$/, 'Invalid pincode. Must be 6 digits');
+  .trim()
+  .min(5, 'Pincode must be at least 5 digits')
+  .max(10, 'Pincode too long')
+  .regex(/^[0-9]{5,6}$/, 'Invalid pincode format');
 
 /**
- * Positive number validation
+ * Positive number validation (with coercion for string inputs)
  */
 export const positiveNumberSchema = z
-  .number()
+  .coerce
+  .number({ invalid_type_error: 'Must be a number' })
   .positive('Value must be positive');
 
 /**
- * Non-negative number validation
+ * Non-negative number validation (with coercion)
  */
 export const nonNegativeNumberSchema = z
-  .number()
+  .coerce
+  .number({ invalid_type_error: 'Must be a number' })
   .min(0, 'Value cannot be negative');
 
 /**
- * Positive integer validation
+ * Positive integer validation (with coercion)
+ * Automatically converts strings like "5" to 5
  */
 export const positiveIntegerSchema = z
-  .number()
+  .coerce
+  .number({ invalid_type_error: 'Must be a number' })
   .int('Value must be an integer')
   .positive('Value must be positive');
 
 /**
- * Price validation (max 2 decimal places)
+ * Price validation (with coercion, max 2 decimal places)
+ * Automatically converts strings like "2500" to 2500.00
  */
 export const priceSchema = z
-  .number()
+  .coerce
+  .number({ invalid_type_error: 'Must be a valid price' })
   .min(0, 'Price cannot be negative')
   .transform((val) => parseFloat(val.toFixed(2)));
 

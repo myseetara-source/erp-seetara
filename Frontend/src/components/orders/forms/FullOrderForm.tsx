@@ -69,6 +69,7 @@ export function FullOrderForm() {
     handleSubmit,
     watch,
     setValue,
+    setError,
     formState: { errors, isValid },
     reset,
   } = useForm<OrderFormData>({
@@ -151,7 +152,7 @@ export function FullOrderForm() {
     }
   };
 
-  // Submit handler
+  // Submit handler with field-level error mapping
   const onSubmit = async (data: OrderFormData) => {
     setIsSubmitting(true);
     setSubmitError(null);
@@ -166,13 +167,63 @@ export function FullOrderForm() {
         }, 2000);
       }
     } catch (error: any) {
+      // Handle network errors
       if (error.code === 'ERR_NETWORK') {
-        setSubmitSuccess(true);
-        setTimeout(() => {
-          router.push('/dashboard/orders');
-        }, 2000);
+        setSubmitError('Network error - please check your connection and try again.');
         return;
       }
+
+      // ===================================================================
+      // HANDLE VALIDATION ERRORS (400) WITH FIELD-LEVEL MAPPING
+      // ===================================================================
+      if (error.response?.status === 400 || error.response?.status === 422) {
+        const responseData = error.response?.data;
+        const errorDetails = responseData?.error?.details || [];
+        const fieldErrors = responseData?.error?.fields || {};
+        
+        // Log for debugging
+        console.log('[FullOrderForm] Validation Error:', {
+          details: errorDetails,
+          fields: fieldErrors,
+        });
+
+        // Set field-level errors in react-hook-form
+        // This maps server errors to form fields with red borders
+        if (Object.keys(fieldErrors).length > 0) {
+          Object.entries(fieldErrors).forEach(([field, messages]) => {
+            // Map flat field names to nested structure
+            // e.g., "customer.phone" -> { customer: { phone: error } }
+            const fieldPath = field as keyof OrderFormData;
+            const errorMessage = Array.isArray(messages) ? messages[0] : String(messages);
+            
+            // Try to set the error on the form field
+            // setError expects a path like 'customer.name' or 'items.0.variant_id'
+            try {
+              // @ts-ignore - dynamic field path
+              setError(fieldPath, {
+                type: 'server',
+                message: errorMessage,
+              });
+            } catch (e) {
+              console.warn(`Could not set error for field: ${field}`);
+            }
+          });
+        }
+
+        // Also show a user-friendly summary
+        if (errorDetails.length > 0) {
+          const summaryMessages = errorDetails
+            .slice(0, 3)
+            .map((e: any) => `${e.field || 'Field'}: ${e.message}`)
+            .join('\n');
+          setSubmitError(`Validation failed:\n${summaryMessages}`);
+        } else {
+          setSubmitError(responseData?.error?.message || 'Validation failed. Please check the form.');
+        }
+        return;
+      }
+
+      // Generic error
       setSubmitError(error.message || 'Failed to create order');
     } finally {
       setIsSubmitting(false);
