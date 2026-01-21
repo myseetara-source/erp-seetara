@@ -90,28 +90,131 @@ class ProductService {
   }
 
   /**
-   * Update product
+   * Update product with variants
    * @param {string} id - Product UUID
-   * @param {Object} data - Update data
-   * @returns {Object} Updated product
+   * @param {Object} data - Update data including variants
+   * @returns {Object} Updated product with variants
+   * 
+   * STRATEGY: For variants, we use upsert logic:
+   * - If variant has ID -> Update existing
+   * - If variant has no ID -> Create new
+   * - Variants not in the list are NOT deleted (to preserve order history)
    */
   async updateProduct(id, data) {
-    const { data: product, error } = await supabaseAdmin
+    // Separate product data from variants
+    const { variants: variantData, ...productData } = data;
+
+    // =========================================================================
+    // STEP 1: Update product basic info
+    // =========================================================================
+    const productUpdateData = {
+      ...productData,
+      updated_at: new Date().toISOString(),
+    };
+
+    // Remove any fields that shouldn't be in products table
+    delete productUpdateData.id;
+    delete productUpdateData.created_at;
+
+    const { data: updatedProduct, error: productError } = await supabaseAdmin
       .from('products')
-      .update(data)
+      .update(productUpdateData)
       .eq('id', id)
       .select()
       .single();
 
-    if (error) {
-      if (error.code === 'PGRST116') {
+    if (productError) {
+      if (productError.code === 'PGRST116') {
         throw new NotFoundError('Product');
       }
-      throw new DatabaseError('Failed to update product', error);
+      logger.error('Failed to update product', { error: productError, productId: id });
+      throw new DatabaseError('Failed to update product', productError);
     }
 
-    logger.info('Product updated', { productId: id });
-    return product;
+    // =========================================================================
+    // STEP 2: Update variants (if provided)
+    // =========================================================================
+    let updatedVariants = [];
+    
+    if (variantData && Array.isArray(variantData) && variantData.length > 0) {
+      for (const variant of variantData) {
+        // Clean up variant data - ensure numeric types
+        const cleanVariant = {
+          product_id: id,
+          sku: variant.sku || '',
+          attributes: variant.attributes || {},
+          cost_price: Number(variant.cost_price) || 0,
+          selling_price: Number(variant.selling_price) || 0,
+          mrp: Number(variant.mrp) || null,
+          current_stock: Number(variant.current_stock) || 0,
+          reorder_level: Number(variant.reorder_level) || 10,
+          is_active: variant.is_active ?? true,
+          updated_at: new Date().toISOString(),
+        };
+
+        if (variant.id) {
+          // =============================================
+          // UPDATE existing variant
+          // =============================================
+          const { data: existingVariant, error: updateError } = await supabaseAdmin
+            .from('product_variants')
+            .update(cleanVariant)
+            .eq('id', variant.id)
+            .eq('product_id', id) // Security: ensure variant belongs to this product
+            .select()
+            .single();
+
+          if (updateError) {
+            logger.warn('Failed to update variant', { 
+              variantId: variant.id, 
+              error: updateError 
+            });
+            // Continue with other variants instead of failing completely
+          } else {
+            updatedVariants.push(existingVariant);
+          }
+        } else {
+          // =============================================
+          // CREATE new variant
+          // =============================================
+          cleanVariant.created_at = new Date().toISOString();
+          
+          const { data: newVariant, error: createError } = await supabaseAdmin
+            .from('product_variants')
+            .insert(cleanVariant)
+            .select()
+            .single();
+
+          if (createError) {
+            logger.warn('Failed to create variant', { 
+              sku: cleanVariant.sku, 
+              error: createError 
+            });
+          } else {
+            updatedVariants.push(newVariant);
+          }
+        }
+      }
+    } else {
+      // Fetch existing variants if none provided
+      const { data: existingVariants } = await supabaseAdmin
+        .from('product_variants')
+        .select('*')
+        .eq('product_id', id)
+        .order('created_at', { ascending: true });
+      
+      updatedVariants = existingVariants || [];
+    }
+
+    logger.info('Product updated', { 
+      productId: id, 
+      variantsUpdated: updatedVariants.length 
+    });
+
+    return {
+      ...updatedProduct,
+      variants: updatedVariants,
+    };
   }
 
   /**

@@ -36,24 +36,33 @@ export const skuSchema = z
 // ============================================================================
 
 /**
- * Inline Variant Schema for Product Creation
- * Used when creating a product with variants in one request
+ * Inline Variant Schema for Product Creation/Update
+ * Used when creating/updating a product with variants in one request
+ * 
+ * ALL NUMERIC FIELDS USE z.coerce to handle string inputs from forms!
  * SKU is optional - will be auto-generated if missing
  */
 const inlineVariantSchema = z.object({
+  // Variant ID (for updates)
+  id: z.string().uuid().optional().nullable(),
+  
   sku: z.string().max(100).optional().nullable(), // Optional - auto-generated if missing
   barcode: z.string().max(100).optional().nullable(),
   attributes: z.record(z.string()).optional().default({}),
+  
   // Legacy fields for backwards compatibility
   color: z.string().max(100).optional().nullable(),
   size: z.string().max(50).optional().nullable(),
   material: z.string().max(100).optional().nullable(),
-  weight_grams: z.number().int().min(0).optional().nullable(),
-  cost_price: priceSchema.optional().default(0), // Default 0 if not provided
-  selling_price: priceSchema.optional().default(0), // Default 0 if not provided
-  mrp: priceSchema.optional().nullable(),
-  current_stock: z.number().int().min(0).default(0),
-  reorder_level: z.number().int().min(0).default(10),
+  
+  // CRITICAL: Use z.coerce to convert strings from form inputs to numbers!
+  weight_grams: z.coerce.number().int().min(0).optional().nullable(),
+  cost_price: z.coerce.number().min(0).default(0),
+  selling_price: z.coerce.number().min(0).default(0),
+  mrp: z.coerce.number().min(0).optional().nullable(),
+  current_stock: z.coerce.number().int().min(0).default(0),
+  reorder_level: z.coerce.number().int().min(0).default(10),
+  
   is_active: z.boolean().default(true),
 }).transform((data) => {
   // Merge legacy fields into attributes
