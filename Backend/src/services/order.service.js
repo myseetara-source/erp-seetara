@@ -1,0 +1,1296 @@
+/**
+ * Order Service
+ * Core order management with state machine, stock management, and integrations
+ */
+
+import { supabaseAdmin } from '../config/supabase.js';
+import config from '../config/index.js';
+import { createLogger } from '../utils/logger.js';
+import {
+  NotFoundError,
+  ValidationError,
+  InvalidStateTransitionError,
+  DatabaseError,
+  InsufficientStockError,
+} from '../utils/errors.js';
+import { calculateOrderTotals, formatVariantName } from '../utils/helpers.js';
+import { productService } from './product.service.js';
+import { customerService } from './customer.service.js';
+import { integrationService } from './integration.service.js';
+
+const logger = createLogger('OrderService');
+
+class OrderService {
+  // ===========================================================================
+  // ORDER CREATION
+  // ===========================================================================
+
+  /**
+   * Create a new order
+   * Full flow: Validate -> Check Stock -> Create/Find Customer -> Create Order -> Deduct Stock -> Log
+   * 
+   * @param {Object} data - Order creation data
+   * @param {Object} context - Request context (user, ip, etc.)
+   * @returns {Object} Created order with items
+   */
+  async createOrder(data, context = {}) {
+    const { customer: customerData, items, ...orderData } = data;
+    const { userId, ipAddress, userAgent } = context;
+
+    logger.info('Creating order', { source: orderData.source, itemCount: items.length });
+
+    // Step 1: Validate and get variant details
+    const variantIds = items.map(item => item.variant_id);
+    const { data: variants, error: variantsError } = await supabaseAdmin
+      .from('product_variants')
+      .select(`
+        id,
+        sku,
+        current_stock,
+        reserved_stock,
+        selling_price,
+        cost_price,
+        color,
+        size,
+        product:products(id, name)
+      `)
+      .in('id', variantIds)
+      .eq('is_active', true);
+
+    if (variantsError || !variants || variants.length !== variantIds.length) {
+      const found = new Set(variants?.map(v => v.id) || []);
+      const missing = variantIds.filter(id => !found.has(id));
+      throw new ValidationError('Some variants not found or inactive', { missing });
+    }
+
+    const variantMap = new Map(variants.map(v => [v.id, v]));
+
+    // Step 2: Check stock availability
+    const stockCheck = await productService.checkStock(items);
+    if (!stockCheck.isAvailable) {
+      throw new InsufficientStockError(
+        stockCheck.unavailable[0].sku,
+        stockCheck.unavailable[0].requested,
+        stockCheck.unavailable[0].available
+      );
+    }
+
+    // Step 3: Find or create customer
+    const { customer, isNew: isNewCustomer } = await customerService.findOrCreate(customerData);
+    logger.debug('Customer resolved', { customerId: customer.id, isNew: isNewCustomer });
+
+    // Step 4: Prepare order items with snapshot data
+    const orderItems = items.map(item => {
+      const variant = variantMap.get(item.variant_id);
+      const unitPrice = item.unit_price ?? variant.selling_price;
+      const discountPerUnit = item.discount_per_unit ?? 0;
+      
+      return {
+        variant_id: item.variant_id,
+        sku: variant.sku,
+        product_name: variant.product.name,
+        variant_name: formatVariantName(variant),
+        quantity: item.quantity,
+        unit_price: unitPrice,
+        unit_cost: variant.cost_price,
+        discount_per_unit: discountPerUnit,
+        total_price: (unitPrice - discountPerUnit) * item.quantity,
+      };
+    });
+
+    // Step 5: Calculate totals
+    const totals = calculateOrderTotals(orderItems, {
+      discountAmount: orderData.discount_amount || 0,
+      shippingCharges: orderData.shipping_charges || 0,
+      codCharges: orderData.cod_charges || 0,
+    });
+
+    // Step 6: Generate order number
+    const { data: orderNumberResult } = await supabaseAdmin
+      .rpc('generate_order_number');
+    const orderNumber = orderNumberResult || `ORD-${Date.now()}`;
+
+    // Step 7: Create order record
+    const orderRecord = {
+      order_number: orderNumber,
+      customer_id: customer.id,
+      source: orderData.source || 'manual',
+      source_order_id: orderData.source_order_id,
+      status: 'intake',
+      
+      // Pricing
+      subtotal: totals.subtotal,
+      discount_amount: totals.discountAmount,
+      discount_code: orderData.discount_code,
+      shipping_charges: totals.shippingCharges,
+      cod_charges: totals.codCharges,
+      total_amount: totals.totalAmount,
+      
+      // Payment
+      payment_method: orderData.payment_method || 'cod',
+      payment_status: orderData.paid_amount >= totals.totalAmount ? 'paid' : 
+                      orderData.paid_amount > 0 ? 'partial' : 'pending',
+      paid_amount: orderData.paid_amount || 0,
+      
+      // Shipping snapshot
+      shipping_name: customerData.name,
+      shipping_phone: customerData.phone,
+      shipping_address: `${customerData.address_line1}${customerData.address_line2 ? ', ' + customerData.address_line2 : ''}`,
+      shipping_city: customerData.city,
+      shipping_state: customerData.state,
+      shipping_pincode: customerData.pincode,
+      
+      // Internal
+      priority: orderData.priority || 0,
+      internal_notes: orderData.internal_notes,
+      customer_notes: orderData.customer_notes,
+    };
+
+    const { data: order, error: orderError } = await supabaseAdmin
+      .from('orders')
+      .insert(orderRecord)
+      .select()
+      .single();
+
+    if (orderError) {
+      logger.error('Failed to create order', { error: orderError });
+      throw new DatabaseError('Failed to create order', orderError);
+    }
+
+    // Step 8: Insert order items
+    const itemsToInsert = orderItems.map(item => ({
+      ...item,
+      order_id: order.id,
+    }));
+
+    const { data: insertedItems, error: itemsError } = await supabaseAdmin
+      .from('order_items')
+      .insert(itemsToInsert)
+      .select();
+
+    if (itemsError) {
+      // Rollback order
+      await supabaseAdmin.from('orders').delete().eq('id', order.id);
+      throw new DatabaseError('Failed to create order items', itemsError);
+    }
+
+    // Step 9: Deduct stock
+    try {
+      await productService.deductStock(items, order.id, userId);
+    } catch (stockError) {
+      // Rollback order and items
+      await supabaseAdmin.from('order_items').delete().eq('order_id', order.id);
+      await supabaseAdmin.from('orders').delete().eq('id', order.id);
+      throw stockError;
+    }
+
+    // Step 10: Create order log
+    await this.createOrderLog({
+      order_id: order.id,
+      old_status: null,
+      new_status: 'intake',
+      action: 'order_created',
+      description: `Order created via ${orderData.source || 'manual'}`,
+      changed_by: userId,
+      ip_address: ipAddress,
+      user_agent: userAgent,
+      meta: { customer_id: customer.id, is_new_customer: isNewCustomer },
+    });
+
+    // Step 11: Trigger integrations (async, non-blocking)
+    this.triggerOrderCreatedIntegrations(order, customer, items).catch(err => {
+      logger.error('Integration trigger failed', { orderId: order.id, error: err.message });
+    });
+
+    logger.info('Order created successfully', {
+      orderId: order.id,
+      orderNumber: order.order_number,
+      customerId: customer.id,
+      total: order.total_amount,
+    });
+
+    return {
+      ...order,
+      items: insertedItems,
+      customer,
+    };
+  }
+
+  // ===========================================================================
+  // STATUS MANAGEMENT (State Machine)
+  // ===========================================================================
+
+  /**
+   * Update order status with state machine validation
+   * Handles stock restoration for cancellations/returns
+   * 
+   * @param {string} orderId - Order UUID
+   * @param {Object} statusData - Status update data
+   * @param {Object} context - Request context
+   * @returns {Object} Updated order
+   */
+  async updateStatus(orderId, statusData, context = {}) {
+    const { status: newStatus, reason, awb_number, courier_partner } = statusData;
+    const { userId, ipAddress, userAgent } = context;
+
+    // Get current order
+    const { data: order, error } = await supabaseAdmin
+      .from('orders')
+      .select('*')
+      .eq('id', orderId)
+      .eq('is_deleted', false)
+      .single();
+
+    if (error || !order) {
+      throw new NotFoundError('Order');
+    }
+
+    const currentStatus = order.status;
+
+    // Validate state transition
+    const allowedTransitions = config.statusTransitions[currentStatus] || [];
+    if (!allowedTransitions.includes(newStatus)) {
+      throw new InvalidStateTransitionError(currentStatus, newStatus);
+    }
+
+    // Prepare update data
+    const updateData = { status: newStatus };
+
+    // Handle status-specific logic
+    if (newStatus === 'shipped' && awb_number) {
+      updateData.awb_number = awb_number;
+      updateData.courier_partner = courier_partner;
+      updateData.shipped_at = new Date().toISOString();
+    }
+
+    if (newStatus === 'delivered') {
+      updateData.delivered_at = new Date().toISOString();
+      updateData.payment_status = 'paid';
+    }
+
+    if (newStatus === 'cancelled') {
+      updateData.cancelled_at = new Date().toISOString();
+    }
+
+    // Update order
+    const { data: updatedOrder, error: updateError } = await supabaseAdmin
+      .from('orders')
+      .update(updateData)
+      .eq('id', orderId)
+      .select()
+      .single();
+
+    if (updateError) {
+      throw new DatabaseError('Failed to update order status', updateError);
+    }
+
+    // Handle stock restoration for cancelled/returned orders
+    if (config.stockRestoringStatuses.includes(newStatus)) {
+      try {
+        await productService.restoreStockForOrder(
+          orderId,
+          userId,
+          `Order ${newStatus}: ${reason || 'No reason provided'}`
+        );
+        logger.info('Stock restored for order', { orderId, status: newStatus });
+      } catch (stockError) {
+        logger.error('Failed to restore stock', { orderId, error: stockError.message });
+        // Don't throw - order status is already updated
+      }
+    }
+
+    // Create order log
+    await this.createOrderLog({
+      order_id: orderId,
+      old_status: currentStatus,
+      new_status: newStatus,
+      action: 'status_change',
+      description: reason || `Status changed to ${newStatus}`,
+      changed_by: userId,
+      ip_address: ipAddress,
+      user_agent: userAgent,
+      meta: { awb_number, courier_partner },
+    });
+
+    // Trigger status change integrations
+    this.triggerStatusChangeIntegrations(updatedOrder, currentStatus, newStatus).catch(err => {
+      logger.error('Integration trigger failed', { orderId, error: err.message });
+    });
+
+    logger.info('Order status updated', {
+      orderId,
+      orderNumber: order.order_number,
+      from: currentStatus,
+      to: newStatus,
+    });
+
+    return updatedOrder;
+  }
+
+  /**
+   * Bulk status update
+   * @param {Array} orderIds - Order UUIDs
+   * @param {string} status - New status
+   * @param {string} reason - Reason for change
+   * @param {Object} context - Request context
+   * @returns {Object} Results summary
+   */
+  async bulkUpdateStatus(orderIds, status, reason, context = {}) {
+    const results = {
+      success: [],
+      failed: [],
+    };
+
+    for (const orderId of orderIds) {
+      try {
+        await this.updateStatus(orderId, { status, reason }, context);
+        results.success.push(orderId);
+      } catch (error) {
+        results.failed.push({
+          orderId,
+          error: error.message,
+        });
+      }
+    }
+
+    logger.info('Bulk status update completed', {
+      total: orderIds.length,
+      success: results.success.length,
+      failed: results.failed.length,
+    });
+
+    return results;
+  }
+
+  // ===========================================================================
+  // ORDER RETRIEVAL
+  // ===========================================================================
+
+  /**
+   * Get order by ID with all related data
+   * @param {string} id - Order UUID
+   * @returns {Object} Order with items, customer, and logs
+   */
+  async getOrderById(id) {
+    const { data: order, error } = await supabaseAdmin
+      .from('orders')
+      .select(`
+        *,
+        customer:customers(*),
+        items:order_items(
+          *,
+          variant:product_variants(
+            id,
+            sku,
+            color,
+            size,
+            current_stock,
+            product:products(id, name, image_url)
+          )
+        ),
+        logs:order_logs(
+          id,
+          old_status,
+          new_status,
+          action,
+          description,
+          created_at
+        )
+      `)
+      .eq('id', id)
+      .eq('is_deleted', false)
+      .single();
+
+    if (error || !order) {
+      throw new NotFoundError('Order');
+    }
+
+    // Sort logs by date
+    if (order.logs) {
+      order.logs.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+    }
+
+    return order;
+  }
+
+  /**
+   * Get order by order number
+   * @param {string} orderNumber - Order number (e.g., ORD-2026-000001)
+   * @returns {Object} Order
+   */
+  async getOrderByNumber(orderNumber) {
+    const { data: order, error } = await supabaseAdmin
+      .from('orders')
+      .select(`
+        *,
+        customer:customers(*),
+        items:order_items(*)
+      `)
+      .eq('order_number', orderNumber)
+      .eq('is_deleted', false)
+      .single();
+
+    if (error || !order) {
+      throw new NotFoundError('Order');
+    }
+
+    return order;
+  }
+
+  /**
+   * List orders with filtering and pagination
+   * Returns flattened data with joined customer, vendor, and item count
+   * @param {Object} options - Query options
+   * @returns {Object} Paginated orders with clean format for frontend
+   */
+  async listOrders(options = {}) {
+    const {
+      page = 1,
+      limit = 20,
+      sortBy = 'created_at',
+      sortOrder = 'desc',
+      status,
+      source,
+      customer_id,
+      payment_status,
+      assigned_to,
+      start_date,
+      end_date,
+      search,
+      awb,
+    } = options;
+
+    const from = (page - 1) * limit;
+    const to = from + limit - 1;
+
+    // Query with joins for customer and order items
+    // Also get vendor info from the first order item's variant
+    let query = supabaseAdmin
+      .from('orders')
+      .select(`
+        id,
+        order_number,
+        status,
+        source,
+        total_amount,
+        payment_status,
+        shipping_name,
+        shipping_phone,
+        shipping_city,
+        shipping_address,
+        awb_number,
+        courier_partner,
+        priority,
+        created_at,
+        updated_at,
+        customer:customers(
+          id,
+          name,
+          phone,
+          city,
+          address_line1,
+          ip_address
+        ),
+        items:order_items(
+          id,
+          product_name,
+          quantity,
+          variant:product_variants(
+            id,
+            sku
+          )
+        )
+      `, { count: 'exact' })
+      .eq('is_deleted', false);
+
+    // Apply filters
+    if (status) query = query.eq('status', status);
+    if (source) query = query.eq('source', source);
+    if (customer_id) query = query.eq('customer_id', customer_id);
+    if (payment_status) query = query.eq('payment_status', payment_status);
+    if (assigned_to) query = query.eq('assigned_to', assigned_to);
+    if (awb) query = query.eq('awb_number', awb);
+    
+    if (start_date) {
+      query = query.gte('created_at', start_date);
+    }
+    if (end_date) {
+      query = query.lte('created_at', end_date);
+    }
+
+    if (search) {
+      query = query.or(
+        `order_number.ilike.%${search}%,` +
+        `shipping_name.ilike.%${search}%,` +
+        `shipping_phone.ilike.%${search}%`
+      );
+    }
+
+    const { data, error, count } = await query
+      .order(sortBy, { ascending: sortOrder === 'asc' })
+      .range(from, to);
+
+    if (error) {
+      throw new DatabaseError('Failed to list orders', error);
+    }
+
+    // Transform data to flat format for frontend
+    // Frontend expects: id, order_number, customer_name, customer_phone, total_amount, status, vendor_name, item_count
+    const transformedData = (data || []).map(order => ({
+      id: order.id,
+      order_number: order.order_number,
+      
+      // Customer info (flattened)
+      customer_name: order.customer?.name || order.shipping_name || 'Unknown',
+      customer_phone: order.customer?.phone || order.shipping_phone || '',
+      customer_city: order.customer?.city || order.shipping_city || null,
+      customer_address: order.customer?.address_line1 || order.shipping_address || null,
+      
+      // Order details
+      total_amount: parseFloat(order.total_amount) || 0,
+      status: order.status,
+      source: order.source,
+      payment_status: order.payment_status,
+      
+      // Item count
+      item_count: order.items?.length || 0,
+      
+      // Vendor name (from source or first product for now)
+      // In a real scenario, this would come from a vendor relationship
+      vendor_name: this.getVendorNameFromSource(order.source),
+      
+      // Logistics
+      awb_number: order.awb_number,
+      courier_partner: order.courier_partner,
+      priority: order.priority,
+      
+      // Timestamps
+      created_at: order.created_at,
+      updated_at: order.updated_at,
+    }));
+
+    return {
+      data: transformedData,
+      pagination: {
+        page,
+        limit,
+        total: count || 0,
+        totalPages: Math.ceil((count || 0) / limit),
+        hasNext: page < Math.ceil((count || 0) / limit),
+        hasPrev: page > 1,
+      },
+    };
+  }
+
+  /**
+   * Get vendor display name from order source
+   * @param {string} source - Order source
+   * @returns {string|null} Vendor name
+   */
+  getVendorNameFromSource(source) {
+    const sourceVendorMap = {
+      'todaytrend': 'Today Trend',
+      'seetara': 'Seetara',
+      'shopify': 'Shopify Store',
+      'woocommerce': 'WooCommerce',
+      'manual': null,
+      'api': null,
+    };
+    return sourceVendorMap[source] || null;
+  }
+
+  /**
+   * Get order statistics
+   * @param {Object} options - Date range options
+   * @returns {Object} Statistics
+   */
+  async getOrderStats(options = {}) {
+    const { start_date, end_date } = options;
+
+    let query = supabaseAdmin
+      .from('orders')
+      .select('status, total_amount, payment_status')
+      .eq('is_deleted', false);
+
+    if (start_date) query = query.gte('created_at', start_date);
+    if (end_date) query = query.lte('created_at', end_date);
+
+    const { data, error } = await query;
+
+    if (error) {
+      throw new DatabaseError('Failed to get order stats', error);
+    }
+
+    // Calculate statistics
+    const stats = {
+      total_orders: data.length,
+      total_revenue: 0,
+      by_status: {},
+      by_payment_status: {},
+    };
+
+    for (const order of data) {
+      stats.total_revenue += parseFloat(order.total_amount) || 0;
+      
+      stats.by_status[order.status] = (stats.by_status[order.status] || 0) + 1;
+      stats.by_payment_status[order.payment_status] = 
+        (stats.by_payment_status[order.payment_status] || 0) + 1;
+    }
+
+    return stats;
+  }
+
+  // ===========================================================================
+  // ORDER UPDATES
+  // ===========================================================================
+
+  /**
+   * Update order details (not status)
+   * @param {string} id - Order UUID
+   * @param {Object} data - Update data
+   * @param {Object} context - Request context
+   * @returns {Object} Updated order
+   */
+  async updateOrder(id, data, context = {}) {
+    const { userId, ipAddress, userAgent } = context;
+
+    // Check if order exists and can be edited
+    const { data: order, error } = await supabaseAdmin
+      .from('orders')
+      .select('status')
+      .eq('id', id)
+      .eq('is_deleted', false)
+      .single();
+
+    if (error || !order) {
+      throw new NotFoundError('Order');
+    }
+
+    // Check if status allows editing
+    const statusConfig = config.orderStatuses[order.status];
+    if (!statusConfig?.canEdit) {
+      throw new ValidationError(`Cannot edit order in '${order.status}' status`);
+    }
+
+    // Update order
+    const { data: updatedOrder, error: updateError } = await supabaseAdmin
+      .from('orders')
+      .update(data)
+      .eq('id', id)
+      .select()
+      .single();
+
+    if (updateError) {
+      throw new DatabaseError('Failed to update order', updateError);
+    }
+
+    // Log the change
+    await this.createOrderLog({
+      order_id: id,
+      old_status: order.status,
+      new_status: order.status,
+      action: 'order_updated',
+      description: 'Order details updated',
+      changed_by: userId,
+      ip_address: ipAddress,
+      user_agent: userAgent,
+      meta: { updated_fields: Object.keys(data) },
+    });
+
+    logger.info('Order updated', { orderId: id });
+    return updatedOrder;
+  }
+
+  /**
+   * Soft delete order
+   * @param {string} id - Order UUID
+   * @param {Object} context - Request context
+   */
+  async deleteOrder(id, context = {}) {
+    const { userId } = context;
+
+    const { error } = await supabaseAdmin
+      .from('orders')
+      .update({ is_deleted: true })
+      .eq('id', id);
+
+    if (error) {
+      throw new DatabaseError('Failed to delete order', error);
+    }
+
+    await this.createOrderLog({
+      order_id: id,
+      action: 'order_deleted',
+      description: 'Order soft deleted',
+      changed_by: userId,
+    });
+
+    logger.info('Order soft deleted', { orderId: id });
+  }
+
+  // ===========================================================================
+  // ORDER LOGS
+  // ===========================================================================
+
+  /**
+   * Create order log entry
+   * @param {Object} logData - Log data
+   */
+  async createOrderLog(logData) {
+    const { error } = await supabaseAdmin
+      .from('order_logs')
+      .insert(logData);
+
+    if (error) {
+      logger.error('Failed to create order log', { error, orderId: logData.order_id });
+    }
+  }
+
+  /**
+   * Get order logs
+   * @param {string} orderId - Order UUID
+   * @param {Object} options - Query options
+   * @returns {Array} Order logs
+   */
+  async getOrderLogs(orderId, options = {}) {
+    const { page = 1, limit = 50 } = options;
+    const from = (page - 1) * limit;
+    const to = from + limit - 1;
+
+    const { data, error, count } = await supabaseAdmin
+      .from('order_logs')
+      .select('*', { count: 'exact' })
+      .eq('order_id', orderId)
+      .order('created_at', { ascending: false })
+      .range(from, to);
+
+    if (error) {
+      throw new DatabaseError('Failed to fetch order logs', error);
+    }
+
+    return {
+      data,
+      pagination: {
+        page,
+        limit,
+        total: count,
+        totalPages: Math.ceil(count / limit),
+      },
+    };
+  }
+
+  // ===========================================================================
+  // INTEGRATION TRIGGERS
+  // ===========================================================================
+
+  /**
+   * Trigger integrations after order creation
+   * Non-blocking async calls to external services
+   */
+  async triggerOrderCreatedIntegrations(order, customer, items) {
+    // SMS notification (placeholder)
+    if (config.sms.apiKey) {
+      await integrationService.sendSMS(customer.phone, 'order_created', {
+        order_number: order.order_number,
+        amount: order.total_amount,
+      }).catch(err => logger.error('SMS failed', { error: err.message }));
+    }
+
+    // Facebook Conversion API (placeholder)
+    if (config.facebook.pixelId) {
+      await integrationService.trackFacebookEvent('Purchase', {
+        order_id: order.id,
+        value: order.total_amount,
+        currency: 'INR',
+        customer_phone: customer.phone,
+        customer_email: customer.email,
+        fbclid: customer.fbclid,
+      }).catch(err => logger.error('Facebook CAPI failed', { error: err.message }));
+    }
+  }
+
+  /**
+   * Trigger integrations after status change
+   */
+  async triggerStatusChangeIntegrations(order, oldStatus, newStatus) {
+    // SMS notification for key status changes
+    const smsStatuses = ['shipped', 'delivered', 'cancelled'];
+    
+    if (smsStatuses.includes(newStatus) && config.sms.apiKey) {
+      await integrationService.sendSMS(order.shipping_phone, `order_${newStatus}`, {
+        order_number: order.order_number,
+        awb_number: order.awb_number,
+        tracking_url: order.tracking_url,
+      }).catch(err => logger.error('SMS failed', { error: err.message }));
+    }
+  }
+
+  // ===========================================================================
+  // NEPAL LOGISTICS - INSIDE VALLEY (Our Riders)
+  // ===========================================================================
+
+  /**
+   * Assign rider to order
+   * @param {string} orderId - Order UUID
+   * @param {string} riderId - Rider user UUID
+   * @param {Object} context - Request context
+   * @returns {Object} Updated order
+   */
+  async assignRider(orderId, riderId, context = {}) {
+    const { userId } = context;
+
+    // Get order
+    const { data: order, error } = await supabaseAdmin
+      .from('orders')
+      .select('*')
+      .eq('id', orderId)
+      .eq('is_deleted', false)
+      .single();
+
+    if (error || !order) {
+      throw new NotFoundError('Order');
+    }
+
+    // Validate fulfillment type
+    if (order.fulfillment_type !== 'inside_valley') {
+      throw new ValidationError('Rider assignment is only for Inside Valley orders');
+    }
+
+    // Validate status
+    if (order.status !== 'packed') {
+      throw new ValidationError('Order must be packed before assigning rider');
+    }
+
+    // Validate rider exists and is available
+    const { data: rider, error: riderError } = await supabaseAdmin
+      .from('users')
+      .select('id, name, phone, role')
+      .eq('id', riderId)
+      .eq('role', 'rider')
+      .eq('is_active', true)
+      .single();
+
+    if (riderError || !rider) {
+      throw new NotFoundError('Rider');
+    }
+
+    // Update order
+    const { data: updatedOrder, error: updateError } = await supabaseAdmin
+      .from('orders')
+      .update({
+        rider_id: riderId,
+        rider_assigned_at: new Date().toISOString(),
+      })
+      .eq('id', orderId)
+      .select()
+      .single();
+
+    if (updateError) {
+      throw new DatabaseError('Failed to assign rider', updateError);
+    }
+
+    // Log
+    await this.createOrderLog({
+      order_id: orderId,
+      action: 'rider_assigned',
+      description: `Rider assigned: ${rider.name} (${rider.phone})`,
+      changed_by: userId,
+      meta: { rider_id: riderId, rider_name: rider.name },
+    });
+
+    // TODO: Send SMS to rider with order details
+    // TODO: Send SMS to customer with rider info
+
+    logger.info('Rider assigned to order', { orderId, riderId, riderName: rider.name });
+    return updatedOrder;
+  }
+
+  /**
+   * Mark order as out for delivery (Inside Valley)
+   * @param {string} orderId - Order UUID
+   * @param {Object} context - Request context
+   * @returns {Object} Updated order
+   */
+  async markOutForDelivery(orderId, context = {}) {
+    const { userId } = context;
+
+    const { data: order, error } = await supabaseAdmin
+      .from('orders')
+      .select('*')
+      .eq('id', orderId)
+      .eq('is_deleted', false)
+      .single();
+
+    if (error || !order) {
+      throw new NotFoundError('Order');
+    }
+
+    // Validate
+    if (order.fulfillment_type !== 'inside_valley') {
+      throw new ValidationError('Out for Delivery is only for Inside Valley orders');
+    }
+
+    if (!order.rider_id) {
+      throw new ValidationError('Order must have a rider assigned first');
+    }
+
+    if (order.status !== 'packed') {
+      throw new ValidationError('Order must be packed to mark as out for delivery');
+    }
+
+    // Update status
+    const { data: updatedOrder, error: updateError } = await supabaseAdmin
+      .from('orders')
+      .update({
+        status: 'out_for_delivery',
+      })
+      .eq('id', orderId)
+      .select()
+      .single();
+
+    if (updateError) {
+      throw new DatabaseError('Failed to update order status', updateError);
+    }
+
+    // Log
+    await this.createOrderLog({
+      order_id: orderId,
+      old_status: 'packed',
+      new_status: 'out_for_delivery',
+      action: 'status_change',
+      description: 'Order marked as out for delivery',
+      changed_by: userId,
+    });
+
+    // TODO: Send SMS to customer: "Your order is out for delivery"
+
+    logger.info('Order marked as out for delivery', { orderId });
+    return updatedOrder;
+  }
+
+  /**
+   * Get available riders
+   * @returns {Array} List of available riders
+   */
+  async getAvailableRiders() {
+    const { data, error } = await supabaseAdmin
+      .from('users')
+      .select(`
+        id,
+        name,
+        phone,
+        riders:riders(
+          vehicle_type,
+          is_available,
+          total_deliveries,
+          successful_deliveries,
+          average_rating
+        )
+      `)
+      .eq('role', 'rider')
+      .eq('is_active', true);
+
+    if (error) {
+      throw new DatabaseError('Failed to fetch riders', error);
+    }
+
+    // Format and filter available riders
+    return data
+      .filter(u => u.riders?.is_available !== false)
+      .map(u => ({
+        id: u.id,
+        name: u.name,
+        phone: u.phone,
+        vehicle_type: u.riders?.vehicle_type || 'bike',
+        total_deliveries: u.riders?.total_deliveries || 0,
+        successful_deliveries: u.riders?.successful_deliveries || 0,
+        average_rating: u.riders?.average_rating || 5.0,
+        is_available: u.riders?.is_available ?? true,
+      }));
+  }
+
+  // ===========================================================================
+  // NEPAL LOGISTICS - OUTSIDE VALLEY (3rd Party Couriers)
+  // ===========================================================================
+
+  /**
+   * Handover order to courier (Outside Valley)
+   * Automatically pushes to logistics provider API
+   * 
+   * @param {string} orderId - Order UUID
+   * @param {Object} courierData - Courier details
+   * @param {Object} context - Request context
+   * @returns {Object} Updated order
+   */
+  async handoverToCourier(orderId, courierData, context = {}) {
+    const { courier_partner, courier_tracking_id, awb_number } = courierData;
+    const { userId } = context;
+
+    // Get order with customer
+    const { data: order, error } = await supabaseAdmin
+      .from('orders')
+      .select('*, customer:customers(*)')
+      .eq('id', orderId)
+      .eq('is_deleted', false)
+      .single();
+
+    if (error || !order) {
+      throw new NotFoundError('Order');
+    }
+
+    // Validate
+    if (order.fulfillment_type !== 'outside_valley') {
+      throw new ValidationError('Handover to Courier is only for Outside Valley orders');
+    }
+
+    if (order.status !== 'packed') {
+      throw new ValidationError('Order must be packed before handover to courier');
+    }
+
+    if (!courier_partner) {
+      throw new ValidationError('Courier partner is required');
+    }
+
+    // If tracking ID not provided, try to get from logistics API
+    let trackingId = courier_tracking_id || awb_number;
+    let logisticsResult = null;
+
+    if (!trackingId) {
+      // Auto-push to logistics provider
+      try {
+        const { LogisticsAdapterFactory } = await import('./logistics/index.js');
+        const adapter = await LogisticsAdapterFactory.getAdapter(
+          courier_partner.toLowerCase().replace(' ', '_')
+        );
+        
+        logisticsResult = await adapter.pushOrder({
+          ...order,
+          shipping_name: order.shipping_name || order.customer?.name,
+          shipping_phone: order.shipping_phone || order.customer?.phone,
+          shipping_address: order.shipping_address || order.customer?.address_line1,
+          shipping_city: order.shipping_city || order.customer?.city,
+          shipping_pincode: order.shipping_pincode || order.customer?.pincode,
+        });
+
+        trackingId = logisticsResult.trackingId || logisticsResult.awbNumber;
+        
+        logger.info('Order pushed to logistics', { 
+          orderId, 
+          provider: courier_partner,
+          trackingId 
+        });
+      } catch (logisticsError) {
+        // Log but don't fail - operator can enter tracking ID manually
+        logger.warn('Failed to auto-push to logistics', { 
+          orderId, 
+          error: logisticsError.message 
+        });
+      }
+    }
+
+    if (!trackingId) {
+      throw new ValidationError('Tracking ID is required. Either provide it or ensure logistics integration is configured.');
+    }
+
+    // Update order
+    const { data: updatedOrder, error: updateError } = await supabaseAdmin
+      .from('orders')
+      .update({
+        status: 'handover_to_courier',
+        courier_partner,
+        courier_tracking_id: trackingId,
+        awb_number: trackingId,
+        handover_at: new Date().toISOString(),
+      })
+      .eq('id', orderId)
+      .select()
+      .single();
+
+    if (updateError) {
+      throw new DatabaseError('Failed to update order', updateError);
+    }
+
+    // Log
+    await this.createOrderLog({
+      order_id: orderId,
+      old_status: 'packed',
+      new_status: 'handover_to_courier',
+      action: 'status_change',
+      description: `Handed over to ${courier_partner}. Tracking: ${trackingId}`,
+      changed_by: userId,
+      meta: { courier_partner, tracking_id: trackingId, logistics_result: logisticsResult },
+    });
+
+    // TODO: Send SMS to customer with tracking info
+
+    logger.info('Order handed over to courier', { orderId, courier_partner, trackingId });
+    return updatedOrder;
+  }
+
+  /**
+   * Get list of courier partners
+   * @returns {Array} List of courier partners
+   */
+  async getCourierPartners() {
+    const { data, error } = await supabaseAdmin
+      .from('courier_partners')
+      .select('*')
+      .eq('is_active', true)
+      .order('name');
+
+    if (error) {
+      throw new DatabaseError('Failed to fetch courier partners', error);
+    }
+
+    return data;
+  }
+
+  // ===========================================================================
+  // COMMON DELIVERY METHODS
+  // ===========================================================================
+
+  /**
+   * Mark order as delivered
+   * @param {string} orderId - Order UUID
+   * @param {Object} deliveryData - Delivery details
+   * @param {Object} context - Request context
+   * @returns {Object} Updated order
+   */
+  async markDelivered(orderId, deliveryData = {}, context = {}) {
+    const { receiver_name, receiver_phone, pod_image_url, notes } = deliveryData;
+    const { userId } = context;
+
+    const { data: order, error } = await supabaseAdmin
+      .from('orders')
+      .select('*')
+      .eq('id', orderId)
+      .eq('is_deleted', false)
+      .single();
+
+    if (error || !order) {
+      throw new NotFoundError('Order');
+    }
+
+    // Validate status transition
+    const validFromStatuses = ['out_for_delivery', 'in_transit', 'handover_to_courier', 'shipped', 'store_sale'];
+    if (!validFromStatuses.includes(order.status)) {
+      throw new ValidationError(`Cannot mark as delivered from status: ${order.status}`);
+    }
+
+    // Update order
+    const { data: updatedOrder, error: updateError } = await supabaseAdmin
+      .from('orders')
+      .update({
+        status: 'delivered',
+        delivered_at: new Date().toISOString(),
+        payment_status: 'paid',
+      })
+      .eq('id', orderId)
+      .select()
+      .single();
+
+    if (updateError) {
+      throw new DatabaseError('Failed to update order', updateError);
+    }
+
+    // Create delivery log
+    await supabaseAdmin
+      .from('delivery_logs')
+      .insert({
+        order_id: orderId,
+        rider_id: order.rider_id,
+        status: 'delivered',
+        receiver_name,
+        receiver_phone,
+        pod_image_url,
+        notes,
+        completed_at: new Date().toISOString(),
+      });
+
+    // Log
+    await this.createOrderLog({
+      order_id: orderId,
+      old_status: order.status,
+      new_status: 'delivered',
+      action: 'status_change',
+      description: `Order delivered${receiver_name ? ` to ${receiver_name}` : ''}`,
+      changed_by: userId,
+    });
+
+    // TODO: Send thank you SMS to customer
+    // TODO: Request review after 24 hours
+    // TODO: Update rider metrics
+
+    logger.info('Order marked as delivered', { orderId });
+    return updatedOrder;
+  }
+
+  /**
+   * Mark order as returned
+   * @param {string} orderId - Order UUID
+   * @param {Object} returnData - Return details
+   * @param {Object} context - Request context
+   * @returns {Object} Updated order
+   */
+  async markReturned(orderId, returnData = {}, context = {}) {
+    const { return_reason, notes } = returnData;
+    const { userId } = context;
+
+    const { data: order, error } = await supabaseAdmin
+      .from('orders')
+      .select('*')
+      .eq('id', orderId)
+      .eq('is_deleted', false)
+      .single();
+
+    if (error || !order) {
+      throw new NotFoundError('Order');
+    }
+
+    // Update order
+    const { data: updatedOrder, error: updateError } = await supabaseAdmin
+      .from('orders')
+      .update({
+        status: 'return',
+        return_reason,
+      })
+      .eq('id', orderId)
+      .select()
+      .single();
+
+    if (updateError) {
+      throw new DatabaseError('Failed to update order', updateError);
+    }
+
+    // Create delivery log
+    await supabaseAdmin
+      .from('delivery_logs')
+      .insert({
+        order_id: orderId,
+        rider_id: order.rider_id,
+        status: 'returned',
+        notes: `${return_reason || 'No reason provided'}. ${notes || ''}`,
+        completed_at: new Date().toISOString(),
+      });
+
+    // Log
+    await this.createOrderLog({
+      order_id: orderId,
+      old_status: order.status,
+      new_status: 'return',
+      action: 'status_change',
+      description: `Order returned: ${return_reason || 'No reason'}`,
+      changed_by: userId,
+    });
+
+    // TODO: Restore inventory
+    // TODO: Update rider/courier metrics
+
+    logger.info('Order marked as returned', { orderId, reason: return_reason });
+    return updatedOrder;
+  }
+}
+
+// Export singleton instance
+export const orderService = new OrderService();
+export default orderService;
