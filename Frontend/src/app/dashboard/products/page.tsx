@@ -98,12 +98,24 @@ export default function ProductsPage() {
     return `Rs. ${amount.toLocaleString()}`;
   };
 
-  // Get price range from variants
+  // Get price range from variants - Fixed NaN handling
   const getPriceRange = (product: Product) => {
-    if (!product.variants || product.variants.length === 0) return '-';
-    const prices = product.variants.map(v => v.selling_price);
+    if (!product.variants || product.variants.length === 0) {
+      return 'No Variants';
+    }
+    
+    // Convert to numbers and filter out NaN/null/undefined
+    const prices = product.variants
+      .map(v => Number(v.selling_price))
+      .filter(p => !isNaN(p) && p > 0);
+    
+    if (prices.length === 0) {
+      return 'Price Not Set';
+    }
+    
     const min = Math.min(...prices);
     const max = Math.max(...prices);
+    
     if (min === max) return formatCurrency(min);
     return `${formatCurrency(min)} - ${formatCurrency(max)}`;
   };
@@ -114,15 +126,19 @@ export default function ProductsPage() {
     p => p.variants?.some(v => v.cost_price !== undefined)
   );
 
-  // Get cost price range (admin only)
+  // Get cost price range (admin only) - Fixed NaN handling
   const getCostPriceRange = (product: Product) => {
     if (!product.variants || product.variants.length === 0) return null;
+    
     const costs = product.variants
-      .map(v => v.cost_price)
-      .filter((c): c is number => c !== undefined);
+      .map(v => Number(v.cost_price))
+      .filter(c => !isNaN(c) && c !== undefined && c !== null);
+    
     if (costs.length === 0) return null;
+    
     const min = Math.min(...costs);
     const max = Math.max(...costs);
+    
     if (min === max) return formatCurrency(min);
     return `${formatCurrency(min)} - ${formatCurrency(max)}`;
   };

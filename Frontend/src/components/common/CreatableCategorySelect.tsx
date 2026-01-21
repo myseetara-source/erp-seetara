@@ -114,7 +114,7 @@ export const CreatableCategorySelect = forwardRef<
     const fetchCategories = useCallback(async (searchQuery: string = '') => {
       setIsLoading(true);
       try {
-        // Try to fetch from API
+        // Try to fetch from API - but gracefully fall back if endpoint doesn't exist
         const response = await apiClient.get('/categories', {
           params: { search: searchQuery, limit: 20 },
         });
@@ -130,8 +130,13 @@ export const CreatableCategorySelect = forwardRef<
             .map(name => ({ id: name.toLowerCase(), name }));
           setCategories(filtered);
         }
-      } catch (err) {
-        // Use default categories on error
+      } catch (err: any) {
+        // Silently use default categories on 404 or any error
+        // This is expected if /categories endpoint doesn't exist yet
+        if (err?.response?.status !== 404) {
+          console.debug('[CreatableCategorySelect] API not available, using defaults');
+        }
+        
         const filtered = DEFAULT_CATEGORIES
           .filter(cat => 
             cat.toLowerCase().includes(searchQuery.toLowerCase())
