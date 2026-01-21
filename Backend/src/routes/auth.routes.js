@@ -37,6 +37,10 @@ const refreshTokenSchema = z.object({
   refreshToken: z.string(),
 });
 
+const verifyPasswordSchema = z.object({
+  password: z.string().min(1, 'Password is required'),
+});
+
 // Public routes
 router.post('/login', validateBody(loginSchema), authController.login);
 router.post('/refresh', validateBody(refreshTokenSchema), authController.refreshToken);
@@ -49,6 +53,21 @@ router.post(
   authenticate,
   validateBody(changePasswordSchema),
   authController.changePassword
+);
+
+/**
+ * Verify password for secure actions
+ * POST /auth/verify-password
+ * 
+ * Used by frontend SecureActionDialog for:
+ * - Level 3 (High Risk) actions like Delete
+ * - Viewing sensitive financial data
+ */
+router.post(
+  '/verify-password',
+  authenticate,
+  validateBody(verifyPasswordSchema),
+  authController.verifyPassword
 );
 
 // Admin only

@@ -42,6 +42,7 @@ import {
 import { Skeleton } from '@/components/ui/skeleton';
 import { VariantAttributeBadges } from '@/components/common/VariantAttributeBadges';
 import { ShowIfDataExists } from '@/components/auth/PermissionGuard';
+import { SecureActionDialog, DeactivateActionDialog, DeleteActionDialog } from '@/components/common/SecureActionDialog';
 import { getProducts, toggleProductStatus, deleteProduct, type Product } from '@/lib/api/products';
 
 export default function ProductsPage() {
@@ -65,25 +66,25 @@ export default function ProductsPage() {
     loadProducts();
   }, [search]);
 
-  // Toggle product status
+  // Toggle product status (Level 2 - Medium Risk)
   const handleToggleStatus = async (id: string) => {
     try {
       const updated = await toggleProductStatus(id);
       setProducts(prev => prev.map(p => p.id === id ? updated : p));
     } catch (error) {
       console.error('Failed to toggle status:', error);
+      throw error; // Re-throw for SecureActionDialog
     }
   };
 
-  // Delete product
+  // Delete product (Level 3 - High Risk, requires password)
   const handleDelete = async (id: string) => {
-    if (!confirm('Are you sure you want to delete this product? This will also delete all variants.')) return;
-    
     try {
       await deleteProduct(id);
       setProducts(prev => prev.filter(p => p.id !== id));
     } catch (error) {
       console.error('Failed to delete product:', error);
+      throw error; // Re-throw for SecureActionDialog
     }
   };
 
@@ -367,22 +368,36 @@ export default function ProductsPage() {
                     <span className="text-gray-700 font-medium">{getPriceRange(product)}</span>
                   </TableCell>
                   <TableCell>
-                    <button
-                      onClick={() => handleToggleStatus(product.id)}
-                      className="flex items-center gap-1.5"
-                    >
-                      {product.is_active ? (
-                        <Badge className="bg-green-100 text-green-700 hover:bg-green-200 cursor-pointer">
-                          <CheckCircle className="w-3 h-3 mr-1" />
-                          Active
-                        </Badge>
-                      ) : (
-                        <Badge className="bg-gray-100 text-gray-600 hover:bg-gray-200 cursor-pointer">
-                          <XCircle className="w-3 h-3 mr-1" />
-                          Inactive
-                        </Badge>
-                      )}
-                    </button>
+                    {/* Level 2: Medium Risk - Confirmation only */}
+                    {product.is_active ? (
+                      <DeactivateActionDialog
+                        itemName={product.name}
+                        itemType="Product"
+                        onConfirm={() => handleToggleStatus(product.id)}
+                      >
+                        <button className="flex items-center gap-1.5">
+                          <Badge className="bg-green-100 text-green-700 hover:bg-green-200 cursor-pointer">
+                            <CheckCircle className="w-3 h-3 mr-1" />
+                            Active
+                          </Badge>
+                        </button>
+                      </DeactivateActionDialog>
+                    ) : (
+                      <SecureActionDialog
+                        title="Activate Product"
+                        description={`Reactivate "${product.name}"? It will become visible to customers again.`}
+                        variant="default"
+                        confirmText="Activate"
+                        onConfirm={() => handleToggleStatus(product.id)}
+                      >
+                        <button className="flex items-center gap-1.5">
+                          <Badge className="bg-gray-100 text-gray-600 hover:bg-gray-200 cursor-pointer">
+                            <XCircle className="w-3 h-3 mr-1" />
+                            Inactive
+                          </Badge>
+                        </button>
+                      </SecureActionDialog>
+                    )}
                   </TableCell>
                   <TableCell>
                     <DropdownMenu>
@@ -398,13 +413,20 @@ export default function ProductsPage() {
                             Edit
                           </Link>
                         </DropdownMenuItem>
-                        <DropdownMenuItem
-                          onClick={() => handleDelete(product.id)}
-                          className="text-red-600 focus:text-red-600"
+                        {/* Level 3: High Risk - Password Required */}
+                        <DeleteActionDialog
+                          itemName={product.name}
+                          itemType="Product"
+                          onConfirm={() => handleDelete(product.id)}
                         >
-                          <Trash2 className="w-4 h-4 mr-2" />
-                          Delete
-                        </DropdownMenuItem>
+                          <DropdownMenuItem
+                            onSelect={(e) => e.preventDefault()}
+                            className="text-red-600 focus:text-red-600 cursor-pointer"
+                          >
+                            <Trash2 className="w-4 h-4 mr-2" />
+                            Delete
+                          </DropdownMenuItem>
+                        </DeleteActionDialog>
                       </DropdownMenuContent>
                     </DropdownMenu>
                   </TableCell>

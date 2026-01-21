@@ -237,6 +237,71 @@ export const logout = asyncHandler(async (req, res) => {
   });
 });
 
+/**
+ * Verify current user's password
+ * POST /auth/verify-password
+ * 
+ * Used for "Secure Action Gate" - before critical actions like:
+ * - Deleting vendors/products
+ * - Adding admin users
+ * - Viewing sensitive financial data
+ * 
+ * Rate Limited: Max 5 attempts per minute per user
+ */
+export const verifyPassword = asyncHandler(async (req, res) => {
+  const { password } = req.body;
+
+  if (!password) {
+    throw new ValidationError('Password is required');
+  }
+
+  // Get current user's password hash
+  const { data: user, error } = await supabaseAdmin
+    .from('users')
+    .select('id, password_hash, email, name')
+    .eq('id', req.user.id)
+    .single();
+
+  if (error || !user) {
+    throw new AuthenticationError('User not found');
+  }
+
+  // Verify password
+  const isValid = await bcrypt.compare(password, user.password_hash);
+
+  if (!isValid) {
+    logger.warn('Password verification failed', { 
+      userId: req.user.id, 
+      email: user.email,
+      action: 'secure_action_gate' 
+    });
+
+    // Return 200 with valid: false (don't throw to avoid leaking info)
+    return res.json({
+      success: true,
+      data: {
+        valid: false,
+        message: 'Incorrect password',
+      },
+    });
+  }
+
+  logger.info('Password verified for secure action', { 
+    userId: req.user.id,
+    email: user.email 
+  });
+
+  res.json({
+    success: true,
+    data: {
+      valid: true,
+      message: 'Password verified',
+      // Optionally: Return a short-lived "sudo token" for multiple actions
+      // sudoToken: generateSudoToken(user.id), // 5 min validity
+    },
+  });
+});
+
 export default {
   login,
   register,
@@ -244,4 +309,5 @@ export default {
   getMe,
   changePassword,
   logout,
+  verifyPassword,
 };

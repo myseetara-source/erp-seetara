@@ -37,6 +37,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { Skeleton } from '@/components/ui/skeleton';
+import { SecureActionDialog, DeactivateActionDialog, DeleteActionDialog } from '@/components/common/SecureActionDialog';
 import { getVendors, toggleVendorStatus, deleteVendor, type Vendor } from '@/lib/api/vendors';
 
 export default function VendorsPage() {
@@ -60,25 +61,25 @@ export default function VendorsPage() {
     loadVendors();
   }, [search]);
 
-  // Toggle vendor status
+  // Toggle vendor status (Level 2 - Medium Risk)
   const handleToggleStatus = async (id: string) => {
     try {
       const updated = await toggleVendorStatus(id);
       setVendors(prev => prev.map(v => v.id === id ? updated : v));
     } catch (error) {
       console.error('Failed to toggle status:', error);
+      throw error; // Re-throw for SecureActionDialog
     }
   };
 
-  // Delete vendor
+  // Delete vendor (Level 3 - High Risk, requires password)
   const handleDelete = async (id: string) => {
-    if (!confirm('Are you sure you want to delete this vendor?')) return;
-    
     try {
       await deleteVendor(id);
       setVendors(prev => prev.filter(v => v.id !== id));
     } catch (error) {
       console.error('Failed to delete vendor:', error);
+      throw error; // Re-throw for SecureActionDialog
     }
   };
 
@@ -204,22 +205,36 @@ export default function VendorsPage() {
                     )}
                   </TableCell>
                   <TableCell>
-                    <button
-                      onClick={() => handleToggleStatus(vendor.id)}
-                      className="flex items-center gap-1.5"
-                    >
-                      {vendor.is_active ? (
-                        <Badge className="bg-green-100 text-green-700 hover:bg-green-200 cursor-pointer">
-                          <CheckCircle className="w-3 h-3 mr-1" />
-                          Active
-                        </Badge>
-                      ) : (
-                        <Badge className="bg-gray-100 text-gray-600 hover:bg-gray-200 cursor-pointer">
-                          <XCircle className="w-3 h-3 mr-1" />
-                          Inactive
-                        </Badge>
-                      )}
-                    </button>
+                    {/* Level 2: Medium Risk - Confirmation only */}
+                    {vendor.is_active ? (
+                      <DeactivateActionDialog
+                        itemName={vendor.name}
+                        itemType="Vendor"
+                        onConfirm={() => handleToggleStatus(vendor.id)}
+                      >
+                        <button className="flex items-center gap-1.5">
+                          <Badge className="bg-green-100 text-green-700 hover:bg-green-200 cursor-pointer">
+                            <CheckCircle className="w-3 h-3 mr-1" />
+                            Active
+                          </Badge>
+                        </button>
+                      </DeactivateActionDialog>
+                    ) : (
+                      <SecureActionDialog
+                        title="Activate Vendor"
+                        description={`Reactivate "${vendor.name}"? They will be able to receive orders again.`}
+                        variant="default"
+                        confirmText="Activate"
+                        onConfirm={() => handleToggleStatus(vendor.id)}
+                      >
+                        <button className="flex items-center gap-1.5">
+                          <Badge className="bg-gray-100 text-gray-600 hover:bg-gray-200 cursor-pointer">
+                            <XCircle className="w-3 h-3 mr-1" />
+                            Inactive
+                          </Badge>
+                        </button>
+                      </SecureActionDialog>
+                    )}
                   </TableCell>
                   <TableCell>
                     <DropdownMenu>
@@ -235,13 +250,20 @@ export default function VendorsPage() {
                             Edit
                           </Link>
                         </DropdownMenuItem>
-                        <DropdownMenuItem
-                          onClick={() => handleDelete(vendor.id)}
-                          className="text-red-600 focus:text-red-600"
+                        {/* Level 3: High Risk - Password Required */}
+                        <DeleteActionDialog
+                          itemName={vendor.name}
+                          itemType="Vendor"
+                          onConfirm={() => handleDelete(vendor.id)}
                         >
-                          <Trash2 className="w-4 h-4 mr-2" />
-                          Delete
-                        </DropdownMenuItem>
+                          <DropdownMenuItem
+                            onSelect={(e) => e.preventDefault()}
+                            className="text-red-600 focus:text-red-600 cursor-pointer"
+                          >
+                            <Trash2 className="w-4 h-4 mr-2" />
+                            Delete
+                          </DropdownMenuItem>
+                        </DeleteActionDialog>
                       </DropdownMenuContent>
                     </DropdownMenu>
                   </TableCell>
