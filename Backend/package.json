@@ -8,8 +8,11 @@
     "start": "node src/server.js",
     "dev": "nodemon src/server.js",
     "test": "jest --coverage",
+    "test:smoke": "node scripts/smoke-test.js",
+    "test:smoke:prod": "node scripts/smoke-test.js --url=$API_URL",
     "lint": "eslint src/",
-    "db:seed": "node src/database/seed.js"
+    "db:seed": "node src/database/seed.js",
+    "db:seed:admin": "node scripts/seed-admin.js"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.971.0",
