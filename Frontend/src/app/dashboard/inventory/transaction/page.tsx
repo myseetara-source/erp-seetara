@@ -207,15 +207,17 @@ const DAMAGE_REASONS = [
 // =============================================================================
 
 const transactionItemSchema = z.object({
-  variant_id: z.string().min(1),
-  product_name: z.string(),
-  variant_name: z.string(),
-  sku: z.string(),
-  current_stock: z.number(),
-  quantity: z.number().int().refine(val => val !== 0, 'Quantity cannot be zero'),
-  unit_cost: z.coerce.number().min(0).default(0),
-  original_qty: z.number().optional(),
-  remaining_qty: z.number().optional(),
+  variant_id: z.string().min(1, 'Variant ID required'),
+  product_name: z.string().optional().default(''),
+  variant_name: z.string().optional().default(''),
+  sku: z.string().optional().default(''),
+  current_stock: z.coerce.number().optional().default(0),
+  damaged_stock: z.coerce.number().optional().default(0), // Added for dual-bucket support
+  quantity: z.coerce.number().refine(val => val !== 0, 'Quantity cannot be zero'),
+  unit_cost: z.coerce.number().optional().default(0),
+  original_qty: z.coerce.number().optional(),
+  remaining_qty: z.coerce.number().optional(),
+  source_type: z.enum(['fresh', 'damaged']).optional(), // Added for dual-bucket support
 });
 
 const transactionSchema = z.object({
@@ -588,10 +590,24 @@ export default function InventoryTransactionPage() {
 
     setIsSubmitting(true);
     try {
+      // Transform items to match backend schema (only required fields)
+      const transformedItems = data.items
+        .filter((item) => item.quantity !== 0)
+        .map((item) => ({
+          variant_id: item.variant_id,
+          quantity: Number(item.quantity), // Ensure it's a number
+          unit_cost: Number(item.unit_cost) || 0.01, // Minimum 0.01 for purchases
+          notes: undefined, // Optional
+        }));
+
+      console.log('[TransactionForm] Submitting payload:', {
+        ...data,
+        items: transformedItems,
+      });
+
       const response = await apiClient.post(API_ROUTES.INVENTORY.TRANSACTIONS.CREATE, {
         ...data,
-        // Filter out items with 0 quantity
-        items: data.items.filter((item) => item.quantity !== 0),
+        items: transformedItems,
       });
 
       if (response.data.success) {
