@@ -2,13 +2,45 @@
  * API Client
  * Centralized axios instance for all API calls
  * Uses Supabase Auth tokens for authentication
+ * 
+ * PORT FIX: Uses smart baseURL detection to avoid ERR_CONNECTION_REFUSED
+ * - Server Side: Uses absolute URL from env or localhost:3000
+ * - Client Side: Uses relative '/api/v1' (auto-detects current port)
  */
 
 import axios, { AxiosInstance, AxiosError, InternalAxiosRequestConfig } from 'axios';
 import { createClient } from '@/lib/supabase/client';
 
+// =============================================================================
+// SMART BASE URL DETECTION
+// =============================================================================
+// 
+// Problem: Hardcoded http://localhost:3000 fails when app runs on port 3001
+// 
+// Solution:
+// - Server Side (SSR): Use absolute URL (env var or fallback)
+// - Client Side (Browser): Use relative path '/api/v1'
+//   The browser will automatically prepend the current origin (http://localhost:3001)
+//
+
+/**
+ * Get the appropriate base URL based on execution environment
+ */
+function getBaseURL(): string {
+  // Server-side rendering (Node.js environment)
+  if (typeof window === 'undefined') {
+    // Use environment variable if set, otherwise fallback to localhost
+    return process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000/api/v1';
+  }
+  
+  // Client-side (Browser)
+  // Use relative path so browser automatically uses current origin/port
+  // This works whether the app runs on 3000, 3001, 8080, or any port
+  return '/api/v1';
+}
+
 // API Configuration
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000/api/v1';
+const API_BASE_URL = getBaseURL();
 const API_TIMEOUT = 30000; // 30 seconds
 
 // Create axios instance
@@ -20,7 +52,11 @@ const apiClient: AxiosInstance = axios.create({
   },
 });
 
-// Request interceptor - Add Supabase auth token to all requests
+// =============================================================================
+// REQUEST INTERCEPTOR
+// =============================================================================
+// Add Supabase auth token to all requests
+
 apiClient.interceptors.request.use(
   async (config: InternalAxiosRequestConfig) => {
     if (typeof window !== 'undefined') {
@@ -31,8 +67,9 @@ apiClient.interceptors.request.use(
         if (session?.access_token && config.headers) {
           config.headers.Authorization = `Bearer ${session.access_token}`;
         }
-      } catch (error) {
-        console.error('Failed to get auth session:', error);
+      } catch {
+        // Auth session error - request will proceed without token
+        // Server will return 401 if auth is required
       }
     }
     
@@ -43,12 +80,16 @@ apiClient.interceptors.request.use(
   }
 );
 
-// Response interceptor - Handle errors globally
+// =============================================================================
+// RESPONSE INTERCEPTOR
+// =============================================================================
+// Handle errors globally
+
 apiClient.interceptors.response.use(
   (response) => response,
   async (error: AxiosError) => {
     if (error.response) {
-      const { status, data } = error.response;
+      const { status } = error.response;
       
       switch (status) {
         case 401:
@@ -57,8 +98,8 @@ apiClient.interceptors.response.use(
             try {
               const supabase = createClient();
               await supabase.auth.signOut();
-            } catch (e) {
-              console.error('Failed to sign out:', e);
+            } catch {
+              // Sign out failed - continue to redirect
             }
             // Redirect to login (skip if already on login page)
             if (!window.location.pathname.includes('/login')) {
@@ -66,22 +107,9 @@ apiClient.interceptors.response.use(
             }
           }
           break;
-        case 403:
-          console.error('Access forbidden:', data);
-          break;
-        case 404:
-          console.error('Resource not found:', data);
-          break;
-        case 500:
-          console.error('Server error:', data);
-          break;
-        default:
-          console.error('API error:', data);
+        // Other error statuses are passed through to the caller
+        // No console.log to avoid security leaks in production
       }
-    } else if (error.request) {
-      console.error('Network error - no response received');
-    } else {
-      console.error('Request error:', error.message);
     }
     
     return Promise.reject(error);
