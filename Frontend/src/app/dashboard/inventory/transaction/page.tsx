@@ -417,7 +417,7 @@ export default function InventoryTransactionPage() {
     watch,
     setValue,
     reset,
-    formState: { errors },
+    formState: { errors, isValid, isSubmitting: formIsSubmitting },
   } = useForm<TransactionFormData>({
     resolver: zodResolver(transactionSchema),
     defaultValues: {
@@ -425,7 +425,25 @@ export default function InventoryTransactionPage() {
       invoice_no: '',
       items: [],
     },
+    mode: 'onChange', // Validate on change to catch errors early
   });
+  
+  // Debug: Log form errors
+  useEffect(() => {
+    if (Object.keys(errors).length > 0) {
+      console.log('[TransactionForm] Validation errors:', errors);
+      // Show the first error as toast
+      const firstError = Object.entries(errors)[0];
+      if (firstError) {
+        const [field, error] = firstError;
+        const message = typeof error === 'object' && error !== null 
+          ? (error as any).message || (error as any).root?.message || `Invalid ${field}`
+          : `Invalid ${field}`;
+        // Only show once per error change
+        console.log(`[TransactionForm] First error: ${field} - ${message}`);
+      }
+    }
+  }, [errors]);
 
   const { fields, append, remove, replace } = useFieldArray({
     control,
@@ -526,8 +544,29 @@ export default function InventoryTransactionPage() {
     return true;
   };
 
+  // Handle form validation errors (called when validation fails)
+  const onFormError = (formErrors: any) => {
+    console.log('[TransactionForm] Form validation failed:', formErrors);
+    
+    // Get first error message
+    if (formErrors.items?.root?.message) {
+      toast.error(formErrors.items.root.message);
+    } else if (formErrors.items?.message) {
+      toast.error(formErrors.items.message);
+    } else if (formErrors.invoice_no?.message) {
+      toast.error(`Invoice No: ${formErrors.invoice_no.message}`);
+    } else {
+      // Find first error
+      const firstKey = Object.keys(formErrors)[0];
+      const firstError = formErrors[firstKey];
+      toast.error(firstError?.message || `Validation failed: ${firstKey}`);
+    }
+  };
+
   // Submit transaction
   const onSubmit = async (data: TransactionFormData) => {
+    console.log('[TransactionForm] onSubmit called with data:', data);
+    
     // Validate return quantities
     if (!validateReturnQuantities()) return;
 
@@ -567,7 +606,7 @@ export default function InventoryTransactionPage() {
         throw new Error(response.data.error?.message || 'Failed to create transaction');
       }
     } catch (error: any) {
-      console.error('Submit error:', error);
+      console.error('[TransactionForm] Submit error:', error);
       toast.error(error.response?.data?.error?.message || error.message || 'Failed to create transaction');
     } finally {
       setIsSubmitting(false);
@@ -628,7 +667,7 @@ export default function InventoryTransactionPage() {
         </div>
       </div>
 
-      <form id="transaction-form" onSubmit={handleSubmit(onSubmit)} className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+      <form id="transaction-form" onSubmit={handleSubmit(onSubmit, onFormError)} className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
         <div className="space-y-6">
           {/* Transaction Type Selector */}
           <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
