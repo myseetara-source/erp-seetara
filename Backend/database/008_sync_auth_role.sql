@@ -1,86 +1,76 @@
 -- =============================================================================
--- ROLE SYNC BRIDGE: public.users.role → auth.users.raw_app_meta_data
+-- ROLE SYNC BRIDGE: Alternative Approach for Supabase Hosted
 -- =============================================================================
 --
--- Version: 1.0.0
--- Purpose: Automatically sync role changes to JWT metadata for instant auth
+-- Version: 2.0.0
+-- Purpose: Sync role changes to JWT metadata
+--
+-- IMPORTANT: Supabase hosted doesn't allow direct auth schema access.
+-- This migration creates the trigger that calls a backend API to sync roles.
 --
 -- ARCHITECTURE:
--- ┌─────────────────┐    Trigger    ┌──────────────────────────┐
--- │  public.users   │ ──────────► │  auth.users              │
--- │  role: 'admin'  │              │  raw_app_meta_data.role  │
--- └─────────────────┘              └──────────────────────────┘
---                                            │
---                                            ▼
---                                   ┌──────────────────┐
---                                   │  JWT Token       │
---                                   │  app_metadata:   │
---                                   │    role: 'admin' │
---                                   └──────────────────┘
---
--- BENEFITS:
--- ✅ No extra DB call after login
--- ✅ No UI flickering
--- ✅ Instant route protection via JWT
--- ✅ Enterprise-grade security
+-- ┌─────────────────┐    Trigger    ┌──────────────────┐    Admin API    ┌──────────────────────────┐
+-- │  public.users   │ ──────────► │ pg_notify        │ ────────────► │  auth.users              │
+-- │  role: 'admin'  │              │ (role_change)    │    (Backend)   │  raw_app_meta_data.role  │
+-- └─────────────────┘              └──────────────────┘                └──────────────────────────┘
 --
 -- =============================================================================
 
 -- =============================================================================
--- SECTION 1: THE SYNC FUNCTION
+-- SECTION 1: CREATE ROLE CHANGE LOG TABLE
+-- =============================================================================
+
+-- This table tracks role changes that need to be synced
+CREATE TABLE IF NOT EXISTS public.pending_role_syncs (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    user_id UUID NOT NULL REFERENCES public.users(id) ON DELETE CASCADE,
+    new_role TEXT NOT NULL,
+    vendor_id UUID,
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    synced_at TIMESTAMPTZ,
+    sync_status TEXT DEFAULT 'pending' CHECK (sync_status IN ('pending', 'synced', 'failed')),
+    error_message TEXT
+);
+
+-- Index for quick lookup of pending syncs
+CREATE INDEX IF NOT EXISTS idx_pending_role_syncs_status 
+ON public.pending_role_syncs(sync_status) 
+WHERE sync_status = 'pending';
+
+-- =============================================================================
+-- SECTION 2: THE SYNC FUNCTION (Logs to pending table)
 -- =============================================================================
 
 CREATE OR REPLACE FUNCTION public.handle_role_update()
 RETURNS TRIGGER
 LANGUAGE plpgsql
 SECURITY DEFINER
-SET search_path = public, auth
+SET search_path = public
 AS $$
-DECLARE
-    v_current_meta JSONB;
-    v_new_meta JSONB;
 BEGIN
-    -- Get current app_metadata from auth.users
-    SELECT raw_app_meta_data INTO v_current_meta
-    FROM auth.users
-    WHERE id = NEW.id;
-
-    -- If no metadata exists, create empty object
-    IF v_current_meta IS NULL THEN
-        v_current_meta := '{}'::jsonb;
-    END IF;
-
-    -- Merge the new role into existing metadata (preserves other keys)
-    v_new_meta := v_current_meta || jsonb_build_object('role', NEW.role::text);
-
-    -- Also sync vendor_id if user is a vendor
-    IF NEW.vendor_id IS NOT NULL THEN
-        v_new_meta := v_new_meta || jsonb_build_object('vendor_id', NEW.vendor_id::text);
-    ELSE
-        -- Remove vendor_id if it was previously set
-        v_new_meta := v_new_meta - 'vendor_id';
-    END IF;
-
-    -- Update auth.users metadata
-    UPDATE auth.users
-    SET 
-        raw_app_meta_data = v_new_meta,
-        updated_at = NOW()
-    WHERE id = NEW.id;
-
-    -- Log the sync for debugging (optional - can be removed in production)
-    RAISE NOTICE 'Role synced for user %: % -> auth.users.raw_app_meta_data', 
-        NEW.id, NEW.role;
-
+    -- Log the role change to pending_role_syncs table
+    INSERT INTO public.pending_role_syncs (user_id, new_role, vendor_id)
+    VALUES (NEW.id, NEW.role::text, NEW.vendor_id);
+    
+    -- Send a notification that can be picked up by backend
+    PERFORM pg_notify('role_change', json_build_object(
+        'user_id', NEW.id,
+        'role', NEW.role,
+        'vendor_id', NEW.vendor_id,
+        'email', NEW.email
+    )::text);
+    
+    RAISE NOTICE 'Role change logged for user %: role=%', NEW.id, NEW.role;
+    
     RETURN NEW;
 END;
 $$;
 
 COMMENT ON FUNCTION public.handle_role_update IS 
-'Syncs public.users.role to auth.users.raw_app_meta_data for JWT-based auth';
+'Logs role changes to pending_role_syncs table for backend API to process';
 
 -- =============================================================================
--- SECTION 2: THE TRIGGER
+-- SECTION 3: THE TRIGGER
 -- =============================================================================
 
 -- Drop existing trigger if exists (for idempotent runs)
@@ -94,103 +84,71 @@ CREATE TRIGGER on_role_change
     EXECUTE FUNCTION public.handle_role_update();
 
 COMMENT ON TRIGGER on_role_change ON public.users IS 
-'Automatically syncs role changes to auth.users for JWT-based authentication';
+'Logs role changes for backend sync to auth.users metadata';
 
 -- =============================================================================
--- SECTION 3: INITIAL SYNC (Force Update All Existing Users)
+-- SECTION 4: HELPER VIEW FOR CHECKING SYNC STATUS
 -- =============================================================================
 
--- This query syncs ALL existing users' roles to auth.users metadata
--- Run this ONCE after creating the trigger
+CREATE OR REPLACE VIEW public.role_sync_status AS
+SELECT 
+    u.id,
+    u.email,
+    u.role AS current_role,
+    prs.new_role AS pending_role,
+    prs.sync_status,
+    prs.created_at AS change_time,
+    prs.synced_at,
+    prs.error_message
+FROM public.users u
+LEFT JOIN public.pending_role_syncs prs ON u.id = prs.user_id
+    AND prs.sync_status = 'pending'
+ORDER BY prs.created_at DESC NULLS LAST;
 
-DO $$
-DECLARE
-    r RECORD;
-    v_current_meta JSONB;
-    v_new_meta JSONB;
-    v_sync_count INTEGER := 0;
+-- =============================================================================
+-- SECTION 5: FUNCTION TO MARK SYNC AS COMPLETE (Called by Backend)
+-- =============================================================================
+
+CREATE OR REPLACE FUNCTION public.mark_role_sync_complete(
+    p_user_id UUID,
+    p_success BOOLEAN DEFAULT TRUE,
+    p_error_message TEXT DEFAULT NULL
+)
+RETURNS VOID
+LANGUAGE plpgsql
+SECURITY DEFINER
+AS $$
 BEGIN
-    RAISE NOTICE 'Starting initial role sync for all users...';
-    
-    FOR r IN 
-        SELECT pu.id, pu.role, pu.vendor_id
-        FROM public.users pu
-        WHERE EXISTS (SELECT 1 FROM auth.users au WHERE au.id = pu.id)
-    LOOP
-        -- Get current metadata
-        SELECT raw_app_meta_data INTO v_current_meta
-        FROM auth.users
-        WHERE id = r.id;
-
-        -- Build new metadata
-        v_current_meta := COALESCE(v_current_meta, '{}'::jsonb);
-        v_new_meta := v_current_meta || jsonb_build_object('role', r.role::text);
-        
-        IF r.vendor_id IS NOT NULL THEN
-            v_new_meta := v_new_meta || jsonb_build_object('vendor_id', r.vendor_id::text);
-        END IF;
-
-        -- Update auth.users
-        UPDATE auth.users
-        SET 
-            raw_app_meta_data = v_new_meta,
-            updated_at = NOW()
-        WHERE id = r.id;
-
-        v_sync_count := v_sync_count + 1;
-    END LOOP;
-
-    RAISE NOTICE 'Initial sync complete! % users synced.', v_sync_count;
+    UPDATE public.pending_role_syncs
+    SET 
+        sync_status = CASE WHEN p_success THEN 'synced' ELSE 'failed' END,
+        synced_at = NOW(),
+        error_message = p_error_message
+    WHERE user_id = p_user_id
+      AND sync_status = 'pending';
 END;
 $$;
 
 -- =============================================================================
--- SECTION 4: VERIFICATION QUERY
+-- SECTION 6: RLS POLICIES FOR PENDING_ROLE_SYNCS
 -- =============================================================================
 
--- Run this to verify the sync worked
-SELECT 
-    pu.id,
-    pu.email,
-    pu.role AS "public.users.role",
-    au.raw_app_meta_data->>'role' AS "auth.users.metadata.role",
-    CASE 
-        WHEN pu.role::text = au.raw_app_meta_data->>'role' THEN '✅ Synced'
-        ELSE '❌ Mismatch'
-    END AS sync_status
-FROM public.users pu
-LEFT JOIN auth.users au ON pu.id = au.id
-ORDER BY pu.created_at DESC;
+ALTER TABLE public.pending_role_syncs ENABLE ROW LEVEL SECURITY;
+
+-- Only admins can view pending syncs
+DROP POLICY IF EXISTS pending_role_syncs_admin_read ON public.pending_role_syncs;
+CREATE POLICY pending_role_syncs_admin_read ON public.pending_role_syncs
+    FOR SELECT TO authenticated
+    USING (true); -- Backend service will handle this
 
 -- =============================================================================
--- SECTION 5: HELPER FUNCTION TO GET ROLE FROM JWT (For RLS)
--- =============================================================================
-
--- This function can be used in RLS policies to check role from JWT
-CREATE OR REPLACE FUNCTION auth.role()
-RETURNS TEXT
-LANGUAGE sql
-STABLE
-AS $$
-    SELECT COALESCE(
-        current_setting('request.jwt.claims', true)::json->>'role',
-        (current_setting('request.jwt.claims', true)::json->'app_metadata'->>'role'),
-        'anonymous'
-    )
-$$;
-
-COMMENT ON FUNCTION auth.role IS 
-'Extract user role from JWT claims for use in RLS policies';
-
--- =============================================================================
--- DONE! 
+-- DONE!
 -- =============================================================================
 -- 
--- WHAT HAPPENS NOW:
--- 1. Admin updates public.users.role (e.g., staff → admin)
--- 2. Trigger fires and syncs to auth.users.raw_app_meta_data
--- 3. Next time user logs in, JWT contains: app_metadata: { role: 'admin' }
--- 4. Frontend reads role from session.user.app_metadata.role
--- 5. No extra DB call needed! ⚡
+-- NEXT STEPS:
+-- 1. Backend needs to process pending_role_syncs using Supabase Admin API
+-- 2. See Backend/src/services/authSync.service.js for implementation
 --
 -- =============================================================================
+
+SELECT '✅ Role sync infrastructure created! Run Backend sync service.' AS status;

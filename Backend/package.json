@@ -12,7 +12,9 @@
     "test:smoke:prod": "node scripts/smoke-test.js --url=$API_URL",
     "lint": "eslint src/",
     "db:seed": "node src/database/seed.js",
-    "db:seed:admin": "node scripts/seed-admin.js"
+    "db:seed:admin": "node scripts/seed-admin.js",
+    "sync:roles": "node scripts/sync-user-roles.js",
+    "sync:roles:pending": "node scripts/sync-user-roles.js pending"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.971.0",
