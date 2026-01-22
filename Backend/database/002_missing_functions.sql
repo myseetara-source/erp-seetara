@@ -8,12 +8,17 @@
 -- =============================================================================
 -- DROP EXISTING FUNCTIONS FIRST (to avoid return type conflicts)
 -- =============================================================================
-DROP FUNCTION IF EXISTS public.deduct_stock_atomic(UUID, INTEGER, UUID, TEXT);
-DROP FUNCTION IF EXISTS public.deduct_stock_bulk(JSONB, UUID, TEXT);
-DROP FUNCTION IF EXISTS public.generate_order_number();
-DROP FUNCTION IF EXISTS public.get_next_invoice_number(TEXT);
-DROP FUNCTION IF EXISTS public.approve_inventory_transaction(UUID, UUID);
-DROP FUNCTION IF EXISTS public.reject_inventory_transaction(UUID, UUID, TEXT);
+
+-- First drop triggers that depend on functions
+DROP TRIGGER IF EXISTS trg_generate_order_number ON orders;
+
+-- Now drop functions with CASCADE to remove any remaining dependencies
+DROP FUNCTION IF EXISTS public.deduct_stock_atomic(UUID, INTEGER, UUID, TEXT) CASCADE;
+DROP FUNCTION IF EXISTS public.deduct_stock_bulk(JSONB, UUID, TEXT) CASCADE;
+DROP FUNCTION IF EXISTS public.generate_order_number() CASCADE;
+DROP FUNCTION IF EXISTS public.get_next_invoice_number(TEXT) CASCADE;
+DROP FUNCTION IF EXISTS public.approve_inventory_transaction(UUID, UUID) CASCADE;
+DROP FUNCTION IF EXISTS public.reject_inventory_transaction(UUID, UUID, TEXT) CASCADE;
 
 -- =============================================================================
 -- 1. ATOMIC STOCK DEDUCTION (Required for Order Creation)
@@ -350,6 +355,32 @@ $$;
 GRANT EXECUTE ON FUNCTION public.reject_inventory_transaction(UUID, UUID, TEXT) TO authenticated;
 
 -- =============================================================================
+-- 7. RECREATE ORDER NUMBER TRIGGER
+-- =============================================================================
+-- This trigger auto-generates order numbers on insert
+
+CREATE OR REPLACE FUNCTION public.set_order_number()
+RETURNS TRIGGER
+LANGUAGE plpgsql
+SECURITY DEFINER
+AS $$
+BEGIN
+    -- Only set if not already provided
+    IF NEW.order_number IS NULL OR NEW.order_number = '' THEN
+        NEW.order_number := public.generate_order_number();
+    END IF;
+    RETURN NEW;
+END;
+$$;
+
+-- Recreate the trigger
+DROP TRIGGER IF EXISTS trg_generate_order_number ON orders;
+CREATE TRIGGER trg_generate_order_number
+    BEFORE INSERT ON orders
+    FOR EACH ROW
+    EXECUTE FUNCTION public.set_order_number();
+
+-- =============================================================================
 -- SUCCESS MESSAGE
 -- =============================================================================
 DO $$
@@ -361,4 +392,6 @@ BEGIN
     RAISE NOTICE '   - get_next_invoice_number';
     RAISE NOTICE '   - approve_inventory_transaction';
     RAISE NOTICE '   - reject_inventory_transaction';
+    RAISE NOTICE '   - set_order_number (trigger function)';
+    RAISE NOTICE '   - trg_generate_order_number (trigger on orders)';
 END $$;
