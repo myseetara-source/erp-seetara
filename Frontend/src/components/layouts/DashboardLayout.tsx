@@ -2,6 +2,11 @@
  * DashboardLayout Component
  * Provides consistent layout with Sidebar and Topbar
  * Used as wrapper for all dashboard pages
+ * 
+ * ARCHITECTURE UPGRADE:
+ * - Uses JWT-based auth (role from session.user.app_metadata)
+ * - No extra DB call for role verification
+ * - Zero UI flickering
  */
 
 'use client';
@@ -9,7 +14,6 @@
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
-import { createClient } from '@/lib/supabase/client';
 import {
   Home,
   ClipboardList,
@@ -23,7 +27,6 @@ import {
   BarChart3,
   Building2,
   Bell,
-  Search,
   Menu,
   User as UserIcon,
   LogOut,
@@ -31,15 +34,16 @@ import {
   Bike,
   HeadphonesIcon,
   MessageSquare,
+  Shield,
 } from 'lucide-react';
 import { CommandPalette } from '@/components/common/CommandPalette';
-import { AuthProvider, User, UserRole } from '@/components/auth/PermissionGuard';
+import { useAuth } from '@/hooks/useAuth';
 
 interface DashboardLayoutProps {
   children: React.ReactNode;
 }
 
-// Navigation items configuration
+// Navigation items configuration with role-based visibility
 const NAV_ITEMS = [
   {
     section: null,
@@ -75,51 +79,49 @@ const NAV_ITEMS = [
   },
 ];
 
+// Role badge component
+function RoleBadge({ role }: { role: string }) {
+  const roleConfig: Record<string, { bg: string; text: string; label: string }> = {
+    admin: { bg: 'bg-red-100', text: 'text-red-700', label: 'Admin' },
+    manager: { bg: 'bg-purple-100', text: 'text-purple-700', label: 'Manager' },
+    staff: { bg: 'bg-blue-100', text: 'text-blue-700', label: 'Staff' },
+    operator: { bg: 'bg-green-100', text: 'text-green-700', label: 'Operator' },
+    vendor: { bg: 'bg-orange-100', text: 'text-orange-700', label: 'Vendor' },
+    rider: { bg: 'bg-cyan-100', text: 'text-cyan-700', label: 'Rider' },
+  };
+
+  const config = roleConfig[role] || { bg: 'bg-gray-100', text: 'text-gray-700', label: role };
+
+  return (
+    <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium ${config.bg} ${config.text}`}>
+      <Shield className="w-3 h-3" />
+      {config.label}
+    </span>
+  );
+}
+
 export default function DashboardLayout({ children }: DashboardLayoutProps) {
   const pathname = usePathname();
   const router = useRouter();
+  
+  // JWT-based auth - role comes from session.user.app_metadata
+  const { user, loading: authLoading, signOut, isAdmin } = useAuth();
+  
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [sidebarExpanded, setSidebarExpanded] = useState(true);
   const [showProfileMenu, setShowProfileMenu] = useState(false);
   const [isLoggingOut, setIsLoggingOut] = useState(false);
-  const [userName, setUserName] = useState('Admin');
-  const [userEmail, setUserEmail] = useState('');
-  const [currentUser, setCurrentUser] = useState<User | null>(null);
 
-  // Fetch user info (including role for AuthProvider)
-  useEffect(() => {
-    const fetchUser = async () => {
-      const supabase = createClient();
-      const { data: { user } } = await supabase.auth.getUser();
-      if (user) {
-        setUserEmail(user.email || '');
-        // Get name AND role from public.users
-        const { data } = await supabase
-          .from('users')
-          .select('id, name, email, role')
-          .eq('id', user.id)
-          .single();
-        if (data) {
-          setUserName(data.name || 'User');
-          // Set the full user object for AuthProvider
-          setCurrentUser({
-            id: data.id,
-            name: data.name || 'User',
-            email: data.email || user.email || '',
-            role: (data.role || 'operator') as UserRole,
-          });
-        }
-      }
-    };
-    fetchUser();
-  }, []);
+  // Client-side only state for date/time (prevents hydration mismatch)
+  const [mounted, setMounted] = useState(false);
+  const [dateTime, setDateTime] = useState('');
+  const [greeting, setGreeting] = useState('Hello');
 
-  // Logout handler
+  // Logout handler using the hook
   const handleLogout = async () => {
     setIsLoggingOut(true);
     try {
-      const supabase = createClient();
-      await supabase.auth.signOut();
+      await signOut();
       router.push('/login');
       router.refresh();
     } catch (error) {
@@ -128,11 +130,6 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
       setIsLoggingOut(false);
     }
   };
-
-  // Client-side only state for date/time (prevents hydration mismatch)
-  const [mounted, setMounted] = useState(false);
-  const [dateTime, setDateTime] = useState('');
-  const [greeting, setGreeting] = useState('Hello');
 
   // Close sidebar on route change (mobile)
   useEffect(() => {
@@ -168,6 +165,11 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
     const interval = setInterval(updateDateTime, 60000); // Update every minute
     return () => clearInterval(interval);
   }, []);
+
+  // Get display name
+  const userName = user?.name || 'User';
+  const userEmail = user?.email || '';
+  const userRole = user?.role || 'staff';
 
   return (
     <div className="flex h-screen bg-gray-100 overflow-hidden">
@@ -314,7 +316,9 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
               </button>
 
               <div className="hidden lg:block">
-                <h1 className="text-xl font-bold text-gray-900">{greeting}, {userName.split(' ')[0]}</h1>
+                <h1 className="text-xl font-bold text-gray-900">
+                  {greeting}, {userName.split(' ')[0]}
+                </h1>
                 <p className="text-sm text-gray-500">{mounted ? dateTime : 'Loading...'}</p>
               </div>
             </div>
@@ -343,7 +347,9 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
                   </div>
                   <div className="hidden sm:block text-left">
                     <p className="text-sm font-medium text-gray-900">{userName}</p>
-                    <p className="text-xs text-gray-500">{userEmail || 'Loading...'}</p>
+                    <p className="text-xs text-gray-500">
+                      {authLoading ? 'Loading...' : userEmail}
+                    </p>
                   </div>
                 </button>
 
@@ -354,10 +360,13 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
                       className="fixed inset-0 z-40"
                       onClick={() => setShowProfileMenu(false)}
                     />
-                    <div className="absolute right-0 mt-2 w-56 bg-white rounded-xl shadow-xl border border-gray-100 py-2 z-50 animate-fade-in-scale">
-                      <div className="px-4 py-2 border-b border-gray-100">
+                    <div className="absolute right-0 mt-2 w-64 bg-white rounded-xl shadow-xl border border-gray-100 py-2 z-50 animate-fade-in-scale">
+                      <div className="px-4 py-3 border-b border-gray-100">
                         <p className="font-medium text-gray-900">{userName}</p>
-                        <p className="text-sm text-gray-500">{userEmail}</p>
+                        <p className="text-sm text-gray-500 truncate">{userEmail}</p>
+                        <div className="mt-2">
+                          <RoleBadge role={userRole} />
+                        </div>
                       </div>
                       <div className="py-1">
                         <button className="w-full flex items-center gap-3 px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 transition-colors">
@@ -371,6 +380,16 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
                           <Settings className="w-4 h-4" />
                           Settings
                         </Link>
+                        {/* Admin-only: Team Management */}
+                        {isAdmin && (
+                          <Link 
+                            href="/dashboard/settings/team"
+                            className="w-full flex items-center gap-3 px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 transition-colors"
+                          >
+                            <Users className="w-4 h-4" />
+                            Team Management
+                          </Link>
+                        )}
                       </div>
                       <div className="border-t border-gray-100 pt-1">
                         <button 
@@ -394,10 +413,7 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
         {/* PAGE CONTENT */}
         {/* ===================================================================== */}
         <div className="p-4 lg:p-6 animate-page-fade-in">
-          {/* Wrap children with AuthProvider so useAuth() works everywhere */}
-          <AuthProvider user={currentUser}>
-            {children}
-          </AuthProvider>
+          {children}
         </div>
       </main>
     </div>

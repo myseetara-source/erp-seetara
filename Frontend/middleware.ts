@@ -100,14 +100,34 @@ function isPublicRoute(pathname: string): boolean {
 }
 
 /**
- * Get auth token from cookies
+ * Get auth token from cookies (Supabase format)
+ * 
+ * Supabase stores tokens in cookies with naming pattern:
+ * - sb-<project-ref>-auth-token
+ * - sb-access-token
  */
 function getAuthToken(request: NextRequest): string | null {
-  // Check for portal-specific token first
+  // Check all cookies for Supabase auth token pattern
+  for (const [name, cookie] of request.cookies) {
+    // Supabase auth cookie patterns
+    if (name.includes('-auth-token') || name.includes('access-token')) {
+      try {
+        // Supabase stores session as JSON in the cookie
+        const parsed = JSON.parse(cookie.value);
+        if (parsed.access_token) return parsed.access_token;
+        if (typeof parsed === 'string') return parsed;
+      } catch {
+        // If not JSON, use as-is
+        if (cookie.value) return cookie.value;
+      }
+    }
+  }
+
+  // Legacy: Check for portal-specific token
   const portalToken = request.cookies.get('portal_token')?.value;
   if (portalToken) return portalToken;
 
-  // Check for main app token
+  // Legacy: Check for main app token
   const appToken = request.cookies.get('auth_token')?.value;
   if (appToken) return appToken;
 
@@ -123,6 +143,19 @@ function getAuthToken(request: NextRequest): string | null {
 /**
  * Decode JWT to get user info (without verification - just for routing)
  * Actual verification happens in backend
+ * 
+ * JWT STRUCTURE (Supabase):
+ * {
+ *   "aud": "authenticated",
+ *   "exp": 1234567890,
+ *   "sub": "user-uuid",
+ *   "email": "user@example.com",
+ *   "app_metadata": {
+ *     "role": "admin",      // ← Synced from public.users.role
+ *     "vendor_id": "uuid"   // ← Only for vendor users
+ *   },
+ *   "user_metadata": { ... }
+ * }
  */
 function decodeToken(token: string): { role?: string; vendor_id?: string } | null {
   try {
@@ -130,10 +163,18 @@ function decodeToken(token: string): { role?: string; vendor_id?: string } | nul
     if (parts.length !== 3) return null;
     
     const payload = JSON.parse(Buffer.from(parts[1], 'base64').toString());
-    return {
-      role: payload.role,
-      vendor_id: payload.vendor_id,
-    };
+    
+    // Priority: app_metadata.role (synced by trigger) > user_metadata.role > direct role
+    const role = 
+      payload.app_metadata?.role || 
+      payload.user_metadata?.role || 
+      payload.role;
+    
+    const vendor_id = 
+      payload.app_metadata?.vendor_id || 
+      payload.user_metadata?.vendor_id;
+    
+    return { role, vendor_id };
   } catch {
     return null;
   }

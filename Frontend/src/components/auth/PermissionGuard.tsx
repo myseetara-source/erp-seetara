@@ -1,9 +1,10 @@
 'use client';
 
 /**
- * PermissionGuard Component
+ * PermissionGuard Component - JWT-Based Authorization
  * 
- * SECURITY: Implements "Operational vs. Financial" separation in the UI.
+ * Uses the useAuth hook which reads role from JWT metadata (app_metadata.role)
+ * No extra DB calls needed.
  * 
  * Usage:
  * 
@@ -20,38 +21,21 @@
  *   <FinancialDashboard />
  * </PermissionGuard>
  * 
- * 3. Check if data exists (for masked data):
- * <PermissionGuard hasData={vendor.balance !== undefined}>
- *   <VendorBalance value={vendor.balance} />
+ * 3. Check for financial access:
+ * <PermissionGuard requireFinancials>
+ *   <ProfitMarginDisplay />
  * </PermissionGuard>
  */
 
-import { ReactNode, createContext, useContext, useMemo } from 'react';
+import { ReactNode } from 'react';
+import { useAuth, UserRole } from '@/hooks/useAuth';
 
 // =============================================================================
-// TYPES
+// RE-EXPORT TYPES FROM useAuth FOR CONVENIENCE
 // =============================================================================
 
-export type UserRole = 'admin' | 'manager' | 'operator' | 'staff' | 'warehouse' | 'rider' | 'vendor';
-
-export interface User {
-  id: string;
-  name: string;
-  email: string;
-  role: UserRole;
-}
-
-export interface AuthContextType {
-  user: User | null;
-  loading: boolean;
-  isAuthenticated: boolean;
-  isAdmin: boolean;
-  isManager: boolean;
-  canSeeFinancials: boolean;
-  canManageVendors: boolean;
-  canMakePayments: boolean;
-  hasRole: (role: UserRole | UserRole[]) => boolean;
-}
+export type { UserRole, AuthUser } from '@/hooks/useAuth';
+export { useAuth, useIsAdmin, useCanSeeFinancials, useUserRole, useIsVendor } from '@/hooks/useAuth';
 
 // =============================================================================
 // PERMISSION CONFIGURATION
@@ -83,79 +67,6 @@ export const REPORT_ROLES: UserRole[] = ['admin', 'manager'];
 export const OPERATIONAL_ROLES: UserRole[] = ['operator', 'staff', 'warehouse'];
 
 // =============================================================================
-// AUTH CONTEXT
-// =============================================================================
-
-const AuthContext = createContext<AuthContextType | null>(null);
-
-/**
- * Hook to access authentication context
- */
-export function useAuth(): AuthContextType {
-  const context = useContext(AuthContext);
-  
-  if (!context) {
-    // Return default context for SSR or when not wrapped in provider
-    // loading: true because user data hasn't been fetched yet
-    return {
-      user: null,
-      loading: true,
-      isAuthenticated: false,
-      isAdmin: false,
-      isManager: false,
-      canSeeFinancials: false,
-      canManageVendors: false,
-      canMakePayments: false,
-      hasRole: () => false,
-    };
-  }
-  
-  return context;
-}
-
-/**
- * AuthProvider - Wraps app to provide auth context
- */
-export function AuthProvider({ 
-  children, 
-  user 
-}: { 
-  children: ReactNode; 
-  user: User | null;
-}) {
-  const value = useMemo<AuthContextType>(() => {
-    const role = user?.role;
-    // loading is false once we have user data (or null after fetch)
-    // Since parent passes user after fetch, user being explicitly passed means loading is done
-    const loading = false; // Parent (DashboardLayout) only renders children after fetching user
-    
-    return {
-      user,
-      loading,
-      isAuthenticated: !!user,
-      isAdmin: role === 'admin',
-      isManager: role === 'manager',
-      canSeeFinancials: FINANCIAL_ROLES.includes(role as UserRole),
-      canManageVendors: VENDOR_MANAGEMENT_ROLES.includes(role as UserRole),
-      canMakePayments: PAYMENT_ROLES.includes(role as UserRole),
-      hasRole: (requiredRole) => {
-        if (!role) return false;
-        if (Array.isArray(requiredRole)) {
-          return requiredRole.includes(role as UserRole);
-        }
-        return role === requiredRole;
-      },
-    };
-  }, [user]);
-
-  return (
-    <AuthContext.Provider value={value}>
-      {children}
-    </AuthContext.Provider>
-  );
-}
-
-// =============================================================================
 // PERMISSION GUARD COMPONENT
 // =============================================================================
 
@@ -176,6 +87,9 @@ interface PermissionGuardProps {
   
   /** Invert the check (show when NOT authorized) */
   invert?: boolean;
+  
+  /** Show loading state while auth is loading */
+  showLoading?: boolean;
 }
 
 /**
@@ -188,20 +102,26 @@ export function PermissionGuard({
   hasData,
   fallback = null,
   invert = false,
+  showLoading = false,
 }: PermissionGuardProps) {
-  const auth = useAuth();
+  const { user, loading, hasRole, canSeeFinancials } = useAuth();
+
+  // Show nothing while loading (prevents flash of content)
+  if (loading) {
+    return showLoading ? <>{fallback}</> : null;
+  }
 
   // Check if user has access
   let hasAccess = true;
 
   // Role-based check
   if (requiredRole) {
-    hasAccess = auth.hasRole(requiredRole);
+    hasAccess = hasRole(requiredRole);
   }
 
   // Financial access check
   if (requireFinancials) {
-    hasAccess = hasAccess && auth.canSeeFinancials;
+    hasAccess = hasAccess && canSeeFinancials;
   }
 
   // Data existence check (for masked data)
@@ -288,49 +208,6 @@ export function ShowIfDataExists<T>({
 }) {
   const exists = data !== undefined && data !== null;
   return exists ? <>{children}</> : null;
-}
-
-// =============================================================================
-// UTILITY HOOKS
-// =============================================================================
-
-/**
- * Hook to check if current user can see financial data
- */
-export function useCanSeeFinancials(): boolean {
-  const { canSeeFinancials } = useAuth();
-  return canSeeFinancials;
-}
-
-/**
- * Hook to check if current user is admin
- */
-export function useIsAdmin(): boolean {
-  const { isAdmin } = useAuth();
-  return isAdmin;
-}
-
-/**
- * Hook to get current user's role
- */
-export function useUserRole(): UserRole | null {
-  const { user } = useAuth();
-  return user?.role || null;
-}
-
-/**
- * Hook to check if data should be displayed (for masked data handling)
- * Returns true if user can see financials OR if data is explicitly provided
- */
-export function useShowFinancialData(data: unknown): boolean {
-  const { canSeeFinancials } = useAuth();
-  
-  // If user can see financials, always show
-  if (canSeeFinancials) return true;
-  
-  // If user can't see financials, only show if data was provided by API
-  // (This means the backend decided this user should see it)
-  return data !== undefined && data !== null;
 }
 
 // =============================================================================
