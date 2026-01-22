@@ -343,6 +343,24 @@ export const getAppConfig = (req, res) => {
   });
 };
 
+// =============================================================================
+// HEALTH CHECK
+// =============================================================================
+
+/**
+ * API Health Check
+ * GET /health
+ */
+export const getHealthStatus = (req, res) => {
+  res.json({
+    success: true,
+    message: 'ERP API is running',
+    timestamp: new Date().toISOString(),
+    version: '1.0.0',
+    environment: process.env.NODE_ENV || 'development',
+  });
+};
+
 export default {
   getCategories,
   createCategory,
@@ -355,4 +373,5 @@ export default {
   getPaymentMethods,
   getOrderSources,
   getAppConfig,
+  getHealthStatus,
 };

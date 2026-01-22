@@ -41,18 +41,10 @@ import * as staticController from '../controllers/static.controller.js';
 const router = Router();
 
 // =============================================================================
-// HEALTH CHECK
+// HEALTH CHECK (Delegates to controller - no inline logic)
 // =============================================================================
 
-router.get('/health', (req, res) => {
-  res.json({
-    success: true,
-    message: 'ERP API is running',
-    timestamp: new Date().toISOString(),
-    version: '1.0.0',
-    environment: process.env.NODE_ENV || 'development',
-  });
-});
+router.get('/health', staticController.getHealthStatus);
 
 // =============================================================================
 // API ROUTES (Alphabetically ordered)
