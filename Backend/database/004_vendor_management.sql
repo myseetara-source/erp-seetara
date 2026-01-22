@@ -380,6 +380,13 @@ ALTER TABLE vendor_users ENABLE ROW LEVEL SECURITY;
 ALTER TABLE vendor_ledger ENABLE ROW LEVEL SECURITY;
 ALTER TABLE vendor_payments ENABLE ROW LEVEL SECURITY;
 
+-- Drop existing policies if they exist (for idempotent migrations)
+DROP POLICY IF EXISTS vendor_users_vendor_access ON vendor_users;
+DROP POLICY IF EXISTS vendor_ledger_vendor_access ON vendor_ledger;
+DROP POLICY IF EXISTS vendor_ledger_admin_write ON vendor_ledger;
+DROP POLICY IF EXISTS vendor_payments_vendor_access ON vendor_payments;
+DROP POLICY IF EXISTS vendor_payments_admin_write ON vendor_payments;
+
 -- Vendor Users: Vendors see only their own users
 CREATE POLICY vendor_users_vendor_access ON vendor_users
     FOR ALL TO authenticated
