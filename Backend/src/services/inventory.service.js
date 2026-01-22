@@ -563,7 +563,20 @@ class InventoryService {
         .update({ balance: newBalance, updated_at: new Date().toISOString() })
         .eq('id', transaction.vendor_id);
 
-      logger.info('Vendor balance reversed', { 
+      // Create ledger entry for the void correction
+      await this._createVoidLedgerEntry({
+        vendorId: transaction.vendor_id,
+        transactionId: id,
+        invoiceNo: transaction.invoice_no,
+        transactionType: transaction.transaction_type,
+        amount: totalAmount,
+        previousBalance: currentBalance,
+        newBalance,
+        userId,
+        reason,
+      });
+
+      logger.info('Vendor balance reversed with ledger entry', { 
         vendorId: transaction.vendor_id, 
         from: currentBalance, 
         to: newBalance 
@@ -1036,6 +1049,94 @@ class InventoryService {
         };
       })
     );
+  }
+
+  /**
+   * Create ledger entry when voiding a transaction
+   * 
+   * This ensures vendor statements remain mathematically accurate.
+   * Every void creates a correcting ledger entry.
+   * 
+   * @private
+   * @param {Object} params - Void details
+   * @param {string} params.vendorId - Vendor UUID
+   * @param {string} params.transactionId - Transaction UUID being voided
+   * @param {string} params.invoiceNo - Invoice number being voided
+   * @param {string} params.transactionType - Original transaction type
+   * @param {number} params.amount - Amount to correct
+   * @param {number} params.previousBalance - Balance before void
+   * @param {number} params.newBalance - Balance after void
+   * @param {string} params.userId - User performing the void
+   * @param {string} params.reason - Void reason
+   */
+  async _createVoidLedgerEntry(params) {
+    const {
+      vendorId,
+      transactionId,
+      invoiceNo,
+      transactionType,
+      amount,
+      previousBalance,
+      newBalance,
+      userId,
+      reason,
+    } = params;
+
+    // Determine entry type based on original transaction
+    let entryType;
+    let description;
+
+    if (transactionType === TRANSACTION_TYPES.PURCHASE) {
+      // Voiding a purchase = Debit (reduce what we owe)
+      entryType = 'void_purchase';
+      description = `VOID: Purchase Invoice #${invoiceNo} cancelled - ${reason}`;
+    } else if (transactionType === TRANSACTION_TYPES.PURCHASE_RETURN) {
+      // Voiding a return = Credit (increase what we owe back)
+      entryType = 'void_return';
+      description = `VOID: Return Invoice #${invoiceNo} reversed - ${reason}`;
+    } else {
+      // Other types don't affect vendor ledger
+      return;
+    }
+
+    try {
+      const { error } = await supabaseAdmin
+        .from('vendor_ledger')
+        .insert({
+          vendor_id: vendorId,
+          entry_type: entryType,
+          reference_id: transactionId,
+          reference_no: `VOID-${invoiceNo}`,
+          description,
+          debit: transactionType === TRANSACTION_TYPES.PURCHASE ? amount : 0,
+          credit: transactionType === TRANSACTION_TYPES.PURCHASE_RETURN ? amount : 0,
+          balance_before: previousBalance,
+          balance_after: newBalance,
+          performed_by: userId,
+        });
+
+      if (error) {
+        // Don't throw, just log - ledger is for audit, shouldn't block void
+        logger.error('Failed to create void ledger entry (non-blocking)', { 
+          error,
+          transactionId,
+          vendorId,
+        });
+      } else {
+        logger.info('Void ledger entry created', {
+          vendorId,
+          transactionId,
+          entryType,
+          amount,
+        });
+      }
+    } catch (err) {
+      // Catch any unexpected errors - ledger is audit, not critical path
+      logger.error('Unexpected error creating void ledger entry', { 
+        error: err.message,
+        transactionId,
+      });
+    }
   }
 }
 

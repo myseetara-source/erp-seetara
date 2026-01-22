@@ -25,6 +25,9 @@ DO $$ BEGIN
         'payment',            -- Payment (Credit - we paid vendor)
         'debit_note',         -- Debit Note (Credit - vendor owes us)
         'credit_note',        -- Credit Note (Debit - we owe vendor more)
+        'void_purchase',      -- Void Purchase (Credit - reverses a purchase)
+        'void_return',        -- Void Return (Debit - reverses a return)
+        'adjustment'          -- General adjustment entry
         'opening_balance',    -- Opening Balance
         'adjustment'          -- Manual Adjustment
     );
