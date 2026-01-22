@@ -381,6 +381,68 @@ CREATE TRIGGER trg_generate_order_number
     EXECUTE FUNCTION public.set_order_number();
 
 -- =============================================================================
+-- 7. ADJUST VARIANT STOCK (For Void Transaction & Stock Corrections)
+-- =============================================================================
+-- This function atomically adjusts both fresh and damaged stock buckets.
+-- Used by: Backend/src/services/inventory.service.js -> voidTransaction
+
+DROP FUNCTION IF EXISTS public.adjust_variant_stock(UUID, INTEGER, INTEGER) CASCADE;
+
+CREATE OR REPLACE FUNCTION public.adjust_variant_stock(
+    p_variant_id UUID,
+    p_fresh_delta INTEGER,
+    p_damaged_delta INTEGER
+)
+RETURNS JSONB
+LANGUAGE plpgsql
+SECURITY DEFINER
+AS $$
+DECLARE
+    v_current_fresh INTEGER;
+    v_current_damaged INTEGER;
+    v_new_fresh INTEGER;
+    v_new_damaged INTEGER;
+BEGIN
+    -- Lock the variant row for update
+    SELECT current_stock, damaged_stock 
+    INTO v_current_fresh, v_current_damaged
+    FROM product_variants
+    WHERE id = p_variant_id
+    FOR UPDATE;
+    
+    IF NOT FOUND THEN
+        RETURN jsonb_build_object(
+            'success', false,
+            'error', 'Variant not found'
+        );
+    END IF;
+    
+    -- Calculate new stock values (never go below 0)
+    v_new_fresh := GREATEST(0, v_current_fresh + p_fresh_delta);
+    v_new_damaged := GREATEST(0, v_current_damaged + p_damaged_delta);
+    
+    -- Update the stock
+    UPDATE product_variants
+    SET 
+        current_stock = v_new_fresh,
+        damaged_stock = v_new_damaged,
+        updated_at = NOW()
+    WHERE id = p_variant_id;
+    
+    RETURN jsonb_build_object(
+        'success', true,
+        'variant_id', p_variant_id,
+        'fresh_before', v_current_fresh,
+        'fresh_after', v_new_fresh,
+        'damaged_before', v_current_damaged,
+        'damaged_after', v_new_damaged
+    );
+END;
+$$;
+
+COMMENT ON FUNCTION public.adjust_variant_stock IS 'Atomically adjusts fresh and damaged stock for a variant. Used for void/reversal operations.';
+
+-- =============================================================================
 -- SUCCESS MESSAGE
 -- =============================================================================
 DO $$
@@ -392,6 +454,7 @@ BEGIN
     RAISE NOTICE '   - get_next_invoice_number';
     RAISE NOTICE '   - approve_inventory_transaction';
     RAISE NOTICE '   - reject_inventory_transaction';
+    RAISE NOTICE '   - adjust_variant_stock (for void/reversal)';
     RAISE NOTICE '   - set_order_number (trigger function)';
     RAISE NOTICE '   - trg_generate_order_number (trigger on orders)';
 END $$;

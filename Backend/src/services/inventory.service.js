@@ -420,14 +420,15 @@ class InventoryService {
   }
 
   // ===========================================================================
-  // VOID TRANSACTION
+  // VOID TRANSACTION (Reverse Stock & Financial)
   // ===========================================================================
 
   /**
    * Void an existing transaction (Admin only)
+   * Reverses all stock movements and vendor balance changes.
    * 
    * @param {string} id - Transaction UUID
-   * @param {string} reason - Void reason (min 10 chars)
+   * @param {string} reason - Void reason (min 5 chars)
    * @param {string} userId - Admin user UUID
    * @returns {Promise<Object>} Voided transaction
    */
@@ -438,11 +439,143 @@ class InventoryService {
       throw new AppError('Transaction is already voided', 400, 'ALREADY_VOIDED');
     }
 
+    if (transaction.status === TRANSACTION_STATUSES.PENDING) {
+      // Pending transactions never affected stock, just void without reversing
+      const { data, error } = await supabaseAdmin
+        .from('inventory_transactions')
+        .update({
+          status: TRANSACTION_STATUSES.VOIDED,
+          notes: `${transaction.notes || ''}\n\n[VOIDED: ${reason}]`.trim(),
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', id)
+        .select()
+        .single();
+
+      if (error) {
+        logger.error('Failed to void pending transaction', { id, error });
+        throw new AppError('Failed to void transaction', 500, 'DATABASE_ERROR');
+      }
+
+      logger.info('Pending transaction voided (no stock reversal needed)', { id });
+      return data;
+    }
+
+    // APPROVED transaction: Reverse stock movements
+    logger.info('Voiding approved transaction - reversing stock', { 
+      id, 
+      type: transaction.transaction_type 
+    });
+
+    // Reverse each item's stock impact
+    for (const item of transaction.items || []) {
+      const qty = Math.abs(item.quantity || 0);
+      const sourceType = item.source_type || 'fresh';
+
+      // Determine reversal based on transaction type
+      switch (transaction.transaction_type) {
+        case TRANSACTION_TYPES.PURCHASE:
+          // Original: +stock -> Reverse: -stock
+          await supabaseAdmin
+            .from('product_variants')
+            .update({ 
+              current_stock: supabaseAdmin.rpc('decrement_stock', { 
+                variant_id: item.variant_id, 
+                amount: qty 
+              }) 
+            })
+            .eq('id', item.variant_id);
+          
+          // Use direct SQL for atomic update
+          await supabaseAdmin.rpc('adjust_variant_stock', {
+            p_variant_id: item.variant_id,
+            p_fresh_delta: -qty,
+            p_damaged_delta: 0,
+          });
+          break;
+
+        case TRANSACTION_TYPES.PURCHASE_RETURN:
+          // Original: -stock -> Reverse: +stock
+          if (sourceType === 'damaged') {
+            await supabaseAdmin.rpc('adjust_variant_stock', {
+              p_variant_id: item.variant_id,
+              p_fresh_delta: 0,
+              p_damaged_delta: qty,
+            });
+          } else {
+            await supabaseAdmin.rpc('adjust_variant_stock', {
+              p_variant_id: item.variant_id,
+              p_fresh_delta: qty,
+              p_damaged_delta: 0,
+            });
+          }
+          break;
+
+        case TRANSACTION_TYPES.DAMAGE:
+          // Original: -fresh, +damaged -> Reverse: +fresh, -damaged
+          await supabaseAdmin.rpc('adjust_variant_stock', {
+            p_variant_id: item.variant_id,
+            p_fresh_delta: qty,
+            p_damaged_delta: -qty,
+          });
+          break;
+
+        case TRANSACTION_TYPES.ADJUSTMENT:
+          // Reverse the adjustment (positive becomes negative, vice versa)
+          const adjustQty = item.quantity > 0 ? -qty : qty;
+          await supabaseAdmin.rpc('adjust_variant_stock', {
+            p_variant_id: item.variant_id,
+            p_fresh_delta: adjustQty,
+            p_damaged_delta: 0,
+          });
+          break;
+      }
+    }
+
+    // Reverse vendor balance if applicable
+    if (transaction.vendor_id && 
+        (transaction.transaction_type === TRANSACTION_TYPES.PURCHASE || 
+         transaction.transaction_type === TRANSACTION_TYPES.PURCHASE_RETURN)) {
+      
+      const totalAmount = (transaction.items || []).reduce((sum, item) => 
+        sum + (Math.abs(item.quantity) * (item.unit_cost || 0)), 0);
+
+      // Get current vendor balance
+      const { data: vendor } = await supabaseAdmin
+        .from('vendors')
+        .select('balance')
+        .eq('id', transaction.vendor_id)
+        .single();
+
+      const currentBalance = parseFloat(vendor?.balance || 0);
+      let newBalance = currentBalance;
+
+      if (transaction.transaction_type === TRANSACTION_TYPES.PURCHASE) {
+        // Original: +balance -> Reverse: -balance
+        newBalance = currentBalance - totalAmount;
+      } else if (transaction.transaction_type === TRANSACTION_TYPES.PURCHASE_RETURN) {
+        // Original: -balance -> Reverse: +balance
+        newBalance = currentBalance + totalAmount;
+      }
+
+      await supabaseAdmin
+        .from('vendors')
+        .update({ balance: newBalance, updated_at: new Date().toISOString() })
+        .eq('id', transaction.vendor_id);
+
+      logger.info('Vendor balance reversed', { 
+        vendorId: transaction.vendor_id, 
+        from: currentBalance, 
+        to: newBalance 
+      });
+    }
+
+    // Mark transaction as voided
     const { data, error } = await supabaseAdmin
       .from('inventory_transactions')
       .update({
         status: TRANSACTION_STATUSES.VOIDED,
-        notes: `${transaction.notes || ''}\n\n[VOIDED: ${reason}]`.trim(),
+        notes: `${transaction.notes || ''}\n\n[VOIDED by Admin: ${reason}]`.trim(),
         updated_at: new Date().toISOString(),
       })
       .eq('id', id)
@@ -454,9 +587,12 @@ class InventoryService {
       throw new AppError('Failed to void transaction', 500, 'DATABASE_ERROR');
     }
 
-    logger.info('Transaction voided', { id, voidedBy: userId, reason });
+    logger.info('Transaction voided with stock reversal complete', { 
+      id, 
+      voidedBy: userId, 
+      reason 
+    });
 
-    // TODO: Reverse stock movements if transaction was approved
     return data;
   }
 

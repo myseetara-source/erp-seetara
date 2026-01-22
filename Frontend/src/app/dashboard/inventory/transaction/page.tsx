@@ -136,6 +136,9 @@ interface TransactionItem {
   original_qty?: number;
   remaining_qty?: number;
   source_type: StockSourceType;
+  // Split Return Support (for Purchase Return)
+  fresh_qty?: number;
+  damaged_qty?: number;
 }
 
 // =============================================================================
@@ -197,15 +200,36 @@ const TRANSACTION_TYPES: Record<TransactionType, TransactionTypeConfig> = {
   },
 };
 
-const DAMAGE_REASONS = [
-  'Expired',
-  'Broken in Transit',
-  'Manufacturing Defect',
-  'Water Damage',
-  'Theft/Loss',
-  'Customer Return (Damaged)',
-  'Other',
-];
+// =============================================================================
+// SMART REASONS (Pre-defined options per transaction type)
+// =============================================================================
+
+const SMART_REASONS: Record<TransactionType, string[]> = {
+  purchase: [], // No reason needed for purchase
+  purchase_return: [
+    'Overstock / Excess Inventory',
+    'Defective / Damaged',
+    'Wrong Item Sent by Vendor',
+    'Expired Product',
+    'Quality Issue',
+    'Order Cancelled',
+  ],
+  damage: [
+    'Damaged in Transit',
+    'Expired',
+    'Manufacturing Defect',
+    'Water/Fire Damage',
+    'Consumed Internal',
+    'Customer Return (Unsellable)',
+  ],
+  adjustment: [
+    'Physical Count Mismatch',
+    'Theft / Loss',
+    'Found Stock (Inventory Audit)',
+    'System Error Correction',
+    'Opening Stock Entry',
+  ],
+};
 
 // =============================================================================
 // VALIDATION SCHEMA
@@ -217,12 +241,15 @@ const transactionItemSchema = z.object({
   variant_name: z.string().optional().default(''),
   sku: z.string().optional().default(''),
   current_stock: z.coerce.number().optional().default(0),
-  damaged_stock: z.coerce.number().optional().default(0), // Added for dual-bucket support
-  quantity: z.coerce.number().refine(val => val !== 0, 'Quantity cannot be zero'),
+  damaged_stock: z.coerce.number().optional().default(0),
+  quantity: z.coerce.number().default(0), // For non-return types
   unit_cost: z.coerce.number().optional().default(0),
   original_qty: z.coerce.number().optional(),
   remaining_qty: z.coerce.number().optional(),
-  source_type: z.enum(['fresh', 'damaged']).optional(), // Added for dual-bucket support
+  source_type: z.enum(['fresh', 'damaged']).optional().default('fresh'),
+  // Split Return Support (Purchase Return uses these instead of quantity)
+  fresh_qty: z.coerce.number().optional().default(0),
+  damaged_qty: z.coerce.number().optional().default(0),
 });
 
 const transactionSchema = z.object({
@@ -517,11 +544,14 @@ export default function InventoryTransactionPage() {
           sku: item.variant?.sku || '',
           current_stock: item.variant?.current_stock || 0,
           damaged_stock: item.variant?.damaged_stock || 0,
-          quantity: 0, // User will enter return qty
+          quantity: 0, // Calculated from fresh_qty + damaged_qty
           unit_cost: item.unit_cost || 0,
           original_qty: item.quantity || 0,
           remaining_qty: item.remaining_qty || 0,
-          source_type: 'fresh' as StockSourceType, // Default to fresh
+          source_type: 'fresh' as StockSourceType,
+          // Split Return: Two separate inputs for Fresh and Damaged
+          fresh_qty: 0,
+          damaged_qty: 0,
         };
       });
 
@@ -530,20 +560,44 @@ export default function InventoryTransactionPage() {
     toast.success(`Loaded ${invoiceItems.length} items from ${invoice.invoice_no}`);
   };
 
-  // Calculate totals
+  // Calculate totals (handles split quantities for returns)
   const totals = useMemo(() => {
-    const totalQty = items.reduce((sum, item) => sum + Math.abs(item.quantity || 0), 0);
-    const totalCost = items.reduce((sum, item) => sum + (Math.abs(item.quantity || 0) * (item.unit_cost || 0)), 0);
+    let totalQty = 0;
+    let totalCost = 0;
+    
+    if (transactionType === 'purchase_return') {
+      // For returns, sum fresh_qty + damaged_qty
+      for (const item of items) {
+        const freshQty = Number(item.fresh_qty) || 0;
+        const damagedQty = Number(item.damaged_qty) || 0;
+        const itemTotal = freshQty + damagedQty;
+        totalQty += itemTotal;
+        totalCost += itemTotal * (item.unit_cost || 0);
+      }
+    } else {
+      // Normal calculation
+      totalQty = items.reduce((sum, item) => sum + Math.abs(item.quantity || 0), 0);
+      totalCost = items.reduce((sum, item) => sum + (Math.abs(item.quantity || 0) * (item.unit_cost || 0)), 0);
+    }
+    
     return { totalQty, totalCost };
-  }, [items]);
+  }, [items, transactionType]);
 
-  // Validate return quantities
+  // Validate return quantities (split validation)
   const validateReturnQuantities = (): boolean => {
     if (transactionType !== 'purchase_return') return true;
 
     for (const item of items) {
-      if (item.quantity > (item.remaining_qty || 0)) {
-        toast.error(`Cannot return more than ${item.remaining_qty} for ${item.sku}`);
+      const freshQty = Number(item.fresh_qty) || 0;
+      const damagedQty = Number(item.damaged_qty) || 0;
+      const totalReturnQty = freshQty + damagedQty;
+      const availableQty = item.remaining_qty || 0;
+      
+      if (totalReturnQty > availableQty) {
+        toast.error(
+          `Cannot return ${totalReturnQty} of "${item.product_name}". ` +
+          `Only ${availableQty} were purchased in this invoice.`
+        );
         return false;
       }
     }
@@ -590,20 +644,66 @@ export default function InventoryTransactionPage() {
 
     setIsSubmitting(true);
     try {
-      // Transform items to match backend schema (only required fields)
-      // Filter out items with 0 or invalid quantities
-      const transformedItems = data.items
-        .filter((item) => {
-          const qty = Number(item.quantity);
-          return !isNaN(qty) && qty > 0;
-        })
-        .map((item) => ({
-          variant_id: item.variant_id,
-          quantity: Math.abs(Number(item.quantity)), // Ensure positive number
-          unit_cost: Number(item.unit_cost) || 0.01, // Minimum 0.01 for purchases
-          source_type: item.source_type || 'fresh', // Multi-bucket support
-          notes: undefined, // Optional
-        }));
+      let transformedItems: Array<{
+        variant_id: string;
+        quantity: number;
+        unit_cost: number;
+        source_type: StockSourceType;
+        notes?: string;
+      }> = [];
+
+      if (transactionType === 'purchase_return') {
+        // SPLIT RETURN: Create separate items for Fresh and Damaged quantities
+        for (const item of data.items) {
+          const freshQty = Number(item.fresh_qty) || 0;
+          const damagedQty = Number(item.damaged_qty) || 0;
+          const totalQty = freshQty + damagedQty;
+          const remainingQty = item.remaining_qty || 0;
+
+          // Validation: Total cannot exceed available
+          if (totalQty > remainingQty) {
+            toast.error(
+              `Cannot return ${totalQty} of "${item.product_name} - ${item.variant_name}". ` +
+              `Only ${remainingQty} available from this invoice.`
+            );
+            setIsSubmitting(false);
+            return;
+          }
+
+          // Add Fresh return item if qty > 0
+          if (freshQty > 0) {
+            transformedItems.push({
+              variant_id: item.variant_id,
+              quantity: freshQty,
+              unit_cost: Number(item.unit_cost) || 0,
+              source_type: 'fresh',
+            });
+          }
+
+          // Add Damaged return item if qty > 0
+          if (damagedQty > 0) {
+            transformedItems.push({
+              variant_id: item.variant_id,
+              quantity: damagedQty,
+              unit_cost: Number(item.unit_cost) || 0,
+              source_type: 'damaged',
+            });
+          }
+        }
+      } else {
+        // Normal flow for Purchase, Damage, Adjustment
+        transformedItems = data.items
+          .filter((item) => {
+            const qty = Number(item.quantity);
+            return !isNaN(qty) && qty > 0;
+          })
+          .map((item) => ({
+            variant_id: item.variant_id,
+            quantity: Math.abs(Number(item.quantity)),
+            unit_cost: Number(item.unit_cost) || 0.01,
+            source_type: (item.source_type || 'fresh') as StockSourceType,
+          }));
+      }
 
       // Validate we have at least one item
       if (transformedItems.length === 0) {
@@ -844,45 +944,58 @@ export default function InventoryTransactionPage() {
                   </div>
                 )}
 
-                {/* Reason (if required) */}
+                {/* Smart Reason Dropdown (with custom option) */}
                 {config.reasonRequired && (
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">
                       <Info className="w-4 h-4 inline mr-1" />
                       Reason <span className="text-red-500">*</span>
-                      <span className="text-xs text-gray-400 ml-1">(min 5 chars)</span>
                     </label>
 
-                    {transactionType === 'damage' ? (
-                      <Controller
-                        name="reason"
-                        control={control}
-                        render={({ field }) => (
+                    <Controller
+                      name="reason"
+                      control={control}
+                      render={({ field }) => (
+                        <div className="space-y-2">
                           <select
-                            {...field}
+                            value={SMART_REASONS[transactionType].includes(field.value || '') ? field.value : '__custom__'}
+                            onChange={(e) => {
+                              if (e.target.value === '__custom__') {
+                                field.onChange('');
+                              } else {
+                                field.onChange(e.target.value);
+                              }
+                            }}
                             className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
                           >
                             <option value="">Select Reason</option>
-                            {DAMAGE_REASONS.map((reason) => (
+                            {SMART_REASONS[transactionType].map((reason) => (
                               <option key={reason} value={reason}>
                                 {reason}
                               </option>
                             ))}
+                            <option value="__custom__">✏️ Other (Custom)</option>
                           </select>
-                        )}
-                      />
-                    ) : (
-                      <textarea
-                        {...register('reason')}
-                        placeholder={
-                          transactionType === 'adjustment'
-                            ? 'Reason for adjustment (e.g., Physical count correction)...'
-                            : 'Reason for return...'
-                        }
-                        rows={2}
-                        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500 resize-none"
-                      />
-                    )}
+                          
+                          {/* Custom reason input (shows when "Other" is selected) */}
+                          {!SMART_REASONS[transactionType].includes(field.value || '') && field.value !== '' && (
+                            <Input
+                              value={field.value || ''}
+                              onChange={(e) => field.onChange(e.target.value)}
+                              placeholder="Enter custom reason..."
+                              className="w-full"
+                            />
+                          )}
+                          {field.value === '' && (
+                            <Input
+                              onChange={(e) => field.onChange(e.target.value)}
+                              placeholder="Type your reason here..."
+                              className="w-full"
+                            />
+                          )}
+                        </div>
+                      )}
+                    />
                   </div>
                 )}
 
@@ -976,21 +1089,34 @@ export default function InventoryTransactionPage() {
                       <th className="px-4 py-3 text-left font-medium text-gray-600">Product</th>
                       <th className="px-4 py-3 text-left font-medium text-gray-600">Variant</th>
                       <th className="px-4 py-3 text-left font-medium text-gray-600">SKU</th>
-                      {transactionType === 'purchase_return' && (
+                      {transactionType === 'purchase_return' ? (
                         <>
-                          <th className="px-4 py-3 text-center font-medium text-gray-600">Source</th>
+                          {/* SPLIT RETURN UI: Two columns for Fresh and Damaged */}
                           <th className="px-4 py-3 text-center font-medium text-gray-600">
                             <div className="flex flex-col">
-                              <span>Stock</span>
-                              <span className="text-xs font-normal">(Fresh / Damaged)</span>
+                              <span>Purchased</span>
+                              <span className="text-xs font-normal text-gray-400">(Available)</span>
                             </div>
                           </th>
-                          <th className="px-4 py-3 text-center font-medium text-gray-600">Purchased</th>
+                          <th className="px-4 py-3 text-center font-medium text-gray-600 w-24">
+                            <div className="flex flex-col">
+                              <span className="text-green-600">🟢 Fresh</span>
+                              <span className="text-xs font-normal">Return Qty</span>
+                            </div>
+                          </th>
+                          <th className="px-4 py-3 text-center font-medium text-gray-600 w-24">
+                            <div className="flex flex-col">
+                              <span className="text-red-600">🔴 Damaged</span>
+                              <span className="text-xs font-normal">Return Qty</span>
+                            </div>
+                          </th>
+                          <th className="px-4 py-3 text-center font-medium text-gray-600 w-20">
+                            Total
+                          </th>
                         </>
+                      ) : (
+                        <th className="px-4 py-3 text-center font-medium text-gray-600 w-28">Qty</th>
                       )}
-                      <th className="px-4 py-3 text-center font-medium text-gray-600 w-28">
-                        {transactionType === 'purchase_return' ? 'Return Qty' : 'Qty'}
-                      </th>
                       <FinancialsOnly>
                         <th className="px-4 py-3 text-center font-medium text-gray-600 w-28">Cost</th>
                         <th className="px-4 py-3 text-right font-medium text-gray-600">Total</th>
@@ -1007,46 +1133,64 @@ export default function InventoryTransactionPage() {
                           <td className="px-4 py-3">{item.variant_name}</td>
                           <td className="px-4 py-3 font-mono text-xs text-gray-500">{item.sku}</td>
 
-                          {transactionType === 'purchase_return' && (
+                          {transactionType === 'purchase_return' ? (
                             <>
-                              {/* Source Bucket Dropdown */}
-                              <td className="px-4 py-3">
-                                <select
-                                  {...register(`items.${index}.source_type`)}
-                                  className="w-full px-2 py-1.5 text-sm rounded-md border border-gray-300 bg-white focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
-                                >
-                                  <option value="fresh">🟢 Fresh</option>
-                                  <option value="damaged">🔴 Damaged</option>
-                                </select>
-                              </td>
-                              {/* Current Stock (Fresh / Damaged) */}
+                              {/* SPLIT RETURN: Purchased & Available */}
                               <td className="px-4 py-3 text-center">
-                                <div className="flex items-center justify-center gap-2">
-                                  <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200">
-                                    {item.current_stock || 0}
-                                  </Badge>
-                                  <span className="text-gray-400">/</span>
-                                  <Badge variant="outline" className="bg-red-50 text-red-700 border-red-200">
-                                    {item.damaged_stock || 0}
-                                  </Badge>
+                                <div className="flex flex-col items-center">
+                                  <span className="font-semibold text-gray-900">{item.original_qty}</span>
+                                  <span className="text-xs text-gray-500">
+                                    (Left: <span className={item.remaining_qty! > 0 ? 'text-green-600 font-medium' : 'text-gray-400'}>{item.remaining_qty}</span>)
+                                  </span>
                                 </div>
                               </td>
-                              {/* Original Purchase Qty */}
-                              <td className="px-4 py-3 text-center font-medium">
-                                {item.original_qty}
+                              {/* Fresh Return Qty */}
+                              <td className="px-4 py-3">
+                                <Input
+                                  type="number"
+                                  {...register(`items.${index}.fresh_qty`, { valueAsNumber: true })}
+                                  max={item.remaining_qty}
+                                  min={0}
+                                  placeholder="0"
+                                  className="w-full text-center h-9 border-green-200 focus:border-green-500 focus:ring-green-500"
+                                />
+                              </td>
+                              {/* Damaged Return Qty */}
+                              <td className="px-4 py-3">
+                                <Input
+                                  type="number"
+                                  {...register(`items.${index}.damaged_qty`, { valueAsNumber: true })}
+                                  max={item.remaining_qty}
+                                  min={0}
+                                  placeholder="0"
+                                  className="w-full text-center h-9 border-red-200 focus:border-red-500 focus:ring-red-500"
+                                />
+                              </td>
+                              {/* Calculated Total */}
+                              <td className="px-4 py-3 text-center">
+                                <Badge 
+                                  variant="outline" 
+                                  className={cn(
+                                    "font-mono",
+                                    ((item.fresh_qty || 0) + (item.damaged_qty || 0)) > 0 
+                                      ? "bg-orange-100 text-orange-700 border-orange-300" 
+                                      : "bg-gray-100 text-gray-500"
+                                  )}
+                                >
+                                  {(item.fresh_qty || 0) + (item.damaged_qty || 0)}
+                                </Badge>
                               </td>
                             </>
+                          ) : (
+                            <td className="px-4 py-3">
+                              <Input
+                                type="number"
+                                {...register(`items.${index}.quantity`, { valueAsNumber: true })}
+                                min={0}
+                                className="w-full text-center h-9"
+                              />
+                            </td>
                           )}
-
-                          <td className="px-4 py-3">
-                            <Input
-                              type="number"
-                              {...register(`items.${index}.quantity`, { valueAsNumber: true })}
-                              max={transactionType === 'purchase_return' ? item.remaining_qty : undefined}
-                              min={0}
-                              className="w-full text-center h-9"
-                            />
-                          </td>
 
                           <FinancialsOnly>
                             <td className="px-4 py-3">
