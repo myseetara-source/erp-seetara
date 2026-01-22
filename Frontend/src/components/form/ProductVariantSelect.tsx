@@ -116,11 +116,12 @@ export function ProductVariantSelect({
   const searchVariants = useCallback(async (searchQuery: string) => {
     setIsLoading(true);
     try {
+      // Use FULL mode to get complete variant data
       const response = await apiClient.get(API_ROUTES.PRODUCTS.SEARCH, {
         params: {
           q: searchQuery || '', // Empty query = recent/popular items
           limit: 15,
-          mode: mode, // SALES or INVENTORY
+          mode: 'FULL', // Always use FULL to get variants
         },
       });
 
@@ -130,7 +131,20 @@ export function ProductVariantSelect({
         const products = response.data.data || [];
 
         for (const product of products) {
-          for (const variant of product.variants || []) {
+          // Handle both 'variants' and 'product_variants' keys
+          const variants = product.variants || product.product_variants || [];
+          
+          if (!Array.isArray(variants) || variants.length === 0) {
+            // Product with no variants - skip or add as single item
+            continue;
+          }
+
+          for (const variant of variants) {
+            // Apply stock filter based on mode
+            if (mode === 'SALES' && (variant.current_stock || 0) <= 0) {
+              continue; // Skip out-of-stock for SALES mode
+            }
+            
             options.push({
               variant_id: variant.id,
               product_id: product.id,

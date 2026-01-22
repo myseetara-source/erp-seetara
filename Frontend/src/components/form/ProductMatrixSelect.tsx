@@ -162,23 +162,47 @@ export function ProductMatrixSelect({
   // SELECT PRODUCT
   // ==========================================================================
 
-  const handleSelectProduct = (product: Product) => {
-    setSelectedProduct(product);
-    
-    // Initialize quantities and costs
-    const initQty: Record<string, number> = {};
-    const initCost: Record<string, number> = {};
-    const initSource: Record<string, SourceType> = {};
+  const handleSelectProduct = async (product: Product) => {
+    // Fetch full variant data (lazy loading)
+    setIsLoading(true);
+    try {
+      const response = await apiClient.get(`/products/${product.id}/variants`);
+      
+      // Get variants from response
+      const variants: Variant[] = response.data?.data || response.data || [];
+      
+      // Create a product with variants for local state
+      const productWithVariants: Product = {
+        ...product,
+        variants: Array.isArray(variants) ? variants : [],
+      };
+      
+      setSelectedProduct(productWithVariants);
+      
+      // Initialize quantities and costs
+      const initQty: Record<string, number> = {};
+      const initCost: Record<string, number> = {};
+      const initSource: Record<string, SourceType> = {};
 
-    product.variants.forEach((v) => {
-      initQty[v.id] = 0;
-      initCost[v.id] = v.cost_price || 0;
-      initSource[v.id] = sourceType;
-    });
+      if (Array.isArray(variants)) {
+        variants.forEach((v) => {
+          initQty[v.id] = 0;
+          initCost[v.id] = v.cost_price || 0;
+          initSource[v.id] = sourceType;
+        });
+      }
 
-    setQuantities(initQty);
-    setCosts(initCost);
-    setSources(initSource);
+      setQuantities(initQty);
+      setCosts(initCost);
+      setSources(initSource);
+      
+    } catch (error) {
+      console.error('Failed to fetch variants:', error);
+      toast.error('Failed to load product variants');
+      setSelectedProduct(null);
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   // ==========================================================================
@@ -190,7 +214,15 @@ export function ProductMatrixSelect({
 
     const items: MatrixItem[] = [];
 
-    selectedProduct.variants.forEach((variant) => {
+    // Handle both 'variants' (frontend) and 'product_variants' (DB) keys
+    const variants = selectedProduct.variants || (selectedProduct as any).product_variants || [];
+    
+    if (!Array.isArray(variants) || variants.length === 0) {
+      toast.error('No variants found for this product');
+      return;
+    }
+
+    variants.forEach((variant) => {
       const qty = quantities[variant.id] || 0;
       if (qty === 0) return; // Skip zero quantity
 
