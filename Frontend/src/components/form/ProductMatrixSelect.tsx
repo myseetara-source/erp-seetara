@@ -362,7 +362,7 @@ export function ProductMatrixSelect({
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-100">
-            {selectedProduct.variants.map((variant) => {
+            {(selectedProduct.variants || []).map((variant) => {
               const variantName = Object.values(variant.attributes || {}).join(' / ') || 'Default';
               const source = sources[variant.id] || 'fresh';
               const maxQty = source === 'fresh' ? variant.current_stock : (variant.damaged_stock || 0);

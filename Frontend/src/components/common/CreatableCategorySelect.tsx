@@ -119,21 +119,33 @@ export const CreatableCategorySelect = forwardRef<
           params: { search: searchQuery, limit: 20 },
         });
 
-        if (response.data.success && response.data.data) {
-          setCategories(response.data.data);
+        if (response.data.success && Array.isArray(response.data.data)) {
+          // API returns array of strings OR array of objects
+          // Normalize to array of { id, name } objects
+          const rawData = response.data.data;
+          const normalized: Category[] = rawData.map((item: string | Category) => {
+            if (typeof item === 'string') {
+              // API returned ["Accessories", "Bags", ...] format
+              return { id: item.toLowerCase().replace(/\s+/g, '-'), name: item };
+            }
+            // API returned [{ id, name }, ...] format
+            return item;
+          }).filter((cat: Category) => cat && cat.name); // Filter out nulls
+          
+          setCategories(normalized);
         } else {
           // Fallback to default categories
           const filtered = DEFAULT_CATEGORIES
             .filter(cat => 
               cat.toLowerCase().includes(searchQuery.toLowerCase())
             )
-            .map(name => ({ id: name.toLowerCase(), name }));
+            .map(name => ({ id: name.toLowerCase().replace(/\s+/g, '-'), name }));
           setCategories(filtered);
         }
-      } catch (err: any) {
+      } catch (err: unknown) {
         // Silently use default categories on 404 or any error
-        // This is expected if /categories endpoint doesn't exist yet
-        if (err?.response?.status !== 404) {
+        const axiosError = err as { response?: { status?: number } };
+        if (axiosError?.response?.status !== 404) {
           console.debug('[CreatableCategorySelect] API not available, using defaults');
         }
         
@@ -141,7 +153,7 @@ export const CreatableCategorySelect = forwardRef<
           .filter(cat => 
             cat.toLowerCase().includes(searchQuery.toLowerCase())
           )
-          .map(name => ({ id: name.toLowerCase(), name }));
+          .map(name => ({ id: name.toLowerCase().replace(/\s+/g, '-'), name }));
         setCategories(filtered);
       } finally {
         setIsLoading(false);
