@@ -18,7 +18,13 @@ import { z } from 'zod';
 import { toast } from 'sonner';
 import apiClient from '@/lib/api/apiClient';
 import { API_ROUTES } from '@/lib/routes';
-import type { OrderStatus, FulfillmentType } from '@/types/database.types';
+import type { 
+  OrderStatus, 
+  FulfillmentType,
+  PaymentMethod,
+  DbProductVariant,
+  DbProduct,
+} from '@/types/database.types';
 
 // =============================================================================
 // SCHEMAS
@@ -228,12 +234,10 @@ function transformToPayload(data: QuickOrderFormData | FullOrderFormData, mode: 
 // MAIN HOOK - Type Safe (Audit Fix CRIT-006)
 // =============================================================================
 
-import type { 
-  OrderStatus,
-  FulfillmentType,
-  PaymentMethod,
-  VariantAttributes 
-} from '@/types';
+/**
+ * Variant Attributes - dynamic key-value pairs for product variants
+ */
+type VariantAttributes = Record<string, string>;
 
 /**
  * Created Order Response from API

@@ -39,11 +39,15 @@ import { cn } from '@/lib/utils';
 import apiClient from '@/lib/api/apiClient';
 import { useIsAdmin } from '@/components/auth/PermissionGuard';
 import { toast } from 'sonner';
+import type { StockSourceType } from '@/types/database.types';
 
 // =============================================================================
-// TYPES
+// TYPES (Aligned with DbProductVariant from database.types.ts)
 // =============================================================================
 
+/**
+ * Variant interface - matches DbProductVariant structure
+ */
 interface Variant {
   id: string;
   sku: string;
@@ -54,12 +58,19 @@ interface Variant {
   damaged_stock?: number;
 }
 
+/**
+ * Product with variants - API response shape
+ * Note: API may return 'variants' (frontend) or 'product_variants' (database)
+ */
 interface Product {
   id: string;
   name: string;
   brand?: string;
   image_url?: string;
+  /** Variants array (normalized from API) */
   variants: Variant[];
+  /** Alternative key from database join */
+  product_variants?: Variant[];
 }
 
 interface MatrixItem {
@@ -74,8 +85,11 @@ interface MatrixItem {
   source_type: 'fresh' | 'damaged';
 }
 
+/** Matches InventoryTransactionType from database */
 type TransactionType = 'purchase' | 'purchase_return' | 'damage' | 'adjustment';
-type SourceType = 'fresh' | 'damaged';
+
+/** Re-export StockSourceType for local use (from database.types.ts) */
+type SourceType = StockSourceType;
 
 interface ProductMatrixSelectProps {
   /** Callback when items are added */
@@ -215,7 +229,7 @@ export function ProductMatrixSelect({
     const items: MatrixItem[] = [];
 
     // Handle both 'variants' (frontend) and 'product_variants' (DB) keys
-    const variants = selectedProduct.variants || (selectedProduct as any).product_variants || [];
+    const variants: Variant[] = selectedProduct.variants || selectedProduct.product_variants || [];
     
     if (!Array.isArray(variants) || variants.length === 0) {
       toast.error('No variants found for this product');
