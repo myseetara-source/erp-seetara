@@ -541,7 +541,7 @@ class InventoryService {
         items:inventory_transaction_items(
           variant_id, quantity, unit_cost,
           variant:product_variants(
-            id, sku, attributes, current_stock,
+            id, sku, attributes, current_stock, damaged_stock,
             product:products(id, name, image_url)
           )
         )

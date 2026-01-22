@@ -117,9 +117,12 @@ interface PurchaseInvoiceItem {
     sku: string;
     attributes: Record<string, string>;
     current_stock: number;
+    damaged_stock?: number;
     product: { id: string; name: string };
   };
 }
+
+type StockSourceType = 'fresh' | 'damaged';
 
 interface TransactionItem {
   variant_id: string;
@@ -127,10 +130,12 @@ interface TransactionItem {
   variant_name: string;
   sku: string;
   current_stock: number;
+  damaged_stock: number;
   quantity: number;
   unit_cost: number;
   original_qty?: number;
   remaining_qty?: number;
+  source_type: StockSourceType;
 }
 
 // =============================================================================
@@ -511,10 +516,12 @@ export default function InventoryTransactionPage() {
           variant_name: variantName || item.variant?.sku || '',
           sku: item.variant?.sku || '',
           current_stock: item.variant?.current_stock || 0,
+          damaged_stock: item.variant?.damaged_stock || 0,
           quantity: 0, // User will enter return qty
           unit_cost: item.unit_cost || 0,
           original_qty: item.quantity || 0,
           remaining_qty: item.remaining_qty || 0,
+          source_type: 'fresh' as StockSourceType, // Default to fresh
         };
       });
 
@@ -594,6 +601,7 @@ export default function InventoryTransactionPage() {
           variant_id: item.variant_id,
           quantity: Math.abs(Number(item.quantity)), // Ensure positive number
           unit_cost: Number(item.unit_cost) || 0.01, // Minimum 0.01 for purchases
+          source_type: item.source_type || 'fresh', // Multi-bucket support
           notes: undefined, // Optional
         }));
 
@@ -970,8 +978,14 @@ export default function InventoryTransactionPage() {
                       <th className="px-4 py-3 text-left font-medium text-gray-600">SKU</th>
                       {transactionType === 'purchase_return' && (
                         <>
+                          <th className="px-4 py-3 text-center font-medium text-gray-600">Source</th>
+                          <th className="px-4 py-3 text-center font-medium text-gray-600">
+                            <div className="flex flex-col">
+                              <span>Stock</span>
+                              <span className="text-xs font-normal">(Fresh / Damaged)</span>
+                            </div>
+                          </th>
                           <th className="px-4 py-3 text-center font-medium text-gray-600">Purchased</th>
-                          <th className="px-4 py-3 text-center font-medium text-gray-600">Available</th>
                         </>
                       )}
                       <th className="px-4 py-3 text-center font-medium text-gray-600 w-28">
@@ -995,16 +1009,31 @@ export default function InventoryTransactionPage() {
 
                           {transactionType === 'purchase_return' && (
                             <>
+                              {/* Source Bucket Dropdown */}
+                              <td className="px-4 py-3">
+                                <select
+                                  {...register(`items.${index}.source_type`)}
+                                  className="w-full px-2 py-1.5 text-sm rounded-md border border-gray-300 bg-white focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
+                                >
+                                  <option value="fresh">🟢 Fresh</option>
+                                  <option value="damaged">🔴 Damaged</option>
+                                </select>
+                              </td>
+                              {/* Current Stock (Fresh / Damaged) */}
+                              <td className="px-4 py-3 text-center">
+                                <div className="flex items-center justify-center gap-2">
+                                  <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200">
+                                    {item.current_stock || 0}
+                                  </Badge>
+                                  <span className="text-gray-400">/</span>
+                                  <Badge variant="outline" className="bg-red-50 text-red-700 border-red-200">
+                                    {item.damaged_stock || 0}
+                                  </Badge>
+                                </div>
+                              </td>
+                              {/* Original Purchase Qty */}
                               <td className="px-4 py-3 text-center font-medium">
                                 {item.original_qty}
-                              </td>
-                              <td className="px-4 py-3 text-center">
-                                <Badge
-                                  variant={item.remaining_qty! > 0 ? 'default' : 'secondary'}
-                                  className={item.remaining_qty! > 0 ? 'bg-green-100 text-green-700' : ''}
-                                >
-                                  {item.remaining_qty}
-                                </Badge>
                               </td>
                             </>
                           )}
