@@ -26,6 +26,7 @@
  */
 
 import apiClient from './apiClient';
+import { API_ROUTES } from '@/lib/routes';
 
 // =============================================================================
 // TYPES
@@ -150,7 +151,7 @@ export const fetcher = async (url: string) => {
  * Cache: 1 hour
  */
 export async function getCategories(): Promise<string[]> {
-  const response = await apiClient.get('/static/categories');
+  const response = await apiClient.get(API_ROUTES.STATIC.CATEGORIES);
   return response.data.data || [];
 }
 
@@ -159,7 +160,7 @@ export async function getCategories(): Promise<string[]> {
  * Cache: 1 hour
  */
 export async function getBrands(): Promise<string[]> {
-  const response = await apiClient.get('/static/brands');
+  const response = await apiClient.get(API_ROUTES.STATIC.BRANDS);
   return response.data.data || [];
 }
 
@@ -168,7 +169,7 @@ export async function getBrands(): Promise<string[]> {
  * Cache: 1 hour
  */
 export async function getDeliveryZones(): Promise<DeliveryZone[]> {
-  const response = await apiClient.get('/static/delivery-zones');
+  const response = await apiClient.get(API_ROUTES.STATIC.DELIVERY_ZONES);
   return response.data.data || [];
 }
 
@@ -177,7 +178,7 @@ export async function getDeliveryZones(): Promise<DeliveryZone[]> {
  * Cache: 24 hours
  */
 export async function getFulfillmentTypes(): Promise<FulfillmentType[]> {
-  const response = await apiClient.get('/static/fulfillment-types');
+  const response = await apiClient.get(API_ROUTES.STATIC.FULFILLMENT_TYPES);
   return response.data.data || [];
 }
 
@@ -186,7 +187,7 @@ export async function getFulfillmentTypes(): Promise<FulfillmentType[]> {
  * Cache: 24 hours
  */
 export async function getOrderStatuses(): Promise<Record<string, OrderStatus>> {
-  const response = await apiClient.get('/static/order-statuses');
+  const response = await apiClient.get(API_ROUTES.STATIC.ORDER_STATUSES);
   return response.data.data || {};
 }
 
@@ -195,7 +196,7 @@ export async function getOrderStatuses(): Promise<Record<string, OrderStatus>> {
  * Cache: 24 hours
  */
 export async function getStatusTransitions(): Promise<Record<string, Record<string, string[]>>> {
-  const response = await apiClient.get('/static/status-transitions');
+  const response = await apiClient.get(API_ROUTES.STATIC.STATUS_TRANSITIONS);
   return response.data.data || {};
 }
 
@@ -204,7 +205,7 @@ export async function getStatusTransitions(): Promise<Record<string, Record<stri
  * Cache: 24 hours
  */
 export async function getPaymentMethods(): Promise<PaymentMethod[]> {
-  const response = await apiClient.get('/static/payment-methods');
+  const response = await apiClient.get(API_ROUTES.STATIC.PAYMENT_METHODS);
   return response.data.data || [];
 }
 
@@ -213,7 +214,7 @@ export async function getPaymentMethods(): Promise<PaymentMethod[]> {
  * Cache: 24 hours
  */
 export async function getOrderSources(): Promise<OrderSource[]> {
-  const response = await apiClient.get('/static/order-sources');
+  const response = await apiClient.get(API_ROUTES.STATIC.ORDER_SOURCES);
   return response.data.data || [];
 }
 
@@ -222,7 +223,7 @@ export async function getOrderSources(): Promise<OrderSource[]> {
  * Cache: 5 minutes (requires auth)
  */
 export async function getAppConfig(): Promise<AppConfig> {
-  const response = await apiClient.get('/static/app-config');
+  const response = await apiClient.get(API_ROUTES.STATIC.APP_CONFIG);
   return response.data.data;
 }
 

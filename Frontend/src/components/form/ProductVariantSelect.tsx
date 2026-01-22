@@ -30,6 +30,7 @@ import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
 import apiClient from '@/lib/api/apiClient';
+import { API_ROUTES } from '@/lib/routes';
 
 // =============================================================================
 // TYPES
@@ -115,7 +116,7 @@ export function ProductVariantSelect({
   const searchVariants = useCallback(async (searchQuery: string) => {
     setIsLoading(true);
     try {
-      const response = await apiClient.get('/products/search', {
+      const response = await apiClient.get(API_ROUTES.PRODUCTS.SEARCH, {
         params: {
           q: searchQuery || '', // Empty query = recent/popular items
           limit: 15,

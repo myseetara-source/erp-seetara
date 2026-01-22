@@ -62,9 +62,11 @@ import {
 } from '@/components/auth/PermissionGuard';
 import { cn } from '@/lib/utils';
 import apiClient from '@/lib/api/apiClient';
+import { API_ROUTES } from '@/lib/routes';
 import { useDebounce } from '@/hooks/useDebounce';
 import { ProductVariantSelect, VariantOption } from '@/components/form/ProductVariantSelect';
 import { ProductMatrixSelect } from '@/components/form/ProductMatrixSelect';
+import type { InventoryTransactionType, InventoryTransactionStatus, DbInventoryTransaction, DbVendor } from '@/types/database.types';
 
 // =============================================================================
 // TYPES
@@ -254,7 +256,7 @@ function InvoiceSearchModal({ isOpen, onClose, onSelectInvoice, vendorId }: Invo
         if (vendorId) params.vendor_id = vendorId;
         if (debouncedQuery) params.invoice_no = debouncedQuery;
 
-        const response = await apiClient.get('/inventory/purchases/search', { params });
+        const response = await apiClient.get(API_ROUTES.INVENTORY.PURCHASES_SEARCH, { params });
         if (response.data.success) {
           setInvoices(response.data.data || []);
         }
@@ -437,7 +439,7 @@ export default function InventoryTransactionPage() {
   useEffect(() => {
     const fetchVendors = async () => {
       try {
-        const response = await apiClient.get('/vendors', { params: { limit: 100 } });
+        const response = await apiClient.get(API_ROUTES.VENDORS.LIST, { params: { limit: 100 } });
         if (response.data.success) {
           setVendors(response.data.data || []);
         }
@@ -452,7 +454,7 @@ export default function InventoryTransactionPage() {
   useEffect(() => {
     const fetchNextInvoice = async () => {
       try {
-        const response = await apiClient.get('/inventory/transactions/next-invoice', {
+        const response = await apiClient.get(API_ROUTES.INVENTORY.TRANSACTIONS.NEXT_INVOICE, {
           params: { type: transactionType },
         });
         if (response.data.success) {
@@ -547,7 +549,7 @@ export default function InventoryTransactionPage() {
 
     setIsSubmitting(true);
     try {
-      const response = await apiClient.post('/inventory/transactions', {
+      const response = await apiClient.post(API_ROUTES.INVENTORY.TRANSACTIONS.CREATE, {
         ...data,
         // Filter out items with 0 quantity
         items: data.items.filter((item) => item.quantity !== 0),

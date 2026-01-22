@@ -227,6 +227,23 @@ export class ExternalServiceError extends AppError {
   }
 }
 
+/**
+ * Async Handler Wrapper
+ * Wraps async route handlers to catch errors and pass to error middleware
+ * Eliminates try-catch boilerplate in controllers
+ * 
+ * @param {Function} fn - Async function to wrap
+ * @returns {Function} Express middleware function
+ */
+export const catchAsync = (fn) => {
+  return (req, res, next) => {
+    Promise.resolve(fn(req, res, next)).catch(next);
+  };
+};
+
+// Alias for compatibility
+export const asyncHandler = catchAsync;
+
 export default {
   AppError,
   BadRequestError,
@@ -242,4 +259,6 @@ export default {
   DatabaseError,
   RateLimitError,
   ExternalServiceError,
+  catchAsync,
+  asyncHandler,
 };

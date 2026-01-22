@@ -17,6 +17,8 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { toast } from 'sonner';
 import apiClient from '@/lib/api/apiClient';
+import { API_ROUTES } from '@/lib/routes';
+import type { OrderStatus, FulfillmentType } from '@/types/database.types';
 
 // =============================================================================
 // SCHEMAS
@@ -406,7 +408,7 @@ export function useOrderForm<T extends QuickOrderFormData | FullOrderFormData>(
     
     setIsSearching(true);
     try {
-      const response = await apiClient.get('/products/search', {
+      const response = await apiClient.get(API_ROUTES.PRODUCTS.SEARCH, {
         params: { q: query, limit: 10, include_variants: true },
       });
       
@@ -464,7 +466,7 @@ export function useOrderForm<T extends QuickOrderFormData | FullOrderFormData>(
       const payload = transformToPayload(data, mode);
       console.log(`[${mode.toUpperCase()}] Submitting order:`, payload);
       
-      const response = await apiClient.post('/orders', payload);
+      const response = await apiClient.post(API_ROUTES.ORDERS.CREATE, payload);
       
       if (response.data.success) {
         setIsSuccess(true);
