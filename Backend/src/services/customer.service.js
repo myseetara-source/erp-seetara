@@ -50,18 +50,14 @@ class CustomerService {
    */
   async createCustomer(data) {
     // Sanitize phone numbers
+    // NOTE: Schema uses single values for ip_address and fbid (not arrays)
     const customerData = {
       ...data,
       phone: sanitizePhone(data.phone),
       alt_phone: data.alt_phone ? sanitizePhone(data.alt_phone) : null,
-      // Initialize tracking arrays
-      ip_addresses: data.ip_address ? [data.ip_address] : [],
-      fb_ids: data.fbid ? [data.fbid] : [],
+      ip_address: data.ip_address || null,  // Single value, not array
+      fbid: data.fbid || null,              // Single value, not array
     };
-
-    // Remove single values now that arrays exist
-    delete customerData.ip_address;
-    delete customerData.fbid;
 
     const { data: customer, error } = await supabaseAdmin
       .from('customers')
@@ -169,14 +165,12 @@ class CustomerService {
       if (orderData.state) updates.state = orderData.state;
       if (orderData.pincode) updates.pincode = orderData.pincode;
 
-      // Append unique IP address
-      if (orderData.ip_address && !existing.ip_addresses?.includes(orderData.ip_address)) {
-        updates.ip_addresses = await this.appendToArray(existing.id, 'ip_addresses', orderData.ip_address);
+      // Update IP address and Facebook ID (single values in new schema)
+      if (orderData.ip_address) {
+        updates.ip_address = orderData.ip_address;
       }
-
-      // Append unique Facebook ID
-      if (orderData.fbid && !existing.fb_ids?.includes(orderData.fbid)) {
-        updates.fb_ids = await this.appendToArray(existing.id, 'fb_ids', orderData.fbid);
+      if (orderData.fbid) {
+        updates.fbid = orderData.fbid;
       }
 
       // Update UTM tracking (latest wins)
@@ -203,7 +197,7 @@ class CustomerService {
       return { customer: { ...existing, ...updates }, isNew: false };
     }
 
-    // Create new customer
+    // Create new customer (single values for ip_address/fbid per new schema)
     const newCustomerData = {
       name: orderData.name || 'Unknown',
       phone,
@@ -214,8 +208,8 @@ class CustomerService {
       city: orderData.city || null,
       state: orderData.state || null,
       pincode: orderData.pincode || null,
-      ip_addresses: orderData.ip_address ? [orderData.ip_address] : [],
-      fb_ids: orderData.fbid ? [orderData.fbid] : [],
+      ip_address: orderData.ip_address || null,  // Single value per new schema
+      fbid: orderData.fbid || null,              // Single value per new schema
       fbclid: orderData.fbclid || null,
       gclid: orderData.gclid || null,
       utm_source: orderData.utm_source || null,
@@ -518,8 +512,8 @@ class CustomerService {
       totalOrderCount: orders.pagination.total,
       // Fraud detection data (admin only)
       tracking: {
-        ipAddresses: customer.ip_addresses || [],
-        facebookIds: customer.fb_ids || [],
+        ipAddress: customer.ip_address || null,  // Single value per new schema
+        facebookId: customer.fbid || null,       // Single value per new schema
         lastFbclid: customer.fbclid,
         lastGclid: customer.gclid,
         utmSource: customer.utm_source,
