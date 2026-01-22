@@ -6,6 +6,16 @@
 -- =============================================================================
 
 -- =============================================================================
+-- DROP EXISTING FUNCTIONS FIRST (to avoid return type conflicts)
+-- =============================================================================
+DROP FUNCTION IF EXISTS public.deduct_stock_atomic(UUID, INTEGER, UUID, TEXT);
+DROP FUNCTION IF EXISTS public.deduct_stock_bulk(JSONB, UUID, TEXT);
+DROP FUNCTION IF EXISTS public.generate_order_number();
+DROP FUNCTION IF EXISTS public.get_next_invoice_number(TEXT);
+DROP FUNCTION IF EXISTS public.approve_inventory_transaction(UUID, UUID);
+DROP FUNCTION IF EXISTS public.reject_inventory_transaction(UUID, UUID, TEXT);
+
+-- =============================================================================
 -- 1. ATOMIC STOCK DEDUCTION (Required for Order Creation)
 -- =============================================================================
 -- This function atomically deducts stock and creates a movement record.
