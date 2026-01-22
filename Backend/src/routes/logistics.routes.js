@@ -65,7 +65,7 @@ router.get(
     date: z.string().optional(),
     overdue: z.enum(['true', 'false']).optional(),
   })),
-  followupController.getPendingFollowUps
+  followupController.getPendingFollowups
 );
 
 /**
@@ -77,29 +77,18 @@ router.post(
   authorize(['admin', 'manager', 'operator']),
   validateParams(z.object({ id: uuidSchema })),
   validateBody(followUpSchema),
-  followupController.scheduleFollowUp
+  followupController.createFollowup
 );
 
 /**
- * Convert follow-up to confirmed order
- * POST /logistics/orders/:id/convert
+ * Update a follow-up
+ * PATCH /logistics/orders/:id/follow-up
  */
-router.post(
-  '/orders/:id/convert',
+router.patch(
+  '/orders/:id/follow-up',
   authorize(['admin', 'manager', 'operator']),
   validateParams(z.object({ id: uuidSchema })),
-  followupController.convertFollowUp
-);
-
-/**
- * Bulk reschedule follow-ups
- * POST /logistics/follow-ups/bulk
- */
-router.post(
-  '/follow-ups/bulk',
-  authorize(['admin', 'manager']),
-  validateBody(bulkFollowUpSchema),
-  followupController.bulkRescheduleFollowUps
+  followupController.updateFollowup
 );
 
 // =============================================================================

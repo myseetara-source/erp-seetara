@@ -91,7 +91,7 @@ class InventoryService {
       .select(`
         *,
         vendor:vendors(id, name, company_name),
-        performer:users!inventory_transactions_performed_by_fkey(id, name, email),
+        performer:users!performed_by(id, name, email),
         items:inventory_transaction_items(
           id, variant_id, quantity, unit_cost, stock_before, stock_after,
           variant:product_variants(id, sku, attributes, product:products(id, name))
@@ -136,11 +136,8 @@ class InventoryService {
       .select(`
         *,
         vendor:vendors(id, name, company_name, phone, email, balance),
-        performer:users!inventory_transactions_performed_by_fkey(id, name, email),
-        approver:users!inventory_transactions_approved_by_fkey(id, name, email),
-        reference:inventory_transactions!inventory_transactions_reference_transaction_id_fkey(
-          id, invoice_no, transaction_type, transaction_date
-        ),
+        performer:users!performed_by(id, name, email),
+        approver:users!approved_by(id, name, email),
         items:inventory_transaction_items(
           id, variant_id, quantity, unit_cost, stock_before, stock_after, source_type, notes,
           variant:product_variants(
@@ -160,6 +157,17 @@ class InventoryService {
       throw new AppError('Failed to fetch transaction', 500, 'DATABASE_ERROR');
     }
 
+    // Fetch reference transaction separately if exists (self-referencing FK)
+    let reference = null;
+    if (data?.reference_transaction_id) {
+      const { data: refData } = await supabaseAdmin
+        .from('inventory_transactions')
+        .select('id, invoice_no, transaction_type, transaction_date')
+        .eq('id', data.reference_transaction_id)
+        .single();
+      reference = refData;
+    }
+
     // Add calculated totals
     const totalQuantity = data.items?.reduce((sum, item) => sum + Math.abs(item.quantity || 0), 0) || 0;
     const totalCost = data.items?.reduce((sum, item) => 
@@ -167,6 +175,7 @@ class InventoryService {
 
     return {
       ...data,
+      reference,
       calculated_total_quantity: totalQuantity,
       calculated_total_cost: totalCost,
     };
@@ -466,7 +475,7 @@ class InventoryService {
       .select(`
         *,
         vendor:vendors(id, name, company_name),
-        performer:users!inventory_transactions_performed_by_fkey(id, name, email),
+        performer:users!performed_by(id, name, email),
         items:inventory_transaction_items(
           id, variant_id, quantity, unit_cost,
           variant:product_variants(id, sku, attributes, product:products(id, name))
