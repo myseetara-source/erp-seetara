@@ -254,7 +254,7 @@ function InvoiceSearchModal({ isOpen, onClose, onSelectInvoice, vendorId }: Invo
     const fetchInvoices = async () => {
       setIsLoading(true);
       try {
-        const params: any = { limit: 20 };
+        const params: { limit: number; vendor_id?: string; invoice_no?: string } = { limit: 20 };
         if (vendorId) params.vendor_id = vendorId;
         if (debouncedQuery) params.invoice_no = debouncedQuery;
 
@@ -262,8 +262,8 @@ function InvoiceSearchModal({ isOpen, onClose, onSelectInvoice, vendorId }: Invo
         if (response.data.success) {
           setInvoices(response.data.data || []);
         }
-      } catch (error) {
-        console.error('Failed to fetch invoices:', error);
+      } catch {
+        // Failed to fetch invoices - will show empty list
       } finally {
         setIsLoading(false);
       }
@@ -430,22 +430,7 @@ export default function InventoryTransactionPage() {
     mode: 'onChange', // Validate on change to catch errors early
   });
   
-  // Debug: Log form errors
-  useEffect(() => {
-    if (Object.keys(errors).length > 0) {
-      console.log('[TransactionForm] Validation errors:', errors);
-      // Show the first error as toast
-      const firstError = Object.entries(errors)[0];
-      if (firstError) {
-        const [field, error] = firstError;
-        const message = typeof error === 'object' && error !== null 
-          ? (error as any).message || (error as any).root?.message || `Invalid ${field}`
-          : `Invalid ${field}`;
-        // Only show once per error change
-        console.log(`[TransactionForm] First error: ${field} - ${message}`);
-      }
-    }
-  }, [errors]);
+  // Form errors are displayed via Zod resolver and onFormError callback
 
   const { fields, append, remove, replace } = useFieldArray({
     control,
@@ -463,8 +448,8 @@ export default function InventoryTransactionPage() {
         if (response.data.success) {
           setVendors(response.data.data || []);
         }
-      } catch (error) {
-        console.error('Failed to fetch vendors:', error);
+      } catch {
+        // Failed to fetch vendors - vendor dropdown will be empty
       }
     };
     fetchVendors();
@@ -547,10 +532,8 @@ export default function InventoryTransactionPage() {
   };
 
   // Handle form validation errors (called when validation fails)
-  const onFormError = (formErrors: any) => {
-    console.log('[TransactionForm] Form validation failed:', formErrors);
-    
-    // Get first error message
+  const onFormError = (formErrors: Record<string, { message?: string; root?: { message?: string } }>) => {
+    // Get first error message and show as toast
     if (formErrors.items?.root?.message) {
       toast.error(formErrors.items.root.message);
     } else if (formErrors.items?.message) {
@@ -567,8 +550,6 @@ export default function InventoryTransactionPage() {
 
   // Submit transaction
   const onSubmit = async (data: TransactionFormData) => {
-    console.log('[TransactionForm] onSubmit called with data:', data);
-    
     // Validate return quantities
     if (!validateReturnQuantities()) return;
 
@@ -600,11 +581,6 @@ export default function InventoryTransactionPage() {
           notes: undefined, // Optional
         }));
 
-      console.log('[TransactionForm] Submitting payload:', {
-        ...data,
-        items: transformedItems,
-      });
-
       const response = await apiClient.post(API_ROUTES.INVENTORY.TRANSACTIONS.CREATE, {
         ...data,
         items: transformedItems,
@@ -621,9 +597,9 @@ export default function InventoryTransactionPage() {
       } else {
         throw new Error(response.data.error?.message || 'Failed to create transaction');
       }
-    } catch (error: any) {
-      console.error('[TransactionForm] Submit error:', error);
-      toast.error(error.response?.data?.error?.message || error.message || 'Failed to create transaction');
+    } catch (error: unknown) {
+      const err = error as { response?: { data?: { error?: { message?: string } } }; message?: string };
+      toast.error(err.response?.data?.error?.message || err.message || 'Failed to create transaction');
     } finally {
       setIsSubmitting(false);
     }
