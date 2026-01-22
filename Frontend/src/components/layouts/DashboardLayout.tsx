@@ -25,7 +25,7 @@ import {
   Bell,
   Search,
   Menu,
-  User,
+  User as UserIcon,
   LogOut,
   Boxes,
   Bike,
@@ -33,6 +33,7 @@ import {
   MessageSquare,
 } from 'lucide-react';
 import { CommandPalette } from '@/components/common/CommandPalette';
+import { AuthProvider, User, UserRole } from '@/components/auth/PermissionGuard';
 
 interface DashboardLayoutProps {
   children: React.ReactNode;
@@ -83,22 +84,30 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
   const [isLoggingOut, setIsLoggingOut] = useState(false);
   const [userName, setUserName] = useState('Admin');
   const [userEmail, setUserEmail] = useState('');
+  const [currentUser, setCurrentUser] = useState<User | null>(null);
 
-  // Fetch user info
+  // Fetch user info (including role for AuthProvider)
   useEffect(() => {
     const fetchUser = async () => {
       const supabase = createClient();
       const { data: { user } } = await supabase.auth.getUser();
       if (user) {
         setUserEmail(user.email || '');
-        // Get name from public.users
+        // Get name AND role from public.users
         const { data } = await supabase
           .from('users')
-          .select('name')
+          .select('id, name, email, role')
           .eq('id', user.id)
           .single();
-        if (data?.name) {
-          setUserName(data.name);
+        if (data) {
+          setUserName(data.name || 'User');
+          // Set the full user object for AuthProvider
+          setCurrentUser({
+            id: data.id,
+            name: data.name || 'User',
+            email: data.email || user.email || '',
+            role: (data.role || 'operator') as UserRole,
+          });
         }
       }
     };
@@ -352,7 +361,7 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
                       </div>
                       <div className="py-1">
                         <button className="w-full flex items-center gap-3 px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 transition-colors">
-                          <User className="w-4 h-4" />
+                          <UserIcon className="w-4 h-4" />
                           Profile
                         </button>
                         <Link 
@@ -385,7 +394,10 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
         {/* PAGE CONTENT */}
         {/* ===================================================================== */}
         <div className="p-4 lg:p-6 animate-page-fade-in">
-          {children}
+          {/* Wrap children with AuthProvider so useAuth() works everywhere */}
+          <AuthProvider user={currentUser}>
+            {children}
+          </AuthProvider>
         </div>
       </main>
     </div>

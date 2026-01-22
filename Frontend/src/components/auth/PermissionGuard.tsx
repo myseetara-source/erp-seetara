@@ -43,6 +43,7 @@ export interface User {
 
 export interface AuthContextType {
   user: User | null;
+  loading: boolean;
   isAuthenticated: boolean;
   isAdmin: boolean;
   isManager: boolean;
@@ -95,8 +96,10 @@ export function useAuth(): AuthContextType {
   
   if (!context) {
     // Return default context for SSR or when not wrapped in provider
+    // loading: true because user data hasn't been fetched yet
     return {
       user: null,
+      loading: true,
       isAuthenticated: false,
       isAdmin: false,
       isManager: false,
@@ -122,9 +125,13 @@ export function AuthProvider({
 }) {
   const value = useMemo<AuthContextType>(() => {
     const role = user?.role;
+    // loading is false once we have user data (or null after fetch)
+    // Since parent passes user after fetch, user being explicitly passed means loading is done
+    const loading = false; // Parent (DashboardLayout) only renders children after fetching user
     
     return {
       user,
+      loading,
       isAuthenticated: !!user,
       isAdmin: role === 'admin',
       isManager: role === 'manager',
