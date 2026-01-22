@@ -267,39 +267,72 @@ class VendorService {
   }
 
   /**
-   * Get vendor stats
+   * Get vendor stats (Uses optimized database function)
    * @param {string} id - Vendor UUID
    * @returns {Object} Vendor statistics
    */
   async getVendorStats(id) {
-    // Get supply count and total
-    const { data: supplies } = await supabaseAdmin
-      .from('vendor_supplies')
-      .select('total_amount, created_at')
-      .eq('vendor_id', id);
+    // Try using the optimized database function first
+    const { data: statsResult, error: rpcError } = await supabaseAdmin
+      .rpc('get_vendor_stats', { p_vendor_id: id });
 
-    // Get payment total
-    const { data: payments } = await supabaseAdmin
-      .from('transactions')
-      .select('amount, created_at')
+    if (!rpcError && statsResult) {
+      return {
+        total_supplies: statsResult.purchase_count || 0,
+        total_purchase_value: parseFloat(statsResult.purchases) || 0,
+        total_payments: parseFloat(statsResult.payments) || 0,
+        total_returns: parseFloat(statsResult.returns) || 0,
+        outstanding_balance: parseFloat(statsResult.balance) || 0,
+        last_supply_date: statsResult.last_purchase_date,
+        last_payment_date: statsResult.last_payment_date,
+        last_activity_date: statsResult.last_activity_date,
+      };
+    }
+
+    // Fallback: Manual aggregation from inventory_transactions
+    logger.debug('Using fallback stats aggregation', { vendorId: id, rpcError });
+    
+    // Get purchase stats
+    const { data: purchases } = await supabaseAdmin
+      .from('inventory_transactions')
+      .select('total_cost, transaction_date')
       .eq('vendor_id', id)
-      .eq('type', 'vendor_payment');
+      .eq('transaction_type', 'purchase')
+      .eq('status', 'approved');
 
-    const totalSupplyValue = (supplies || []).reduce((sum, s) => sum + (s.total_amount || 0), 0);
+    // Get return stats
+    const { data: returns } = await supabaseAdmin
+      .from('inventory_transactions')
+      .select('total_cost')
+      .eq('vendor_id', id)
+      .eq('transaction_type', 'purchase_return')
+      .eq('status', 'approved');
+
+    // Get payment stats
+    const { data: payments } = await supabaseAdmin
+      .from('vendor_payments')
+      .select('amount, payment_date')
+      .eq('vendor_id', id)
+      .eq('status', 'completed');
+
+    const totalPurchases = (purchases || []).reduce((sum, p) => sum + Math.abs(p.total_cost || 0), 0);
+    const totalReturns = (returns || []).reduce((sum, r) => sum + Math.abs(r.total_cost || 0), 0);
     const totalPayments = (payments || []).reduce((sum, p) => sum + (p.amount || 0), 0);
 
     // Get latest dates
-    const lastSupply = supplies?.sort((a, b) => new Date(b.created_at) - new Date(a.created_at))[0];
-    const lastPayment = payments?.sort((a, b) => new Date(b.created_at) - new Date(a.created_at))[0];
+    const lastPurchase = purchases?.sort((a, b) => 
+      new Date(b.transaction_date) - new Date(a.transaction_date))[0];
+    const lastPayment = payments?.sort((a, b) => 
+      new Date(b.payment_date) - new Date(a.payment_date))[0];
 
     return {
-      total_supplies: supplies?.length || 0,
-      total_purchase_value: totalSupplyValue,
+      total_supplies: purchases?.length || 0,
+      total_purchase_value: totalPurchases,
       total_payments: totalPayments,
-      outstanding_balance: totalSupplyValue - totalPayments,
-      average_order_value: supplies?.length > 0 ? totalSupplyValue / supplies.length : 0,
-      last_supply_date: lastSupply?.created_at || null,
-      last_payment_date: lastPayment?.created_at || null,
+      total_returns: totalReturns,
+      outstanding_balance: totalPurchases - totalReturns - totalPayments,
+      last_supply_date: lastPurchase?.transaction_date || null,
+      last_payment_date: lastPayment?.payment_date || null,
     };
   }
 
@@ -551,33 +584,94 @@ class VendorService {
   // ===========================================================================
 
   /**
-   * Record vendor payment
+   * Record vendor payment (Uses atomic database function)
    * @param {Object} data - Payment data
    * @param {string} userId - User making the payment
-   * @returns {Object} Transaction record
+   * @returns {Object} Payment record with ledger entry
    */
   async recordPayment(data, userId = null) {
-    const { vendor_id, amount, payment_mode, reference_number, description, notes } = data;
+    const { 
+      vendor_id, 
+      amount, 
+      payment_method, 
+      payment_mode,  // Alias for payment_method
+      reference_number, 
+      notes 
+    } = data;
 
-    // Verify vendor
+    const paymentMethod = payment_method || payment_mode || 'cash';
+
+    // Verify vendor exists
     const vendor = await this.getVendorById(vendor_id);
 
-    // Generate transaction number
-    const { data: txnNumberResult } = await supabaseAdmin
-      .rpc('generate_transaction_number');
-    const transactionNumber = txnNumberResult || `TXN-${Date.now()}`;
+    // Use atomic database function for payment + ledger + balance update
+    const { data: result, error } = await supabaseAdmin.rpc('record_vendor_payment', {
+      p_vendor_id: vendor_id,
+      p_amount: parseFloat(amount),
+      p_payment_method: paymentMethod,
+      p_reference_number: reference_number || null,
+      p_notes: notes || null,
+      p_performed_by: userId,
+    });
 
-    // Create transaction
-    const { data: transaction, error } = await supabaseAdmin
-      .from('transactions')
+    if (error) {
+      logger.error('RPC payment failed, using fallback', { error });
+      // Fallback: Manual payment creation
+      return this._recordPaymentManual(data, userId, vendor);
+    }
+
+    if (!result.success) {
+      throw new ValidationError(result.error || 'Failed to record payment');
+    }
+
+    logger.info('Vendor payment recorded (atomic)', { 
+      paymentId: result.payment_id,
+      paymentNo: result.payment_no,
+      vendorId: vendor_id,
+      amount,
+      balanceBefore: result.balance_before,
+      balanceAfter: result.balance_after,
+    });
+
+    // Return payment record
+    const { data: payment } = await supabaseAdmin
+      .from('vendor_payments')
+      .select('*')
+      .eq('id', result.payment_id)
+      .single();
+
+    return {
+      ...payment,
+      vendor_name: vendor.name,
+      balance_before: result.balance_before,
+      balance_after: result.balance_after,
+    };
+  }
+
+  /**
+   * Fallback manual payment recording
+   * @private
+   */
+  async _recordPaymentManual(data, userId, vendor) {
+    const { vendor_id, amount, payment_method, payment_mode, reference_number, notes } = data;
+    const paymentMethod = payment_method || payment_mode || 'cash';
+
+    // Generate payment number
+    const paymentNo = `PAY-${Date.now()}`;
+    const balanceBefore = parseFloat(vendor.balance) || 0;
+    const balanceAfter = balanceBefore - parseFloat(amount);
+
+    // Create payment record
+    const { data: payment, error } = await supabaseAdmin
+      .from('vendor_payments')
       .insert({
-        transaction_number: transactionNumber,
-        type: 'vendor_payment',
-        amount,
         vendor_id,
-        payment_mode,
+        payment_no: paymentNo,
+        amount: parseFloat(amount),
+        payment_method: paymentMethod,
         reference_number,
-        description: description || `Payment to ${vendor.name}`,
+        balance_before: balanceBefore,
+        balance_after: balanceAfter,
         notes,
         created_by: userId,
       })
@@ -585,19 +679,30 @@ class VendorService {
       .single();
 
     if (error) {
-      throw new DatabaseError('Failed to create transaction', error);
+      throw new DatabaseError('Failed to create payment record', error);
     }
 
-    // Update vendor balance (decrease - we paid them)
-    await this.updateVendorBalance(vendor_id, -amount);
+    // Update vendor balance
+    await this.updateVendorBalance(vendor_id, -parseFloat(amount));
 
-    logger.info('Vendor payment recorded', { 
-      transactionId: transaction.id,
-      vendorId: vendor_id,
-      amount 
-    });
+    // Create ledger entry
+    await supabaseAdmin
+      .from('vendor_ledger')
+      .insert({
+        vendor_id,
+        entry_type: 'payment',
+        reference_id: payment.id,
+        reference_no: paymentNo,
+        debit: 0,
+        credit: parseFloat(amount),
+        running_balance: balanceAfter,
+        description: `Payment via ${paymentMethod}`,
+        performed_by: userId,
+      });
 
-    return transaction;
+    logger.info('Vendor payment recorded (manual fallback)', { paymentId: payment.id });
+
+    return payment;
   }
 
   /**

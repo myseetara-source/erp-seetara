@@ -344,6 +344,7 @@ export const getVendorSummary = asyncHandler(async (req, res) => {
           total_supplies: stats.total_supplies,
           total_purchase_value: stats.total_purchase_value,
           total_payments: stats.total_payments,
+          total_returns: stats.total_returns || 0,
           outstanding_balance: stats.outstanding_balance,
           average_order_value: stats.average_order_value,
           last_supply_date: stats.last_supply_date,
@@ -364,6 +365,45 @@ export const getVendorSummary = asyncHandler(async (req, res) => {
       },
     });
   }
+});
+
+/**
+ * Get vendor stats (Fast endpoint for dashboard cards)
+ * GET /vendors/:id/stats
+ * 
+ * SECURITY: Admin only (contains financial data)
+ * 
+ * Returns: { purchases, payments, returns, balance }
+ */
+export const getVendorStats = asyncHandler(async (req, res) => {
+  const userRole = req.user?.role;
+  
+  // Only admins can see financial stats
+  if (!canSeeFinancials(userRole)) {
+    return res.status(403).json({
+      success: false,
+      error: {
+        code: 'FORBIDDEN',
+        message: 'You do not have permission to view vendor stats',
+      },
+    });
+  }
+
+  const stats = await vendorService.getVendorStats(req.params.id);
+
+  // Return fast, lightweight response for dashboard
+  res.json({
+    success: true,
+    data: {
+      purchases: stats.total_purchase_value || 0,
+      payments: stats.total_payments || 0,
+      returns: stats.total_returns || 0,
+      balance: stats.outstanding_balance || 0,
+      purchase_count: stats.total_supplies || 0,
+      last_purchase_date: stats.last_supply_date,
+      last_payment_date: stats.last_payment_date,
+    },
+  });
 });
 
 // =============================================================================
@@ -434,6 +474,7 @@ export default {
   recordPayment,
   getVendorLedger,
   getVendorSummary,
+  getVendorStats,
   // Portal
   getVendorProfile,
   getOwnLedger,

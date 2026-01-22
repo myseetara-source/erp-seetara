@@ -141,6 +141,20 @@ router.get(
 );
 
 /**
+ * Get vendor stats (Fast endpoint for dashboard)
+ * GET /vendors/:id/stats
+ * 
+ * SECURITY: Admin only - Returns financial aggregations
+ * Response: { purchases, payments, returns, balance }
+ */
+router.get(
+  '/:id/stats',
+  authorize('admin'),
+  validateParams(vendorIdSchema),
+  vendorController.getVendorStats
+);
+
+/**
  * Get vendor ledger (hisab-kitab)
  * GET /vendors/:id/ledger
  * 
@@ -217,7 +231,7 @@ router.post(
 // =============================================================================
 
 /**
- * Record vendor payment
+ * Record vendor payment (General endpoint)
  * POST /vendors/payments
  * 
  * SECURITY: Admin only - This is a FINANCIAL action
@@ -228,6 +242,30 @@ router.post(
   authorize('admin'),
   validateBody(createVendorPaymentSchema),
   vendorController.recordPayment
+);
+
+/**
+ * Record payment for specific vendor
+ * POST /vendors/:id/payment
+ * 
+ * SECURITY: Admin only - Financial action
+ * Creates ledger entry automatically
+ */
+router.post(
+  '/:id/payment',
+  authorize('admin'),
+  validateParams(vendorIdSchema),
+  validateBody(z.object({
+    amount: z.number().positive('Amount must be positive'),
+    payment_method: z.enum(['cash', 'bank_transfer', 'cheque', 'esewa', 'khalti', 'connectips', 'other']).default('cash'),
+    reference_number: z.string().optional(),
+    notes: z.string().optional(),
+  })),
+  async (req, res, next) => {
+    // Inject vendor_id from params into body for service
+    req.body.vendor_id = req.params.id;
+    vendorController.recordPayment(req, res, next);
+  }
 );
 
 // =============================================================================
