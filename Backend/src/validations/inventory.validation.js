@@ -75,22 +75,25 @@ export const purchaseTransactionSchema = baseTransactionSchema.extend({
 });
 
 /**
- * PURCHASE_RETURN Schema
+ * PURCHASE_RETURN Schema (Direct Vendor Return / Debit Note)
  * - Vendor: Required
- * - Reference Transaction: REQUIRED (links to original purchase)
+ * - Reference Transaction: OPTIONAL (no invoice linking required)
  * - Quantity: Positive (will be converted to negative internally)
+ * - Source Type: Required (fresh or damaged)
+ * 
+ * NEW LOGIC: Direct return to vendor without linking to original invoice.
+ * Stock is validated against current warehouse stock, not purchase history.
  */
 export const purchaseReturnTransactionSchema = baseTransactionSchema.extend({
   transaction_type: z.literal('purchase_return'),
   vendor_id: z.string().uuid('Vendor is required for purchase return'),
-  // MAKER-CHECKER: Link to original purchase invoice (REQUIRED)
-  reference_transaction_id: z.string().uuid('Original purchase invoice is required'),
+  // DIRECT RETURN: No invoice linking required
+  reference_transaction_id: z.string().uuid().optional().nullable(),
   reason: z.string().min(5, 'Return reason is required (min 5 chars)'),
   items: z.array(
     transactionItemSchema.extend({
       quantity: z.number().int().min(1, 'Quantity must be positive'),
-      // Track original purchase qty for validation
-      original_qty: z.number().int().optional(),
+      source_type: z.enum(['fresh', 'damaged']).default('fresh'),
     })
   ).min(1, 'At least one item is required'),
 });

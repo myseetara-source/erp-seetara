@@ -836,116 +836,75 @@ class InventoryService {
   }
 
   /**
-   * Validate purchase return quantities against original invoice
-   * Implements CRIT-002 security fix
+   * Validate purchase return against warehouse stock availability
+   * NEW LOGIC: Direct Vendor Return (Debit Note) - No invoice linking
    * 
    * @private
    * @param {Object} data - Return transaction data
    * @param {Array} parsedItems - Parsed items to return
-   * @throws {AppError} If validation fails
+   * @throws {AppError} If stock validation fails
    */
   async _validatePurchaseReturn(data, parsedItems) {
-    if (!data.reference_transaction_id) {
-      throw new AppError(
-        'Purchase Return requires a reference to original purchase invoice',
-        400,
-        'MISSING_REFERENCE'
-      );
+    // Vendor is required for returns
+    if (!data.vendor_id) {
+      throw new AppError('Vendor is required for Purchase Return', 400, 'MISSING_VENDOR');
     }
 
-    // Get original purchase
-    const { data: refTx, error: refError } = await supabaseAdmin
-      .from('inventory_transactions')
-      .select(`
-        id, transaction_type, status,
-        items:inventory_transaction_items(variant_id, quantity)
-      `)
-      .eq('id', data.reference_transaction_id)
-      .single();
-
-    if (refError || !refTx) {
-      throw new AppError('Reference purchase transaction not found', 400, 'INVALID_REFERENCE');
-    }
-
-    if (refTx.transaction_type !== TRANSACTION_TYPES.PURCHASE) {
-      throw new AppError('Reference must be a Purchase transaction', 400, 'INVALID_REFERENCE_TYPE');
-    }
-
-    // Build original quantity map
-    const originalQtyMap = new Map();
-    for (const item of refTx.items || []) {
-      originalQtyMap.set(item.variant_id, Math.abs(item.quantity));
-    }
-
-    // Get already returned quantities
-    const { data: previousReturns } = await supabaseAdmin
-      .from('inventory_transactions')
-      .select('items:inventory_transaction_items(variant_id, quantity)')
-      .eq('reference_transaction_id', data.reference_transaction_id)
-      .eq('transaction_type', TRANSACTION_TYPES.PURCHASE_RETURN)
-      .eq('status', TRANSACTION_STATUSES.APPROVED);
-
-    const alreadyReturnedMap = new Map();
-    if (previousReturns) {
-      for (const returnTx of previousReturns) {
-        for (const item of returnTx.items || []) {
-          const existing = alreadyReturnedMap.get(item.variant_id) || 0;
-          alreadyReturnedMap.set(item.variant_id, existing + Math.abs(item.quantity));
-        }
-      }
-    }
-
-    // Validate each return item
+    // Validate stock availability for each item
     const validationErrors = [];
 
     for (const returnItem of parsedItems) {
-      const originalQty = originalQtyMap.get(returnItem.variant_id) || 0;
-      const alreadyReturned = alreadyReturnedMap.get(returnItem.variant_id) || 0;
-      const maxReturnable = originalQty - alreadyReturned;
       const requestedQty = Math.abs(returnItem.quantity);
+      const sourceType = returnItem.source_type || 'fresh';
 
-      if (requestedQty > maxReturnable) {
-        const { data: variant } = await supabaseAdmin
-          .from('product_variants')
-          .select('sku')
-          .eq('id', returnItem.variant_id)
-          .single();
+      // Get current stock levels
+      const { data: variant, error: variantError } = await supabaseAdmin
+        .from('product_variants')
+        .select('id, sku, current_stock, damaged_stock')
+        .eq('id', returnItem.variant_id)
+        .single();
 
+      if (variantError || !variant) {
         validationErrors.push({
           variant_id: returnItem.variant_id,
-          sku: variant?.sku || returnItem.variant_id,
-          requested: requestedQty,
-          original: originalQty,
-          already_returned: alreadyReturned,
-          max_returnable: maxReturnable,
-          message: `Cannot return ${requestedQty}. Max returnable: ${maxReturnable}`,
+          message: 'Product variant not found',
         });
+        continue;
       }
 
-      if (originalQty === 0) {
+      // Check stock based on source bucket
+      const availableStock = sourceType === 'damaged' 
+        ? (variant.damaged_stock || 0) 
+        : (variant.current_stock || 0);
+
+      if (requestedQty > availableStock) {
         validationErrors.push({
           variant_id: returnItem.variant_id,
-          message: 'Item was not in the original purchase invoice',
+          sku: variant.sku,
+          requested: requestedQty,
+          available: availableStock,
+          source_type: sourceType,
+          message: `Cannot return ${requestedQty} from ${sourceType} stock. Only ${availableStock} available.`,
         });
       }
     }
 
     if (validationErrors.length > 0) {
-      logger.warn('SECURITY: Return quantity validation failed', { 
-        referenceId: data.reference_transaction_id, 
+      logger.warn('SECURITY: Stock availability validation failed', { 
+        vendorId: data.vendor_id, 
         errors: validationErrors 
       });
       
       throw new AppError(
-        'Cannot return more than originally purchased',
+        'Insufficient stock for return',
         400,
-        'RETURN_QUANTITY_EXCEEDED',
+        'INSUFFICIENT_STOCK',
         { details: validationErrors }
       );
     }
 
-    logger.debug('Return validation passed', {
-      referenceId: data.reference_transaction_id,
+    logger.debug('Direct return validation passed', {
+      vendorId: data.vendor_id,
       itemCount: parsedItems.length,
     });
   }

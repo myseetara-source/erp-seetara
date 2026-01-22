@@ -167,10 +167,10 @@ const TRANSACTION_TYPES: Record<TransactionType, TransactionTypeConfig> = {
     borderColor: 'border-orange-200',
     vendorRequired: true,
     reasonRequired: true,
-    costVisible: false,
+    costVisible: true, // Show Return Rate (editable)
     quantityDirection: 'out',
     prefix: 'RET',
-    requiresInvoiceLink: true, // MUST link to original purchase
+    requiresInvoiceLink: false, // DIRECT VENDOR RETURN (Debit Note) - No invoice linking
   },
   damage: {
     label: 'Write-off / Damage',
@@ -560,43 +560,31 @@ export default function InventoryTransactionPage() {
     toast.success(`Loaded ${invoiceItems.length} items from ${invoice.invoice_no}`);
   };
 
-  // Calculate totals (handles split quantities for returns)
+  // Calculate totals (unified for all transaction types)
   const totals = useMemo(() => {
-    let totalQty = 0;
-    let totalCost = 0;
-    
-    if (transactionType === 'purchase_return') {
-      // For returns, sum fresh_qty + damaged_qty
-      for (const item of items) {
-        const freshQty = Number(item.fresh_qty) || 0;
-        const damagedQty = Number(item.damaged_qty) || 0;
-        const itemTotal = freshQty + damagedQty;
-        totalQty += itemTotal;
-        totalCost += itemTotal * (item.unit_cost || 0);
-      }
-    } else {
-      // Normal calculation
-      totalQty = items.reduce((sum, item) => sum + Math.abs(item.quantity || 0), 0);
-      totalCost = items.reduce((sum, item) => sum + (Math.abs(item.quantity || 0) * (item.unit_cost || 0)), 0);
-    }
-    
+    const totalQty = items.reduce((sum, item) => sum + Math.abs(item.quantity || 0), 0);
+    const totalCost = items.reduce((sum, item) => 
+      sum + (Math.abs(item.quantity || 0) * (item.unit_cost || 0)), 0);
     return { totalQty, totalCost };
-  }, [items, transactionType]);
+  }, [items]);
 
-  // Validate return quantities (split validation)
+  // Validate return quantities (stock availability check)
   const validateReturnQuantities = (): boolean => {
     if (transactionType !== 'purchase_return') return true;
 
     for (const item of items) {
-      const freshQty = Number(item.fresh_qty) || 0;
-      const damagedQty = Number(item.damaged_qty) || 0;
-      const totalReturnQty = freshQty + damagedQty;
-      const availableQty = item.remaining_qty || 0;
+      const returnQty = Number(item.quantity) || 0;
+      if (returnQty <= 0) continue;
       
-      if (totalReturnQty > availableQty) {
+      const sourceType = item.source_type || 'fresh';
+      const availableStock = sourceType === 'damaged' 
+        ? (item.damaged_stock || 0) 
+        : (item.current_stock || 0);
+      
+      if (returnQty > availableStock) {
         toast.error(
-          `Cannot return ${totalReturnQty} of "${item.product_name}". ` +
-          `Only ${availableQty} were purchased in this invoice.`
+          `Cannot return ${returnQty} of "${item.product_name}" from ${sourceType} stock. ` +
+          `Only ${availableStock} available in warehouse.`
         );
         return false;
       }
@@ -653,42 +641,32 @@ export default function InventoryTransactionPage() {
       }> = [];
 
       if (transactionType === 'purchase_return') {
-        // SPLIT RETURN: Create separate items for Fresh and Damaged quantities
+        // DIRECT VENDOR RETURN: Simple flow with source_type
         for (const item of data.items) {
-          const freshQty = Number(item.fresh_qty) || 0;
-          const damagedQty = Number(item.damaged_qty) || 0;
-          const totalQty = freshQty + damagedQty;
-          const remainingQty = item.remaining_qty || 0;
+          const qty = Number(item.quantity) || 0;
+          if (qty <= 0) continue;
 
-          // Validation: Total cannot exceed available
-          if (totalQty > remainingQty) {
+          const sourceType = (item.source_type || 'fresh') as StockSourceType;
+          const availableStock = sourceType === 'damaged' 
+            ? (item.damaged_stock || 0) 
+            : (item.current_stock || 0);
+
+          // Validation: Cannot exceed available stock
+          if (qty > availableStock) {
             toast.error(
-              `Cannot return ${totalQty} of "${item.product_name} - ${item.variant_name}". ` +
-              `Only ${remainingQty} available from this invoice.`
+              `Cannot return ${qty} of "${item.product_name}" from ${sourceType} stock. ` +
+              `Only ${availableStock} available.`
             );
             setIsSubmitting(false);
             return;
           }
 
-          // Add Fresh return item if qty > 0
-          if (freshQty > 0) {
-            transformedItems.push({
-              variant_id: item.variant_id,
-              quantity: freshQty,
-              unit_cost: Number(item.unit_cost) || 0,
-              source_type: 'fresh',
-            });
-          }
-
-          // Add Damaged return item if qty > 0
-          if (damagedQty > 0) {
-            transformedItems.push({
-              variant_id: item.variant_id,
-              quantity: damagedQty,
-              unit_cost: Number(item.unit_cost) || 0,
-              source_type: 'damaged',
-            });
-          }
+          transformedItems.push({
+            variant_id: item.variant_id,
+            quantity: qty,
+            unit_cost: Number(item.unit_cost) || 0,
+            source_type: sourceType,
+          });
         }
       } else {
         // Normal flow for Purchase, Damage, Adjustment
@@ -876,49 +854,18 @@ export default function InventoryTransactionPage() {
                   </div>
                 </div>
 
-                {/* PURCHASE RETURN: Invoice Selector */}
+                {/* Direct Vendor Return Notice */}
                 {transactionType === 'purchase_return' && (
-                  <div className="p-4 bg-orange-50 rounded-lg border border-orange-200">
-                    <label className="block text-sm font-medium text-orange-700 mb-2 flex items-center gap-2">
-                      <Link2 className="w-4 h-4" />
-                      Original Purchase Invoice <span className="text-red-500">*</span>
-                    </label>
-
-                    {selectedInvoice ? (
-                      <div className="flex items-center justify-between p-3 bg-white rounded-lg border">
-                        <div>
-                          <span className="font-mono font-medium text-orange-600">
-                            {selectedInvoice.invoice_no}
-                          </span>
-                          <span className="text-gray-500 ml-2">
-                            • {selectedInvoice.vendor?.name}
-                          </span>
-                        </div>
-                        <Button
-                          type="button"
-                          variant="outline"
-                          size="sm"
-                          onClick={() => setIsInvoiceSearchOpen(true)}
-                        >
-                          Change
-                        </Button>
-                      </div>
-                    ) : (
-                      <Button
-                        type="button"
-                        variant="outline"
-                        onClick={() => setIsInvoiceSearchOpen(true)}
-                        className="w-full justify-start text-orange-600 border-orange-300 hover:bg-orange-100"
-                      >
-                        <FileSearch className="w-4 h-4 mr-2" />
-                        Search & Select Original Invoice
-                      </Button>
-                    )}
+                  <div className="p-3 bg-orange-50 rounded-lg border border-orange-200">
+                    <p className="text-sm text-orange-700 flex items-center gap-2">
+                      <PackageMinus className="w-4 h-4" />
+                      <span><strong>Direct Vendor Return (Debit Note):</strong> Select vendor, add products, and specify return quantities from Fresh or Damaged stock.</span>
+                    </p>
                   </div>
                 )}
 
-                {/* Vendor (if required and not purchase return) */}
-                {config.vendorRequired && transactionType !== 'purchase_return' && (
+                {/* Vendor (if required - now includes purchase_return) */}
+                {config.vendorRequired && (
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">
                       <Building2 className="w-4 h-4 inline mr-1" />
@@ -1091,28 +1038,15 @@ export default function InventoryTransactionPage() {
                       <th className="px-4 py-3 text-left font-medium text-gray-600">SKU</th>
                       {transactionType === 'purchase_return' ? (
                         <>
-                          {/* SPLIT RETURN UI: Two columns for Fresh and Damaged */}
+                          {/* DIRECT VENDOR RETURN: Source + Stock + Qty */}
+                          <th className="px-4 py-3 text-center font-medium text-gray-600 w-28">Source</th>
                           <th className="px-4 py-3 text-center font-medium text-gray-600">
                             <div className="flex flex-col">
-                              <span>Purchased</span>
-                              <span className="text-xs font-normal text-gray-400">(Available)</span>
+                              <span>Available</span>
+                              <span className="text-xs font-normal text-gray-400">(Fresh / Damaged)</span>
                             </div>
                           </th>
-                          <th className="px-4 py-3 text-center font-medium text-gray-600 w-24">
-                            <div className="flex flex-col">
-                              <span className="text-green-600">🟢 Fresh</span>
-                              <span className="text-xs font-normal">Return Qty</span>
-                            </div>
-                          </th>
-                          <th className="px-4 py-3 text-center font-medium text-gray-600 w-24">
-                            <div className="flex flex-col">
-                              <span className="text-red-600">🔴 Damaged</span>
-                              <span className="text-xs font-normal">Return Qty</span>
-                            </div>
-                          </th>
-                          <th className="px-4 py-3 text-center font-medium text-gray-600 w-20">
-                            Total
-                          </th>
+                          <th className="px-4 py-3 text-center font-medium text-gray-600 w-24">Qty</th>
                         </>
                       ) : (
                         <th className="px-4 py-3 text-center font-medium text-gray-600 w-28">Qty</th>
@@ -1135,50 +1069,38 @@ export default function InventoryTransactionPage() {
 
                           {transactionType === 'purchase_return' ? (
                             <>
-                              {/* SPLIT RETURN: Purchased & Available */}
+                              {/* DIRECT VENDOR RETURN: Source Bucket */}
+                              <td className="px-4 py-3">
+                                <select
+                                  {...register(`items.${index}.source_type`)}
+                                  className="w-full px-2 py-1.5 text-sm rounded-md border border-gray-300 bg-white focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
+                                >
+                                  <option value="fresh">🟢 Fresh</option>
+                                  <option value="damaged">🔴 Damaged</option>
+                                </select>
+                              </td>
+                              {/* Available Stock (Fresh / Damaged) */}
                               <td className="px-4 py-3 text-center">
-                                <div className="flex flex-col items-center">
-                                  <span className="font-semibold text-gray-900">{item.original_qty}</span>
-                                  <span className="text-xs text-gray-500">
-                                    (Left: <span className={item.remaining_qty! > 0 ? 'text-green-600 font-medium' : 'text-gray-400'}>{item.remaining_qty}</span>)
-                                  </span>
+                                <div className="flex items-center justify-center gap-2">
+                                  <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200">
+                                    {item.current_stock || 0}
+                                  </Badge>
+                                  <span className="text-gray-400">/</span>
+                                  <Badge variant="outline" className="bg-red-50 text-red-700 border-red-200">
+                                    {item.damaged_stock || 0}
+                                  </Badge>
                                 </div>
                               </td>
-                              {/* Fresh Return Qty */}
+                              {/* Return Qty */}
                               <td className="px-4 py-3">
                                 <Input
                                   type="number"
-                                  {...register(`items.${index}.fresh_qty`, { valueAsNumber: true })}
-                                  max={item.remaining_qty}
-                                  min={0}
+                                  {...register(`items.${index}.quantity`, { valueAsNumber: true })}
+                                  min={1}
+                                  max={item.source_type === 'damaged' ? item.damaged_stock : item.current_stock}
                                   placeholder="0"
-                                  className="w-full text-center h-9 border-green-200 focus:border-green-500 focus:ring-green-500"
+                                  className="w-full text-center h-9"
                                 />
-                              </td>
-                              {/* Damaged Return Qty */}
-                              <td className="px-4 py-3">
-                                <Input
-                                  type="number"
-                                  {...register(`items.${index}.damaged_qty`, { valueAsNumber: true })}
-                                  max={item.remaining_qty}
-                                  min={0}
-                                  placeholder="0"
-                                  className="w-full text-center h-9 border-red-200 focus:border-red-500 focus:ring-red-500"
-                                />
-                              </td>
-                              {/* Calculated Total */}
-                              <td className="px-4 py-3 text-center">
-                                <Badge 
-                                  variant="outline" 
-                                  className={cn(
-                                    "font-mono",
-                                    ((item.fresh_qty || 0) + (item.damaged_qty || 0)) > 0 
-                                      ? "bg-orange-100 text-orange-700 border-orange-300" 
-                                      : "bg-gray-100 text-gray-500"
-                                  )}
-                                >
-                                  {(item.fresh_qty || 0) + (item.damaged_qty || 0)}
-                                </Badge>
                               </td>
                             </>
                           ) : (
@@ -1199,7 +1121,7 @@ export default function InventoryTransactionPage() {
                                 {...register(`items.${index}.unit_cost`, { valueAsNumber: true })}
                                 className="w-full text-center h-9"
                                 step="0.01"
-                                disabled={transactionType === 'purchase_return'}
+                                placeholder={transactionType === 'purchase_return' ? 'Rate' : '0'}
                               />
                             </td>
                             <td className="px-4 py-3 text-right font-medium">
