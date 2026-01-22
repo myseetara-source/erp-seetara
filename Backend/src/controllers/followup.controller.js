@@ -1,122 +1,189 @@
 /**
- * Follow-up Controller
+ * Order Follow-up Controller
  * 
- * Handles order follow-up scheduling and management
- * Used when customer needs to be contacted before confirmation
+ * Handles CRM call tracking and follow-up management.
+ * 
+ * Features:
+ * - Record call attempts with status
+ * - Schedule next follow-up
+ * - Get call history for an order
+ * - Dashboard widgets (pending follow-ups, performance metrics)
  */
 
 import { supabaseAdmin } from '../config/supabase.js';
-import { asyncHandler } from '../middleware/error.middleware.js';
-import { AppError, NotFoundError, ValidationError } from '../utils/errors.js';
-import { OrderStateMachine, ORDER_STATUS } from '../services/orderStateMachine.js';
-import { createLogger } from '../utils/logger.js';
+import { AppError, catchAsync } from '../utils/errors.js';
 
-const logger = createLogger('FollowUpController');
+// Valid response statuses
+const VALID_STATUSES = [
+  'answered',
+  'no_answer',
+  'switched_off',
+  'busy',
+  'wrong_number',
+  'callback_requested',
+  'number_not_reachable',
+  'confirmed',
+  'cancelled',
+];
 
 // =============================================================================
-// SCHEDULE FOLLOW-UP
+// CREATE FOLLOW-UP (Log a call)
 // =============================================================================
 
-/**
- * Schedule a follow-up for an order
- * POST /api/v1/orders/:id/follow-up
- * 
- * Body: { reason: string, next_date: ISO datetime }
- */
-export const scheduleFollowUp = asyncHandler(async (req, res) => {
-  const { id: orderId } = req.params;
-  const { reason, next_date } = req.body;
+export const createFollowup = catchAsync(async (req, res) => {
+  const { order_id, response_status, remarks, outcome, next_followup_date, phone_called, call_duration_seconds, call_method } = req.body;
+  const staffId = req.user?.id;
 
-  // Validate inputs
-  if (!reason || !next_date) {
-    throw new ValidationError('Follow-up reason and next date are required');
+  if (!order_id) {
+    throw new AppError('Order ID is required', 400, 'VALIDATION_ERROR');
   }
 
-  const nextDate = new Date(next_date);
-  if (isNaN(nextDate.getTime())) {
-    throw new ValidationError('Invalid date format for next_date');
+  if (!response_status || !VALID_STATUSES.includes(response_status)) {
+    throw new AppError(`Invalid response status. Must be one of: ${VALID_STATUSES.join(', ')}`, 400, 'VALIDATION_ERROR');
   }
 
-  if (nextDate < new Date()) {
-    throw new ValidationError('Follow-up date must be in the future');
-  }
-
-  // Get current order
+  // Verify order exists
   const { data: order, error: orderError } = await supabaseAdmin
     .from('orders')
-    .select('id, status, fulfillment_type, followup_count, order_number')
-    .eq('id', orderId)
+    .select('id, order_number, status')
+    .eq('id', order_id)
     .single();
 
   if (orderError || !order) {
-    throw new NotFoundError('Order');
+    throw new AppError('Order not found', 404, 'NOT_FOUND');
   }
 
-  // Validate state transition
-  OrderStateMachine.validateTransition(
-    order,
-    ORDER_STATUS.FOLLOW_UP,
-    { followup_reason: reason, followup_date: next_date }
-  );
-
-  // Update order
-  const { data: updatedOrder, error: updateError } = await supabaseAdmin
-    .from('orders')
-    .update({
-      status: ORDER_STATUS.FOLLOW_UP,
-      followup_date: nextDate.toISOString(),
-      followup_reason: reason,
-      followup_count: (order.followup_count || 0) + 1,
-      updated_by: req.user.id,
-      updated_at: new Date().toISOString(),
-    })
-    .eq('id', orderId)
-    .select()
-    .single();
-
-  if (updateError) {
-    throw new AppError('Failed to schedule follow-up', 500);
-  }
-
-  // Log the follow-up
-  await supabaseAdmin.from('order_comments').insert({
-    order_id: orderId,
-    comment: `Follow-up scheduled: ${reason}. Next call: ${nextDate.toLocaleDateString()}`,
-    source: 'operator',
-    created_by: req.user.id,
+  // Get next attempt number
+  const { data: nextAttempt } = await supabaseAdmin.rpc('get_next_followup_attempt', {
+    p_order_id: order_id,
   });
 
-  logger.info('Follow-up scheduled', { orderId, nextDate, reason, userId: req.user.id });
+  const attemptNumber = nextAttempt || 1;
+
+  // Create follow-up record
+  const { data: followup, error: followupError } = await supabaseAdmin
+    .from('order_followups')
+    .insert({
+      order_id,
+      staff_id: staffId,
+      attempt_number: attemptNumber,
+      response_status,
+      call_duration_seconds: call_duration_seconds || 0,
+      remarks,
+      outcome,
+      next_followup_date: next_followup_date || null,
+      next_followup_assigned_to: staffId, // Default to self
+      phone_called,
+      call_method: call_method || 'manual',
+    })
+    .select(`
+      *,
+      staff:users!order_followups_staff_id_fkey(id, name, email)
+    `)
+    .single();
+
+  if (followupError) {
+    console.error('[FollowupController] Create error:', followupError);
+    throw new AppError('Failed to create follow-up record', 500, 'DATABASE_ERROR');
+  }
+
+  // Update order's followup_date and status based on response
+  const orderUpdates = {
+    updated_at: new Date().toISOString(),
+  };
+
+  if (next_followup_date) {
+    orderUpdates.followup_date = next_followup_date;
+  }
+
+  // Auto-update order status based on response
+  if (response_status === 'confirmed' && order.status === 'intake') {
+    orderUpdates.status = 'converted';
+  } else if (response_status === 'cancelled') {
+    orderUpdates.status = 'cancelled';
+    orderUpdates.cancellation_reason = remarks || 'Cancelled via follow-up call';
+    orderUpdates.cancelled_by = staffId;
+    orderUpdates.cancelled_at = new Date().toISOString();
+  } else if (response_status === 'callback_requested' && order.status === 'intake') {
+    orderUpdates.status = 'follow_up';
+    orderUpdates.followup_reason = remarks || 'Callback requested';
+  }
+
+  if (Object.keys(orderUpdates).length > 1) {
+    await supabaseAdmin
+      .from('orders')
+      .update(orderUpdates)
+      .eq('id', order_id);
+  }
+
+  // Create timeline entry
+  await supabaseAdmin
+    .from('order_timeline')
+    .insert({
+      order_id,
+      event_type: 'call',
+      title: `Call Attempt #${attemptNumber}: ${response_status}`,
+      description: remarks || null,
+      performed_by: staffId,
+      related_entity_type: 'followup',
+      related_entity_id: followup.id,
+      metadata: {
+        attempt_number: attemptNumber,
+        response_status,
+        outcome,
+        duration_seconds: call_duration_seconds,
+      },
+    });
+
+  res.status(201).json({
+    success: true,
+    message: `Follow-up #${attemptNumber} recorded successfully`,
+    data: followup,
+  });
+});
+
+// =============================================================================
+// GET FOLLOW-UPS FOR AN ORDER
+// =============================================================================
+
+export const getOrderFollowups = catchAsync(async (req, res) => {
+  const { orderId } = req.params;
+
+  const { data, error } = await supabaseAdmin
+    .from('order_followups')
+    .select(`
+      *,
+      staff:users!order_followups_staff_id_fkey(id, name, email),
+      next_assigned:users!order_followups_next_followup_assigned_to_fkey(id, name)
+    `)
+    .eq('order_id', orderId)
+    .order('attempt_number', { ascending: true });
+
+  if (error) {
+    console.error('[FollowupController] Get order followups error:', error);
+    throw new AppError('Failed to fetch follow-ups', 500, 'DATABASE_ERROR');
+  }
 
   res.json({
     success: true,
-    message: 'Follow-up scheduled successfully',
-    data: {
-      orderId,
-      orderNumber: order.order_number,
-      status: ORDER_STATUS.FOLLOW_UP,
-      followupDate: nextDate.toISOString(),
-      followupReason: reason,
-      followupCount: (order.followup_count || 0) + 1,
+    data: data || [],
+    meta: {
+      total_attempts: data?.length || 0,
+      last_attempt: data?.length > 0 ? data[data.length - 1] : null,
     },
   });
 });
 
 // =============================================================================
-// GET PENDING FOLLOW-UPS
+// GET PENDING FOLLOW-UPS (Dashboard Widget)
 // =============================================================================
 
-/**
- * Get orders with pending follow-ups
- * GET /api/v1/orders/follow-ups
- * 
- * Query: { date?: ISO date, overdue?: boolean }
- */
-export const getPendingFollowUps = asyncHandler(async (req, res) => {
-  const { date, overdue, page = 1, limit = 20 } = req.query;
-  const from = (page - 1) * limit;
-  const to = from + parseInt(limit) - 1;
+export const getPendingFollowups = catchAsync(async (req, res) => {
+  const { staff_id, limit = 50 } = req.query;
+  const userId = req.user?.id;
+  const isAdmin = req.user?.role === 'admin';
 
+  // Get orders that need follow-up
   let query = supabaseAdmin
     .from('orders')
     .select(`
@@ -126,188 +193,200 @@ export const getPendingFollowUps = asyncHandler(async (req, res) => {
       followup_date,
       followup_reason,
       followup_count,
+      shipping_name,
+      shipping_phone,
       total_amount,
       created_at,
-      customer:customers(id, name, phone)
-    `, { count: 'exact' })
-    .eq('status', ORDER_STATUS.FOLLOW_UP)
-    .order('followup_date', { ascending: true });
+      assigned_to,
+      assignee:users!orders_assigned_to_fkey(id, name)
+    `)
+    .in('status', ['intake', 'follow_up'])
+    .order('followup_date', { ascending: true, nullsFirst: false })
+    .order('created_at', { ascending: true })
+    .limit(Number(limit));
 
-  // Filter by specific date
-  if (date) {
-    const startOfDay = new Date(date);
-    startOfDay.setHours(0, 0, 0, 0);
-    const endOfDay = new Date(date);
-    endOfDay.setHours(23, 59, 59, 999);
-
-    query = query
-      .gte('followup_date', startOfDay.toISOString())
-      .lte('followup_date', endOfDay.toISOString());
+  // Filter by staff if not admin or if specific staff requested
+  if (!isAdmin && userId) {
+    query = query.or(`assigned_to.eq.${userId},assigned_to.is.null`);
+  } else if (staff_id) {
+    query = query.eq('assigned_to', staff_id);
   }
 
-  // Filter overdue follow-ups
-  if (overdue === 'true') {
-    query = query.lt('followup_date', new Date().toISOString());
-  }
-
-  const { data, error, count } = await query.range(from, to);
+  const { data, error, count } = await query;
 
   if (error) {
-    throw new AppError('Failed to fetch follow-ups', 500);
+    console.error('[FollowupController] Get pending followups error:', error);
+    throw new AppError('Failed to fetch pending follow-ups', 500, 'DATABASE_ERROR');
   }
 
-  // Categorize results
+  // Categorize by urgency
   const now = new Date();
-  const categorized = (data || []).map(order => ({
-    ...order,
-    isOverdue: new Date(order.followup_date) < now,
-    isDueToday: new Date(order.followup_date).toDateString() === now.toDateString(),
-  }));
+  const categorized = {
+    overdue: [],
+    today: [],
+    upcoming: [],
+    no_date: [],
+  };
+
+  (data || []).forEach(order => {
+    if (!order.followup_date) {
+      categorized.no_date.push(order);
+    } else {
+      const followupDate = new Date(order.followup_date);
+      const isToday = followupDate.toDateString() === now.toDateString();
+      const isOverdue = followupDate < now && !isToday;
+
+      if (isOverdue) {
+        categorized.overdue.push(order);
+      } else if (isToday) {
+        categorized.today.push(order);
+      } else {
+        categorized.upcoming.push(order);
+      }
+    }
+  });
 
   res.json({
     success: true,
-    data: categorized,
-    summary: {
-      total: count,
-      overdue: categorized.filter(o => o.isOverdue).length,
-      dueToday: categorized.filter(o => o.isDueToday).length,
+    data: {
+      all: data || [],
+      categorized,
     },
-    pagination: {
-      page: parseInt(page),
-      limit: parseInt(limit),
-      total: count,
-      totalPages: Math.ceil(count / limit),
+    meta: {
+      total: data?.length || 0,
+      overdue: categorized.overdue.length,
+      today: categorized.today.length,
+      upcoming: categorized.upcoming.length,
+      no_date: categorized.no_date.length,
     },
   });
 });
 
 // =============================================================================
-// CONVERT FOLLOW-UP TO ORDER
+// GET STAFF PERFORMANCE (Admin only)
 // =============================================================================
 
-/**
- * Convert a follow-up to confirmed order
- * POST /api/v1/orders/:id/convert
- * 
- * Body: { notes?: string }
- */
-export const convertFollowUp = asyncHandler(async (req, res) => {
-  const { id: orderId } = req.params;
-  const { notes } = req.body;
+export const getStaffPerformance = catchAsync(async (req, res) => {
+  const { from_date, to_date } = req.query;
+  const isAdmin = req.user?.role === 'admin';
 
-  // Get current order
-  const { data: order, error: orderError } = await supabaseAdmin
-    .from('orders')
-    .select('id, status, fulfillment_type, order_number')
-    .eq('id', orderId)
-    .single();
-
-  if (orderError || !order) {
-    throw new NotFoundError('Order');
+  if (!isAdmin) {
+    throw new AppError('Admin access required', 403, 'FORBIDDEN');
   }
 
-  // Validate state transition
-  OrderStateMachine.validateTransition(order, ORDER_STATUS.CONVERTED, {});
+  // Default to last 7 days
+  const startDate = from_date || new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
+  const endDate = to_date || new Date().toISOString();
 
-  // Update order
-  const { data: updatedOrder, error: updateError } = await supabaseAdmin
-    .from('orders')
+  const { data, error } = await supabaseAdmin
+    .from('order_followups')
+    .select(`
+      staff_id,
+      response_status,
+      created_at,
+      staff:users!order_followups_staff_id_fkey(id, name, email)
+    `)
+    .gte('created_at', startDate)
+    .lte('created_at', endDate);
+
+  if (error) {
+    console.error('[FollowupController] Get performance error:', error);
+    throw new AppError('Failed to fetch performance data', 500, 'DATABASE_ERROR');
+  }
+
+  // Aggregate by staff
+  const staffStats = {};
+  (data || []).forEach(followup => {
+    const staffId = followup.staff_id;
+    if (!staffStats[staffId]) {
+      staffStats[staffId] = {
+        staff_id: staffId,
+        staff_name: followup.staff?.name || 'Unknown',
+        staff_email: followup.staff?.email || '',
+        total_calls: 0,
+        answered: 0,
+        no_answer: 0,
+        confirmed: 0,
+        cancelled: 0,
+        other: 0,
+        conversion_rate: 0,
+      };
+    }
+
+    staffStats[staffId].total_calls++;
+
+    switch (followup.response_status) {
+      case 'answered':
+        staffStats[staffId].answered++;
+        break;
+      case 'confirmed':
+        staffStats[staffId].confirmed++;
+        break;
+      case 'cancelled':
+        staffStats[staffId].cancelled++;
+        break;
+      case 'no_answer':
+      case 'switched_off':
+      case 'busy':
+        staffStats[staffId].no_answer++;
+        break;
+      default:
+        staffStats[staffId].other++;
+    }
+  });
+
+  // Calculate conversion rate
+  Object.values(staffStats).forEach(stat => {
+    if (stat.total_calls > 0) {
+      stat.conversion_rate = ((stat.confirmed / stat.total_calls) * 100).toFixed(1);
+    }
+  });
+
+  res.json({
+    success: true,
+    data: Object.values(staffStats).sort((a, b) => b.total_calls - a.total_calls),
+    meta: {
+      period: { from: startDate, to: endDate },
+      total_calls: data?.length || 0,
+    },
+  });
+});
+
+// =============================================================================
+// UPDATE FOLLOW-UP
+// =============================================================================
+
+export const updateFollowup = catchAsync(async (req, res) => {
+  const { id } = req.params;
+  const { remarks, outcome, next_followup_date } = req.body;
+
+  const { data, error } = await supabaseAdmin
+    .from('order_followups')
     .update({
-      status: ORDER_STATUS.CONVERTED,
-      followup_date: null, // Clear follow-up date
-      updated_by: req.user.id,
-      updated_at: new Date().toISOString(),
+      remarks,
+      outcome,
+      next_followup_date,
     })
-    .eq('id', orderId)
+    .eq('id', id)
     .select()
     .single();
 
-  if (updateError) {
-    throw new AppError('Failed to convert order', 500);
-  }
-
-  // Log conversion
-  await supabaseAdmin.from('order_comments').insert({
-    order_id: orderId,
-    comment: `Order converted to confirmed.${notes ? ` Notes: ${notes}` : ''}`,
-    source: 'operator',
-    created_by: req.user.id,
-  });
-
-  logger.info('Order converted', { orderId, userId: req.user.id });
-
-  res.json({
-    success: true,
-    message: 'Order converted successfully',
-    data: {
-      orderId,
-      orderNumber: order.order_number,
-      status: ORDER_STATUS.CONVERTED,
-    },
-  });
-});
-
-// =============================================================================
-// BULK FOLLOW-UP ACTIONS
-// =============================================================================
-
-/**
- * Bulk update follow-up dates
- * POST /api/v1/orders/follow-ups/bulk
- * 
- * Body: { order_ids: string[], new_date: ISO datetime }
- */
-export const bulkRescheduleFollowUps = asyncHandler(async (req, res) => {
-  const { order_ids, new_date } = req.body;
-
-  if (!order_ids || !Array.isArray(order_ids) || order_ids.length === 0) {
-    throw new ValidationError('Order IDs array is required');
-  }
-
-  if (!new_date) {
-    throw new ValidationError('New date is required');
-  }
-
-  const nextDate = new Date(new_date);
-  if (isNaN(nextDate.getTime()) || nextDate < new Date()) {
-    throw new ValidationError('Invalid or past date');
-  }
-
-  // Update all orders
-  const { data, error } = await supabaseAdmin
-    .from('orders')
-    .update({
-      followup_date: nextDate.toISOString(),
-      updated_by: req.user.id,
-      updated_at: new Date().toISOString(),
-    })
-    .in('id', order_ids)
-    .eq('status', ORDER_STATUS.FOLLOW_UP)
-    .select('id');
-
   if (error) {
-    throw new AppError('Failed to reschedule follow-ups', 500);
+    console.error('[FollowupController] Update error:', error);
+    throw new AppError('Failed to update follow-up', 500, 'DATABASE_ERROR');
   }
-
-  logger.info('Bulk follow-up reschedule', { 
-    orderCount: data?.length || 0, 
-    newDate: nextDate.toISOString(),
-    userId: req.user.id,
-  });
 
   res.json({
     success: true,
-    message: `${data?.length || 0} follow-ups rescheduled`,
-    data: {
-      updatedCount: data?.length || 0,
-      newDate: nextDate.toISOString(),
-    },
+    message: 'Follow-up updated',
+    data,
   });
 });
 
 export default {
-  scheduleFollowUp,
-  getPendingFollowUps,
-  convertFollowUp,
-  bulkRescheduleFollowUps,
+  createFollowup,
+  getOrderFollowups,
+  getPendingFollowups,
+  getStaffPerformance,
+  updateFollowup,
 };

@@ -59,6 +59,18 @@ export const API_ROUTES = {
     LOGS: (id: string) => `${BASE_URL}/orders/${id}/logs`,
     PRINT: (id: string) => `${BASE_URL}/orders/${id}/print`,
     STATS: `${BASE_URL}/orders/stats`,
+    TIMELINE: (id: string) => `${BASE_URL}/orders/${id}/timeline`,
+  },
+
+  // ---------------------------------------------------------------------------
+  // FOLLOW-UPS (ORDER 360 - CRM Call Tracking)
+  // ---------------------------------------------------------------------------
+  FOLLOWUPS: {
+    CREATE: `${BASE_URL}/followups`,
+    FOR_ORDER: (orderId: string) => `${BASE_URL}/followups/order/${orderId}`,
+    PENDING: `${BASE_URL}/followups/pending`,
+    PERFORMANCE: `${BASE_URL}/followups/performance`,
+    UPDATE: (id: string) => `${BASE_URL}/followups/${id}`,
   },
 
   // ---------------------------------------------------------------------------

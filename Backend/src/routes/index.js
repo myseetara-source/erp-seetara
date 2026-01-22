@@ -22,6 +22,7 @@ import riderRoutes from './rider.routes.js';
 import smsRoutes from './sms.routes.js';
 import externalRoutes from './external.routes.js';
 import staticRoutes from './static.routes.js'; // PERF-003: Cached static data
+import followupRoutes from './followup.routes.js'; // ORDER 360: CRM call tracking
 
 const router = Router();
 
@@ -54,6 +55,7 @@ router.use('/', riderRoutes); // Mounts /dispatch/* and /rider/*
 router.use('/sms', smsRoutes);
 router.use('/external', externalRoutes); // External website integrations
 router.use('/static', staticRoutes); // PERF-003: Cached static data (categories, zones, config)
+router.use('/followups', followupRoutes); // ORDER 360: CRM call tracking
 
 // =============================================================================
 // BACKWARD COMPATIBILITY ROUTES
