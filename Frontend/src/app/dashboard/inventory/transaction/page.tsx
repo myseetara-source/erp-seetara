@@ -494,17 +494,29 @@ export default function InventoryTransactionPage() {
     // Load items from invoice with remaining qty
     const invoiceItems: TransactionItem[] = invoice.items
       .filter((item) => item.remaining_qty > 0) // Only items with qty left to return
-      .map((item) => ({
-        variant_id: item.variant_id,
-        product_name: item.variant?.product?.name || '',
-        variant_name: Object.values(item.variant?.attributes || {}).join(' / '),
-        sku: item.variant?.sku || '',
-        current_stock: item.variant?.current_stock || 0,
-        quantity: 0, // User will enter return qty
-        unit_cost: item.unit_cost,
-        original_qty: item.quantity,
-        remaining_qty: item.remaining_qty,
-      }));
+      .map((item) => {
+        // Extract product name from nested structure
+        const productName = item.variant?.product?.name || 
+                           (item as { product_name?: string }).product_name || 
+                           'Unknown Product';
+        
+        // Extract variant attributes as readable string
+        const variantName = item.variant?.attributes 
+          ? Object.values(item.variant.attributes).join(' / ')
+          : '';
+        
+        return {
+          variant_id: item.variant_id,
+          product_name: productName,
+          variant_name: variantName || item.variant?.sku || '',
+          sku: item.variant?.sku || '',
+          current_stock: item.variant?.current_stock || 0,
+          quantity: 0, // User will enter return qty
+          unit_cost: item.unit_cost || 0,
+          original_qty: item.quantity || 0,
+          remaining_qty: item.remaining_qty || 0,
+        };
+      });
 
     replace(invoiceItems);
     setIsInvoiceSearchOpen(false);
@@ -572,14 +584,25 @@ export default function InventoryTransactionPage() {
     setIsSubmitting(true);
     try {
       // Transform items to match backend schema (only required fields)
+      // Filter out items with 0 or invalid quantities
       const transformedItems = data.items
-        .filter((item) => item.quantity !== 0)
+        .filter((item) => {
+          const qty = Number(item.quantity);
+          return !isNaN(qty) && qty > 0;
+        })
         .map((item) => ({
           variant_id: item.variant_id,
-          quantity: Number(item.quantity), // Ensure it's a number
+          quantity: Math.abs(Number(item.quantity)), // Ensure positive number
           unit_cost: Number(item.unit_cost) || 0.01, // Minimum 0.01 for purchases
           notes: undefined, // Optional
         }));
+
+      // Validate we have at least one item
+      if (transformedItems.length === 0) {
+        toast.error('Please enter quantity for at least one item');
+        setIsSubmitting(false);
+        return;
+      }
 
       const response = await apiClient.post(API_ROUTES.INVENTORY.TRANSACTIONS.CREATE, {
         ...data,
@@ -989,7 +1012,7 @@ export default function InventoryTransactionPage() {
                           <td className="px-4 py-3">
                             <Input
                               type="number"
-                              {...register(`items.${index}.quantity`)}
+                              {...register(`items.${index}.quantity`, { valueAsNumber: true })}
                               max={transactionType === 'purchase_return' ? item.remaining_qty : undefined}
                               min={0}
                               className="w-full text-center h-9"
@@ -1000,7 +1023,7 @@ export default function InventoryTransactionPage() {
                             <td className="px-4 py-3">
                               <Input
                                 type="number"
-                                {...register(`items.${index}.unit_cost`)}
+                                {...register(`items.${index}.unit_cost`, { valueAsNumber: true })}
                                 className="w-full text-center h-9"
                                 step="0.01"
                                 disabled={transactionType === 'purchase_return'}

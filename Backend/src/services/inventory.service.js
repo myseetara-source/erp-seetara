@@ -537,10 +537,13 @@ class InventoryService {
       .from('inventory_transactions')
       .select(`
         id, invoice_no, transaction_date, total_quantity, total_cost,
-        vendor:vendors(id, name),
+        vendor:vendors(id, name, company_name),
         items:inventory_transaction_items(
           variant_id, quantity, unit_cost,
-          variant:product_variants(id, sku, attributes, current_stock)
+          variant:product_variants(
+            id, sku, attributes, current_stock,
+            product:products(id, name, image_url)
+          )
         )
       `)
       .eq('transaction_type', TRANSACTION_TYPES.PURCHASE)
