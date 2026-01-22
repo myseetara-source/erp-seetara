@@ -26,7 +26,7 @@ export const login = asyncHandler(async (req, res) => {
   // Find user
   const { data: user, error } = await supabaseAdmin
     .from('users')
-    .select('*')
+    .select('id, email, name, phone, role, vendor_id, is_active, avatar_url')
     .eq('email', email.toLowerCase())
     .single();
 

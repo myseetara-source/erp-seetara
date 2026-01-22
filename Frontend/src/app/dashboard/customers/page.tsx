@@ -144,7 +144,8 @@ export default function CustomersPage() {
   };
 
   // Format currency
-  const formatCurrency = (amount: number) => `Rs. ${amount.toLocaleString()}`;
+  // Using centralized currency utility from @/lib/utils/currency
+import { formatCurrency } from '@/lib/utils/currency';
 
   // Get rank medal
   const getRankMedal = (rank: number) => {

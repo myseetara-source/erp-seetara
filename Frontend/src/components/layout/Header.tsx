@@ -38,47 +38,47 @@ export default function Header({ onMenuClick }: HeaderProps) {
   }
 
   return (
-    <header className="sticky top-0 z-20 bg-white border-b border-gray-200 shadow-sm">
-      <div className="flex items-center justify-between h-16 px-4 lg:px-6">
+    <header className="sticky top-0 z-20 bg-white border-b border-gray-200">
+      <div className="flex items-center justify-between h-12 px-3 lg:px-4">
         {/* Left side */}
-        <div className="flex items-center gap-4">
+        <div className="flex items-center gap-3">
           <button
             onClick={onMenuClick}
-            className="md:hidden p-2 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-lg transition-colors"
+            className="md:hidden p-1.5 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-lg transition-colors"
           >
-            <Menu className="w-6 h-6" />
+            <Menu className="w-5 h-5" />
           </button>
 
           <div className="hidden lg:block">
-            <h1 className="text-xl font-bold text-gray-900">{getGreeting()}, Admin</h1>
-            <p className="text-sm text-gray-500">{formatDateTime()}</p>
+            <h1 className="text-sm font-semibold text-gray-900">{getGreeting()}, admin</h1>
+            <p className="text-xs text-gray-500">{formatDateTime()}</p>
           </div>
         </div>
 
         {/* Center - Search */}
-        <div className="flex-1 max-w-xl mx-4 hidden md:block">
+        <div className="flex-1 max-w-md mx-3 hidden md:block">
           <div className="relative">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
+            <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
             <input
               type="text"
-              placeholder="Search orders, customers, products..."
-              className="w-full pl-10 pr-4 py-2.5 bg-gray-100 border-0 rounded-xl text-sm focus:ring-2 focus:ring-orange-500/20 focus:bg-white transition-all"
+              placeholder="Search..."
+              className="w-full pl-8 pr-12 py-1.5 bg-gray-100 border-0 rounded-lg text-xs focus:ring-2 focus:ring-orange-500/20 focus:bg-white transition-all"
             />
-            <kbd className="absolute right-3 top-1/2 -translate-y-1/2 px-2 py-0.5 bg-gray-200 rounded text-xs font-mono text-gray-500">
+            <kbd className="absolute right-2 top-1/2 -translate-y-1/2 px-1.5 py-0.5 bg-gray-200 rounded text-[10px] font-mono text-gray-500">
               ⌘K
             </kbd>
           </div>
         </div>
 
         {/* Right side */}
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-1.5">
           {/* Quick Order Button */}
           <Button
             onClick={() => setShowQuickOrder(true)}
-            className="hidden sm:flex bg-orange-500 hover:bg-orange-600 text-white"
+            className="hidden sm:flex h-7 px-2.5 text-xs bg-orange-500 hover:bg-orange-600 text-white"
             size="sm"
           >
-            <Plus className="w-4 h-4 mr-1" />
+            <Plus className="w-3.5 h-3.5 mr-1" />
             Quick Order
           </Button>
 
@@ -86,30 +86,28 @@ export default function Header({ onMenuClick }: HeaderProps) {
           <QuickOrderModal
             open={showQuickOrder}
             onOpenChange={setShowQuickOrder}
-            onOrderCreated={(order) => {
-              console.log('Order created:', order)
+            onOrderCreated={() => {
               setShowQuickOrder(false)
             }}
           />
 
           {/* Notifications */}
-          <button className="relative p-2.5 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-xl transition-colors">
-            <Bell className="w-5 h-5" />
-            <span className="absolute top-1.5 right-1.5 w-2.5 h-2.5 bg-red-500 rounded-full border-2 border-white" />
+          <button className="relative p-2 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-lg transition-colors">
+            <Bell className="w-4 h-4" />
+            <span className="absolute top-1 right-1 w-2 h-2 bg-red-500 rounded-full border-2 border-white" />
           </button>
 
           {/* Profile Dropdown */}
           <div className="relative">
             <button
               onClick={() => setShowProfile(!showProfile)}
-              className="flex items-center gap-2 p-1.5 pr-3 hover:bg-gray-100 rounded-xl transition-colors"
+              className="flex items-center gap-1.5 p-1 pr-2 hover:bg-gray-100 rounded-lg transition-colors"
             >
-              <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-orange-500 to-amber-500 flex items-center justify-center text-white font-semibold text-sm shadow-md">
+              <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-orange-500 to-amber-500 flex items-center justify-center text-white font-medium text-xs">
                 A
               </div>
               <div className="hidden sm:block text-left">
-                <p className="text-sm font-medium text-gray-900">Admin</p>
-                <p className="text-xs text-gray-500">admin@erp.com</p>
+                <p className="text-xs font-medium text-gray-900">admin</p>
               </div>
             </button>
 
@@ -120,24 +118,24 @@ export default function Header({ onMenuClick }: HeaderProps) {
                   className="fixed inset-0 z-40"
                   onClick={() => setShowProfile(false)}
                 />
-                <div className="absolute right-0 mt-2 w-56 bg-white rounded-xl shadow-xl border border-gray-100 py-2 z-50 animate-fade-in-scale">
-                  <div className="px-4 py-2 border-b border-gray-100">
-                    <p className="font-medium text-gray-900">Admin User</p>
-                    <p className="text-sm text-gray-500">admin@erp.com</p>
+                <div className="absolute right-0 mt-1 w-48 bg-white rounded-lg shadow-xl border border-gray-100 py-1 z-50 animate-fade-in-scale">
+                  <div className="px-3 py-2 border-b border-gray-100">
+                    <p className="text-sm font-medium text-gray-900">Admin User</p>
+                    <p className="text-xs text-gray-500">admin@erp.com</p>
                   </div>
-                  <div className="py-1">
-                    <button className="w-full flex items-center gap-3 px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 transition-colors">
-                      <User className="w-4 h-4" />
+                  <div className="py-0.5">
+                    <button className="w-full flex items-center gap-2 px-3 py-1.5 text-xs text-gray-700 hover:bg-gray-50 transition-colors">
+                      <User className="w-3.5 h-3.5" />
                       Profile
                     </button>
-                    <button className="w-full flex items-center gap-3 px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 transition-colors">
-                      <Settings className="w-4 h-4" />
+                    <button className="w-full flex items-center gap-2 px-3 py-1.5 text-xs text-gray-700 hover:bg-gray-50 transition-colors">
+                      <Settings className="w-3.5 h-3.5" />
                       Settings
                     </button>
                   </div>
-                  <div className="border-t border-gray-100 pt-1">
-                    <button className="w-full flex items-center gap-3 px-4 py-2 text-sm text-red-600 hover:bg-red-50 transition-colors">
-                      <LogOut className="w-4 h-4" />
+                  <div className="border-t border-gray-100 pt-0.5">
+                    <button className="w-full flex items-center gap-2 px-3 py-1.5 text-xs text-red-600 hover:bg-red-50 transition-colors">
+                      <LogOut className="w-3.5 h-3.5" />
                       Log Out
                     </button>
                   </div>

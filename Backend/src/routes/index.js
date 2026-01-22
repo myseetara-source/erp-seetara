@@ -15,6 +15,7 @@ import { Router } from 'express';
 // ROUTE IMPORTS (Alphabetically ordered)
 // =============================================================================
 
+import adminRoutes from './admin.routes.js';
 import authRoutes from './auth.routes.js';
 import customerRoutes from './customer.routes.js';
 import externalRoutes from './external.routes.js';
@@ -51,6 +52,7 @@ router.get('/health', staticController.getHealthStatus);
 // API ROUTES (Alphabetically ordered)
 // =============================================================================
 
+router.use('/admin', adminRoutes);
 router.use('/auth', authRoutes);
 router.use('/customers', customerRoutes);
 router.use('/external', externalRoutes);

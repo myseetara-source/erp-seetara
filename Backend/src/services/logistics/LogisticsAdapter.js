@@ -319,7 +319,7 @@ export class LogisticsAdapterFactory {
     if (!config) {
       const { data: provider } = await supabaseAdmin
         .from('courier_partners')
-        .select('*')
+        .select('id, order_number, status, courier_partner, awb_number, tracking_url, shipped_at')
         .eq('code', normalizedCode)
         .single();
 

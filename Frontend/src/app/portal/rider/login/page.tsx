@@ -81,12 +81,12 @@ export default function RiderLoginPage() {
       } else {
         setError(response.data.message || 'लगइन असफल');
       }
-    } catch (err: any) {
-      console.error('Login error:', err);
+    } catch (err: unknown) {
+      const error = err as { response?: { status?: number; data?: { message?: string } } };
       
-      if (err.response?.status === 401) {
+      if (error.response?.status === 401) {
         setError('गलत इमेल वा पासवर्ड');
-      } else if (err.response?.status === 403) {
+      } else if (error.response?.status === 403) {
         setError('तपाईंको खाता निष्क्रिय छ। सहायताको लागि सम्पर्क गर्नुहोस्।');
       } else {
         setError('जडान हुन सकेन। कृपया फेरि प्रयास गर्नुहोस्।');

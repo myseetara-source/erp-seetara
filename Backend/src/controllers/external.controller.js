@@ -448,7 +448,7 @@ export const cancelExternalOrder = asyncHandler(async (req, res) => {
 
   const { data: order, error } = await supabaseAdmin
     .from('orders')
-    .select('*')
+    .select('id, order_number, customer_id, status, total_amount, payment_status, fulfillment_type, created_at')
     .eq('order_number', orderNumber)
     .single();
 

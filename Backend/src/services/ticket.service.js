@@ -329,7 +329,7 @@ async function updateTicket(ticketId, updates, userId) {
   // Get current ticket state
   const { data: currentTicket } = await supabase
     .from('tickets')
-    .select('*')
+    .select('id, ticket_number, order_id, customer_id, type, priority, status, subject, description, assigned_to, resolved_at, created_at, updated_at')
     .eq('id', ticketId)
     .single();
 

@@ -81,12 +81,12 @@ export default function VendorLoginPage() {
       } else {
         setError(response.data.message || 'Login failed');
       }
-    } catch (err: any) {
-      console.error('Login error:', err);
+    } catch (err: unknown) {
+      const error = err as { response?: { status?: number; data?: { message?: string } } };
       
-      if (err.response?.status === 401) {
+      if (error.response?.status === 401) {
         setError('Invalid email or password');
-      } else if (err.response?.status === 403) {
+      } else if (error.response?.status === 403) {
         setError('Your account has been deactivated. Contact support.');
       } else {
         setError('Unable to connect. Please try again.');

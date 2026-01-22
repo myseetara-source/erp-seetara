@@ -296,7 +296,7 @@ export const dispatchManifest = asyncHandler(async (req, res) => {
   // Get manifest
   const { data: manifest, error: manifestError } = await supabaseAdmin
     .from('courier_manifests')
-    .select('*')
+    .select('id, order_number, customer_id, status, fulfillment_type, rider_id, courier_partner, awb_number, created_at')
     .eq('id', manifestId)
     .single();
 

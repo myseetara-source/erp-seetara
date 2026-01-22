@@ -41,21 +41,124 @@ body {
   background: rgba(249, 115, 22, 0.5);
 }
 
-/* Responsive font sizes */
+/* =============================================================================
+   HIGH DENSITY ENTERPRISE UI SYSTEM
+   Inspired by Linear, Stripe Dashboard, QuickBooks
+   ============================================================================= */
+
+/* Base: 14px for all screens (enterprise standard) */
 html {
-  font-size: 16px;
+  font-size: 14px;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
 }
 
-@media (max-width: 1440px) {
-  html {
-    font-size: 14px;
-  }
+/* Body defaults */
+body {
+  @apply text-sm leading-normal tracking-[-0.01em];
+  font-feature-settings: "cv02", "cv03", "cv04", "cv11";
 }
 
-@media (max-width: 1280px) {
-  html {
-    font-size: 13px;
-  }
+/* =============================================================================
+   GLOBAL COMPONENT SIZING (Enterprise Density)
+   ============================================================================= */
+
+/* All text inputs: h-9 (36px) */
+input:not([type="checkbox"]):not([type="radio"]):not([type="range"]),
+select,
+.input-base {
+  @apply h-9 text-sm px-3;
+}
+
+/* Textareas */
+textarea {
+  @apply text-sm px-3 py-2;
+}
+
+/* Labels */
+label, .label {
+  @apply text-xs font-medium text-gray-500 mb-1 block;
+}
+
+/* =============================================================================
+   TABLE DENSITY
+   ============================================================================= */
+
+table {
+  @apply text-sm w-full;
+}
+
+thead th {
+  @apply text-[11px] font-semibold text-gray-400 uppercase tracking-wider py-2.5 px-3 text-left bg-gray-50/50;
+}
+
+tbody td {
+  @apply py-2 px-3 border-b border-gray-100;
+}
+
+tbody tr:hover {
+  @apply bg-gray-50/50;
+}
+
+/* =============================================================================
+   CARD & CONTAINER DENSITY
+   ============================================================================= */
+
+.card {
+  @apply bg-white rounded-lg border border-gray-200 p-4;
+}
+
+.card-sm {
+  @apply bg-white rounded-lg border border-gray-100 p-3;
+}
+
+/* =============================================================================
+   STAT CARDS (Compact Numbers)
+   ============================================================================= */
+
+.stat-card {
+  @apply bg-white rounded-lg border border-gray-100 p-3;
+}
+
+.stat-card .stat-label {
+  @apply text-[11px] font-medium text-gray-400 uppercase tracking-wide;
+}
+
+.stat-card .stat-value {
+  @apply text-xl font-bold text-gray-900 mt-0.5;
+}
+
+.stat-card .stat-sub {
+  @apply text-[11px] text-gray-400 mt-0.5;
+}
+
+/* =============================================================================
+   UTILITY CLASSES
+   ============================================================================= */
+
+/* Compact spacing */
+.gap-compact { @apply gap-1.5; }
+.p-compact { @apply p-3; }
+.py-compact { @apply py-2; }
+.px-compact { @apply px-3; }
+
+/* Compact text */
+.text-compact { @apply text-xs leading-snug; }
+.text-micro { @apply text-[11px] leading-tight; }
+
+/* Enterprise button sizes */
+.btn-xs { @apply h-7 px-2 text-xs; }
+.btn-sm { @apply h-8 px-3 text-xs; }
+.btn-md { @apply h-9 px-4 text-sm; }
+
+/* Page container */
+.page-container {
+  @apply p-4 lg:p-5;
+}
+
+/* Section headers */
+.section-header {
+  @apply text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2;
 }
 
 /* Status colors */
@@ -181,6 +284,43 @@ input[type="number"] {
 
 .animate-fade-in-scale {
   animation: fadeInScale 0.2s ease-out forwards;
+}
+
+/* Modal entrance animation */
+@keyframes modalEnter {
+  from {
+    opacity: 0;
+    transform: scale(0.95) translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+
+.animate-modal-enter {
+  animation: modalEnter 0.2s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+/* Simple fade in */
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+.animate-fade-in {
+  animation: fadeIn 0.15s ease-out forwards;
+}
+
+/* Shake animation for errors */
+@keyframes shake {
+  0%, 100% { transform: translateX(0); }
+  10%, 30%, 50%, 70%, 90% { transform: translateX(-4px); }
+  20%, 40%, 60%, 80% { transform: translateX(4px); }
+}
+
+.animate-shake {
+  animation: shake 0.4s ease-in-out;
 }
 
 /* Toast notification animation */

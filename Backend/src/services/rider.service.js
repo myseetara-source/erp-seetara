@@ -46,7 +46,7 @@ const DELIVERY_RESULT = {
 async function getRiderByUserId(userId) {
   const { data: rider, error } = await supabase
     .from('riders')
-    .select('*')
+    .select('id, user_id, name, phone, vehicle_type, vehicle_number, is_available, status, total_deliveries, successful_deliveries, average_rating, created_at')
     .eq('user_id', userId)
     .single();
 
@@ -223,7 +223,7 @@ async function assignOrdersToRider(riderId, orderIds, assignedBy) {
   
   let { data: run } = await supabase
     .from('delivery_runs')
-    .select('*')
+    .select('id, user_id, name, phone, vehicle_type, vehicle_number, is_available, status, total_deliveries, successful_deliveries, average_rating, created_at')
     .eq('rider_id', riderId)
     .eq('run_date', today)
     .eq('status', 'pending')
@@ -642,7 +642,7 @@ async function getRiderCashSummary(riderId) {
   // Get pending settlements
   const { data: pendingSettlements } = await supabase
     .from('rider_settlements')
-    .select('*')
+    .select('id, user_id, name, phone, vehicle_type, vehicle_number, is_available, status, total_deliveries, successful_deliveries, average_rating, created_at')
     .eq('rider_id', riderId)
     .eq('status', 'pending')
     .order('created_at', { ascending: false });

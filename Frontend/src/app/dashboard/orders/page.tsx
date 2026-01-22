@@ -182,14 +182,11 @@ export default function OrdersPage() {
   // RENDER
   // =========================================================================
   return (
-    <div className="space-y-4">
-      {/* Quick Create Panel (Expandable) */}
-      <QuickCreatePanel onSuccess={handleRefresh} />
-
+    <div className="space-y-2">
       {/* ===================================================================== */}
-      {/* FILTERS SECTION */}
+      {/* FILTERS SECTION - Compact */}
       {/* ===================================================================== */}
-      <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-4">
+      <div className="bg-white rounded-lg shadow-sm border border-gray-100 p-2.5">
         {/* Row 1: Fulfillment Tabs + Search + Date + Actions */}
         <div className="flex items-center gap-3 flex-wrap">
           {/* Fulfillment Type Tabs */}
@@ -334,7 +331,7 @@ export default function OrdersPage() {
         </div>
 
         {/* Row 2: Status Filters */}
-        <div className="flex items-center gap-2 flex-wrap mt-3 pt-3 border-t border-gray-100">
+        <div className="flex items-center gap-2 flex-wrap mt-2 pt-2 border-t border-gray-100">
           {STATUS_FILTERS.map((status) => {
             const Icon = status.icon;
             const isSelected = selectedStatus === status.id;
@@ -396,13 +393,18 @@ export default function OrdersPage() {
       </div>
 
       {/* ===================================================================== */}
+      {/* QUICK CREATE PANEL - Repositioned after filters for Focus Mode */}
+      {/* ===================================================================== */}
+      <QuickCreatePanel onSuccess={handleRefresh} />
+
+      {/* ===================================================================== */}
       {/* ORDER TABLE */}
       {/* ===================================================================== */}
       <OrderTable
         key={refreshKey}
         filters={filters}
         onSelectOrder={(order) => {
-          console.log('Selected order:', order);
+          // Order selection handled by table
         }}
       />
     </div>

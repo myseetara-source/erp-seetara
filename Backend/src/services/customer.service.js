@@ -86,7 +86,7 @@ class CustomerService {
   async getCustomerById(id) {
     const { data: customer, error } = await supabaseAdmin
       .from('customers')
-      .select('*')
+      .select('id, name, phone, alt_phone, email, address_line1, city, state, total_orders, total_spent, tier, last_order_date, is_blocked, created_at')
       .eq('id', id)
       .single();
 
@@ -111,7 +111,7 @@ class CustomerService {
 
     const { data: customer, error } = await supabaseAdmin
       .from('customers')
-      .select('*')
+      .select('id, name, phone, alt_phone, email, address_line1, city, state, total_orders, total_spent, tier, last_order_date, is_blocked, created_at')
       .eq('phone', sanitized)
       .single();
 

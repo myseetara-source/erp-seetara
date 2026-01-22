@@ -199,7 +199,7 @@ class ProductService {
       // Fetch existing variants if none provided
       const { data: existingVariants } = await supabaseAdmin
         .from('product_variants')
-        .select('*')
+        .select('id, name, description, brand, category, image_url, is_active, shipping_inside, shipping_outside, created_at, updated_at')
         .eq('product_id', id)
         .order('created_at', { ascending: true });
       
@@ -934,7 +934,7 @@ class ProductService {
   async getLowStockAlerts() {
     const { data, error } = await supabaseAdmin
       .from('inventory_alerts')
-      .select('*');
+      .select('id, name, description, brand, category, image_url, is_active, shipping_inside, shipping_outside, created_at, updated_at');
 
     if (error) {
       throw new DatabaseError('Failed to fetch inventory alerts', error);

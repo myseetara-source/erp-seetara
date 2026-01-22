@@ -16,9 +16,11 @@
  * - Delete (soft) users
  */
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
+import ReactDOM from 'react-dom';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/hooks/useAuth';
+import apiClient from '@/lib/api/apiClient';
 import {
   Users,
   Plus,
@@ -71,21 +73,21 @@ interface Vendor {
 }
 
 // =============================================================================
-// ROLE CONFIGURATION
+// ROLE CONFIGURATION (Must match database ENUM: user_role)
+// Database ENUM: 'admin', 'manager', 'operator', 'vendor', 'rider'
+// UI shows 5 roles: Admin, CSR (maps to operator), Manager, Vendor, Rider
 // =============================================================================
 
 const ROLES = [
   { value: 'admin', label: 'Admin', icon: Crown, color: 'bg-red-100 text-red-700 border-red-200' },
   { value: 'manager', label: 'Manager', icon: Shield, color: 'bg-purple-100 text-purple-700 border-purple-200' },
-  { value: 'staff', label: 'Staff', icon: UserIcon, color: 'bg-blue-100 text-blue-700 border-blue-200' },
-  { value: 'operator', label: 'Operator', icon: Headphones, color: 'bg-green-100 text-green-700 border-green-200' },
-  { value: 'csr', label: 'CSR', icon: Headphones, color: 'bg-teal-100 text-teal-700 border-teal-200' },
+  { value: 'operator', label: 'CSR', icon: Headphones, color: 'bg-blue-100 text-blue-700 border-blue-200' }, // CSR = operator in DB
   { value: 'rider', label: 'Rider', icon: Bike, color: 'bg-cyan-100 text-cyan-700 border-cyan-200' },
   { value: 'vendor', label: 'Vendor', icon: Building2, color: 'bg-orange-100 text-orange-700 border-orange-200' },
 ];
 
 const getRoleConfig = (role: string) => {
-  return ROLES.find(r => r.value === role) || ROLES[2]; // Default to staff
+  return ROLES.find(r => r.value === role) || ROLES[2]; // Default to CSR (operator)
 };
 
 // =============================================================================
@@ -152,7 +154,7 @@ function UserAvatar({ name, email }: { name: string; email: string }) {
 }
 
 // =============================================================================
-// ADD USER MODAL
+// ADD USER MODAL (Portal-based with Glassmorphism)
 // =============================================================================
 
 interface AddUserModalProps {
@@ -166,15 +168,45 @@ function AddUserModal({ isOpen, onClose, onSuccess, vendors }: AddUserModalProps
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [showPassword, setShowPassword] = useState(false);
+  const [isClosing, setIsClosing] = useState(false);
   
   const [formData, setFormData] = useState({
     name: '',
     email: '',
     password: '',
     phone: '',
-    role: 'staff',
+    role: 'operator', // Default to operator (matches DB ENUM)
     vendor_id: '',
   });
+
+  // Handle close with animation
+  const handleClose = useCallback(() => {
+    setIsClosing(true);
+    setTimeout(() => {
+      setIsClosing(false);
+      onClose();
+    }, 150);
+  }, [onClose]);
+
+  // Handle escape key
+  useEffect(() => {
+    const handleEscape = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && isOpen) {
+        handleClose();
+      }
+    };
+    
+    if (isOpen) {
+      document.addEventListener('keydown', handleEscape);
+      // Prevent body scroll when modal is open
+      document.body.style.overflow = 'hidden';
+    }
+    
+    return () => {
+      document.removeEventListener('keydown', handleEscape);
+      document.body.style.overflow = '';
+    };
+  }, [isOpen, handleClose]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -182,23 +214,19 @@ function AddUserModal({ isOpen, onClose, onSuccess, vendors }: AddUserModalProps
     setError(null);
 
     try {
-      const res = await fetch('/api/admin/users', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(formData),
-      });
+      const res = await apiClient.post('/admin/users', formData);
 
-      const data = await res.json();
-
-      if (!res.ok) {
-        throw new Error(data.error || 'Failed to create user');
+      if (!res.data.success) {
+        throw new Error(res.data.error || 'Failed to create user');
       }
 
       onSuccess();
-      onClose();
-      setFormData({ name: '', email: '', password: '', phone: '', role: 'staff', vendor_id: '' });
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'An error occurred');
+      handleClose();
+      setFormData({ name: '', email: '', password: '', phone: '', role: 'operator', vendor_id: '' });
+    } catch (err: unknown) {
+      const errorMessage = err instanceof Error ? err.message : 
+        (err as { response?: { data?: { error?: string } } })?.response?.data?.error || 'An error occurred';
+      setError(errorMessage);
     } finally {
       setLoading(false);
     }
@@ -206,60 +234,94 @@ function AddUserModal({ isOpen, onClose, onSuccess, vendors }: AddUserModalProps
 
   if (!isOpen) return null;
 
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center">
-      {/* Backdrop */}
-      <div className="absolute inset-0 bg-black/50" onClick={onClose} />
+  // Render using Portal to escape any parent container constraints
+  return ReactDOM.createPortal(
+    <div 
+      className={`fixed inset-0 z-[100] flex items-center justify-center p-4 transition-all duration-150 ${
+        isClosing ? 'opacity-0' : 'opacity-100'
+      }`}
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="modal-title"
+    >
+      {/* Backdrop with blur - covers entire viewport including sidebar/header */}
+      <div 
+        className={`absolute inset-0 bg-gray-900/60 backdrop-blur-sm transition-opacity duration-150 ${
+          isClosing ? 'opacity-0' : 'opacity-100'
+        }`}
+        onClick={handleClose}
+        aria-hidden="true"
+      />
       
-      {/* Modal */}
-      <div className="relative bg-white rounded-2xl shadow-2xl w-full max-w-md mx-4 overflow-hidden animate-scale-in">
+      {/* Modal Content */}
+      <div 
+        className={`relative bg-white rounded-xl shadow-2xl w-full max-w-md overflow-hidden transform transition-all duration-150 ${
+          isClosing 
+            ? 'opacity-0 scale-95' 
+            : 'opacity-100 scale-100 animate-modal-enter'
+        }`}
+        onClick={(e) => e.stopPropagation()}
+      >
+        {/* Decorative gradient bar at top */}
+        <div className="h-1 bg-gradient-to-r from-orange-500 via-orange-400 to-amber-500" />
+        
         {/* Header */}
         <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100">
-          <h2 className="text-lg font-semibold text-gray-900">Add New Team Member</h2>
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-orange-500 to-amber-500 flex items-center justify-center shadow-lg shadow-orange-500/20">
+              <UserIcon className="w-5 h-5 text-white" />
+            </div>
+            <div>
+              <h2 id="modal-title" className="text-lg font-semibold text-gray-900">Add New Team Member</h2>
+              <p className="text-xs text-gray-500">Create a new user account</p>
+            </div>
+          </div>
           <button
-            onClick={onClose}
-            className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-colors"
+            onClick={handleClose}
+            className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-all duration-150 hover:rotate-90"
           >
             <X className="w-5 h-5" />
           </button>
         </div>
 
         {/* Form */}
-        <form onSubmit={handleSubmit} className="p-6 space-y-4">
+        <form onSubmit={handleSubmit} className="p-6 space-y-4 max-h-[calc(100vh-200px)] overflow-y-auto">
           {error && (
-            <div className="flex items-center gap-2 p-3 bg-red-50 border border-red-200 rounded-lg text-red-700 text-sm">
+            <div className="flex items-center gap-2 p-3 bg-red-50 border border-red-200 rounded-lg text-red-700 text-sm animate-shake">
               <AlertCircle className="w-4 h-4 flex-shrink-0" />
               {error}
             </div>
           )}
 
           {/* Name */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Full Name *</label>
+          <div className="space-y-1.5">
+            <label className="block text-sm font-medium text-gray-700">Full Name <span className="text-red-500">*</span></label>
             <Input
               type="text"
               value={formData.name}
               onChange={e => setFormData({ ...formData, name: e.target.value })}
               placeholder="John Doe"
               required
+              className="transition-shadow focus:shadow-lg focus:shadow-orange-500/10"
             />
           </div>
 
           {/* Email */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Email *</label>
+          <div className="space-y-1.5">
+            <label className="block text-sm font-medium text-gray-700">Email <span className="text-red-500">*</span></label>
             <Input
               type="email"
               value={formData.email}
               onChange={e => setFormData({ ...formData, email: e.target.value })}
               placeholder="john@company.com"
               required
+              className="transition-shadow focus:shadow-lg focus:shadow-orange-500/10"
             />
           </div>
 
           {/* Password */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Password *</label>
+          <div className="space-y-1.5">
+            <label className="block text-sm font-medium text-gray-700">Password <span className="text-red-500">*</span></label>
             <div className="relative">
               <Input
                 type={showPassword ? 'text' : 'password'}
@@ -268,12 +330,12 @@ function AddUserModal({ isOpen, onClose, onSuccess, vendors }: AddUserModalProps
                 placeholder="Min 6 characters"
                 required
                 minLength={6}
-                className="pr-10"
+                className="pr-10 transition-shadow focus:shadow-lg focus:shadow-orange-500/10"
               />
               <button
                 type="button"
                 onClick={() => setShowPassword(!showPassword)}
-                className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 transition-colors"
               >
                 {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
               </button>
@@ -281,23 +343,24 @@ function AddUserModal({ isOpen, onClose, onSuccess, vendors }: AddUserModalProps
           </div>
 
           {/* Phone */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Phone</label>
+          <div className="space-y-1.5">
+            <label className="block text-sm font-medium text-gray-700">Phone</label>
             <Input
               type="tel"
               value={formData.phone}
               onChange={e => setFormData({ ...formData, phone: e.target.value })}
               placeholder="9841234567"
+              className="transition-shadow focus:shadow-lg focus:shadow-orange-500/10"
             />
           </div>
 
           {/* Role */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Role *</label>
+          <div className="space-y-1.5">
+            <label className="block text-sm font-medium text-gray-700">Role <span className="text-red-500">*</span></label>
             <select
               value={formData.role}
               onChange={e => setFormData({ ...formData, role: e.target.value, vendor_id: '' })}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
+              className="w-full h-10 px-3 py-2 bg-white border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-orange-500 focus:border-orange-500 transition-shadow focus:shadow-lg focus:shadow-orange-500/10"
               required
             >
               {ROLES.map(role => (
@@ -310,12 +373,12 @@ function AddUserModal({ isOpen, onClose, onSuccess, vendors }: AddUserModalProps
 
           {/* Vendor Select (Only for vendor role) */}
           {formData.role === 'vendor' && (
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Assign to Vendor *</label>
+            <div className="space-y-1.5 animate-fade-in">
+              <label className="block text-sm font-medium text-gray-700">Assign to Vendor <span className="text-red-500">*</span></label>
               <select
                 value={formData.vendor_id}
                 onChange={e => setFormData({ ...formData, vendor_id: e.target.value })}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
+                className="w-full h-10 px-3 py-2 bg-white border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-orange-500 focus:border-orange-500 transition-shadow focus:shadow-lg focus:shadow-orange-500/10"
                 required
               >
                 <option value="">Select a vendor...</option>
@@ -327,44 +390,46 @@ function AddUserModal({ isOpen, onClose, onSuccess, vendors }: AddUserModalProps
               </select>
             </div>
           )}
-
-          {/* Actions */}
-          <div className="flex gap-3 pt-4">
-            <Button
-              type="button"
-              variant="outline"
-              onClick={onClose}
-              className="flex-1"
-              disabled={loading}
-            >
-              Cancel
-            </Button>
-            <Button
-              type="submit"
-              className="flex-1 bg-orange-500 hover:bg-orange-600"
-              disabled={loading}
-            >
-              {loading ? (
-                <>
-                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                  Creating...
-                </>
-              ) : (
-                <>
-                  <Plus className="w-4 h-4 mr-2" />
-                  Create User
-                </>
-              )}
-            </Button>
-          </div>
         </form>
+
+        {/* Footer Actions - Fixed at bottom */}
+        <div className="flex gap-3 px-6 py-4 bg-gray-50 border-t border-gray-100">
+          <Button
+            type="button"
+            variant="outline"
+            onClick={handleClose}
+            className="flex-1 h-11"
+            disabled={loading}
+          >
+            Cancel
+          </Button>
+          <Button
+            type="submit"
+            onClick={handleSubmit}
+            className="flex-1 h-11 bg-gradient-to-r from-orange-500 to-orange-600 hover:from-orange-600 hover:to-orange-700 shadow-lg shadow-orange-500/25 transition-all duration-200 hover:shadow-xl hover:shadow-orange-500/30"
+            disabled={loading}
+          >
+            {loading ? (
+              <>
+                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                Creating...
+              </>
+            ) : (
+              <>
+                <Plus className="w-4 h-4 mr-2" />
+                Create User
+              </>
+            )}
+          </Button>
+        </div>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 }
 
 // =============================================================================
-// ACTION DROPDOWN COMPONENT
+// ACTION DROPDOWN COMPONENT (Portal-based for overflow fix)
 // =============================================================================
 
 interface ActionDropdownProps {
@@ -377,67 +442,111 @@ interface ActionDropdownProps {
 
 function ActionDropdown({ user, onToggleStatus, onResetPassword, onDelete, currentUserId }: ActionDropdownProps) {
   const [isOpen, setIsOpen] = useState(false);
+  const [position, setPosition] = useState({ top: 0, left: 0 });
+  const triggerRef = useRef<HTMLButtonElement>(null);
 
   const isSelf = user.id === currentUserId;
+
+  // Calculate position when opening
+  const handleOpen = () => {
+    if (triggerRef.current) {
+      const rect = triggerRef.current.getBoundingClientRect();
+      const menuWidth = 192; // w-48 = 12rem = 192px
+      const menuHeight = 160; // Approximate height
+      
+      // Calculate position
+      let top = rect.bottom + 4; // 4px gap
+      let left = rect.right - menuWidth; // Align right edge
+      
+      // Adjust if menu would go off-screen
+      if (left < 8) left = 8;
+      if (top + menuHeight > window.innerHeight) {
+        top = rect.top - menuHeight - 4; // Show above
+      }
+      
+      setPosition({ top, left });
+    }
+    setIsOpen(true);
+  };
+
+  // Portal-based dropdown menu
+  const DropdownMenu = () => {
+    if (typeof window === 'undefined') return null;
+    
+    return ReactDOM.createPortal(
+      <>
+        {/* Backdrop */}
+        <div 
+          className="fixed inset-0 z-[9998]" 
+          onClick={() => setIsOpen(false)} 
+        />
+        {/* Menu */}
+        <div 
+          className="fixed w-48 bg-white rounded-lg shadow-xl border border-gray-200 py-1 z-[9999] animate-fade-in-scale"
+          style={{ 
+            top: position.top, 
+            left: position.left,
+          }}
+        >
+          <button
+            onClick={() => {
+              onToggleStatus(user.id, !user.is_active);
+              setIsOpen(false);
+            }}
+            disabled={isSelf}
+            className="w-full flex items-center gap-2 px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            {user.is_active ? (
+              <>
+                <UserX className="w-4 h-4 text-red-500" />
+                Deactivate
+              </>
+            ) : (
+              <>
+                <UserCheck className="w-4 h-4 text-green-500" />
+                Activate
+              </>
+            )}
+          </button>
+          <button
+            onClick={() => {
+              onResetPassword(user.id);
+              setIsOpen(false);
+            }}
+            className="w-full flex items-center gap-2 px-4 py-2 text-sm text-gray-700 hover:bg-gray-50"
+          >
+            <Key className="w-4 h-4 text-blue-500" />
+            Reset Password
+          </button>
+          <hr className="my-1" />
+          <button
+            onClick={() => {
+              onDelete(user.id);
+              setIsOpen(false);
+            }}
+            disabled={isSelf}
+            className="w-full flex items-center gap-2 px-4 py-2 text-sm text-red-600 hover:bg-red-50 disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            <Trash2 className="w-4 h-4" />
+            Delete User
+          </button>
+        </div>
+      </>,
+      document.body
+    );
+  };
 
   return (
     <div className="relative">
       <button
-        onClick={() => setIsOpen(!isOpen)}
+        ref={triggerRef}
+        onClick={handleOpen}
         className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-colors"
       >
         <MoreVertical className="w-4 h-4" />
       </button>
 
-      {isOpen && (
-        <>
-          <div className="fixed inset-0 z-40" onClick={() => setIsOpen(false)} />
-          <div className="absolute right-0 mt-1 w-48 bg-white rounded-lg shadow-lg border border-gray-100 py-1 z-50">
-            <button
-              onClick={() => {
-                onToggleStatus(user.id, !user.is_active);
-                setIsOpen(false);
-              }}
-              disabled={isSelf}
-              className="w-full flex items-center gap-2 px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              {user.is_active ? (
-                <>
-                  <UserX className="w-4 h-4 text-red-500" />
-                  Deactivate
-                </>
-              ) : (
-                <>
-                  <UserCheck className="w-4 h-4 text-green-500" />
-                  Activate
-                </>
-              )}
-            </button>
-            <button
-              onClick={() => {
-                onResetPassword(user.id);
-                setIsOpen(false);
-              }}
-              className="w-full flex items-center gap-2 px-4 py-2 text-sm text-gray-700 hover:bg-gray-50"
-            >
-              <Key className="w-4 h-4 text-blue-500" />
-              Reset Password
-            </button>
-            <hr className="my-1" />
-            <button
-              onClick={() => {
-                onDelete(user.id);
-                setIsOpen(false);
-              }}
-              disabled={isSelf}
-              className="w-full flex items-center gap-2 px-4 py-2 text-sm text-red-600 hover:bg-red-50 disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              <Trash2 className="w-4 h-4" />
-              Delete User
-            </button>
-          </div>
-        </>
-      )}
+      {isOpen && <DropdownMenu />}
     </div>
   );
 }
@@ -472,16 +581,17 @@ export default function TeamManagementPage() {
       if (statusFilter !== 'all') params.set('status', statusFilter);
       if (searchQuery) params.set('search', searchQuery);
 
-      const res = await fetch(`/api/admin/users?${params.toString()}`);
-      const data = await res.json();
+      const res = await apiClient.get(`/admin/users?${params.toString()}`);
 
-      if (!res.ok) {
-        throw new Error(data.error || 'Failed to fetch users');
+      if (!res.data.success) {
+        throw new Error(res.data.error || 'Failed to fetch users');
       }
 
-      setUsers(data.data || []);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'An error occurred');
+      setUsers(res.data.data || []);
+    } catch (err: unknown) {
+      const errorMessage = err instanceof Error ? err.message : 
+        (err as { response?: { data?: { error?: string } } })?.response?.data?.error || 'An error occurred';
+      setError(errorMessage);
     } finally {
       setLoading(false);
     }
@@ -490,10 +600,9 @@ export default function TeamManagementPage() {
   // Fetch vendors for dropdown
   const fetchVendors = useCallback(async () => {
     try {
-      const res = await fetch('/api/v1/vendors');
-      const data = await res.json();
-      if (data.success) {
-        setVendors(data.data || []);
+      const res = await apiClient.get('/vendors');
+      if (res.data.success) {
+        setVendors(res.data.data || []);
       }
     } catch {
       // Silently fail - vendors are optional
@@ -511,27 +620,23 @@ export default function TeamManagementPage() {
   // Toggle user status
   const handleToggleStatus = async (userId: string, newStatus: boolean) => {
     try {
-      const res = await fetch(`/api/admin/users/${userId}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ is_active: newStatus }),
-      });
+      const res = await apiClient.patch(`/admin/users/${userId}`, { is_active: newStatus });
 
-      const data = await res.json();
-
-      if (!res.ok) {
-        throw new Error(data.error || 'Failed to update user');
+      if (!res.data.success) {
+        throw new Error(res.data.error || 'Failed to update user');
       }
 
       setSuccess(`User ${newStatus ? 'activated' : 'deactivated'} successfully`);
       fetchUsers();
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'An error occurred');
+    } catch (err: unknown) {
+      const errorMessage = err instanceof Error ? err.message : 
+        (err as { response?: { data?: { error?: string } } })?.response?.data?.error || 'An error occurred';
+      setError(errorMessage);
     }
   };
 
   // Reset password (placeholder)
-  const handleResetPassword = async (userId: string) => {
+  const handleResetPassword = async (_userId: string) => {
     setSuccess('Password reset link sent to user email');
     // TODO: Implement password reset
   };
@@ -541,20 +646,18 @@ export default function TeamManagementPage() {
     if (!confirm('Are you sure you want to delete this user?')) return;
 
     try {
-      const res = await fetch(`/api/admin/users/${userId}`, {
-        method: 'DELETE',
-      });
+      const res = await apiClient.delete(`/admin/users/${userId}`);
 
-      const data = await res.json();
-
-      if (!res.ok) {
-        throw new Error(data.error || 'Failed to delete user');
+      if (!res.data.success) {
+        throw new Error(res.data.error || 'Failed to delete user');
       }
 
-      setSuccess(data.message || 'User deleted successfully');
+      setSuccess(res.data.message || 'User deleted successfully');
       fetchUsers();
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'An error occurred');
+    } catch (err: unknown) {
+      const errorMessage = err instanceof Error ? err.message : 
+        (err as { response?: { data?: { error?: string } } })?.response?.data?.error || 'An error occurred';
+      setError(errorMessage);
     }
   };
 

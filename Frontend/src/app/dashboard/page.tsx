@@ -14,6 +14,7 @@ import {
   CheckCircle,
 } from 'lucide-react'
 import Link from 'next/link'
+import { formatCurrency } from '@/lib/utils/currency'
 
 interface StatCardProps {
   title: string
@@ -221,7 +222,7 @@ export default function DashboardPage() {
                     </div>
                   </div>
                   <div className="text-right">
-                    <p className="font-semibold text-gray-900">₹{order.amount.toLocaleString()}</p>
+                    <p className="font-semibold text-gray-900">{formatCurrency(order.amount)}</p>
                     <div className="flex items-center gap-2 mt-1">
                       <span className={`px-2 py-0.5 rounded-full text-xs font-medium capitalize ${getStatusColor(order.status)}`}>
                         {order.status}

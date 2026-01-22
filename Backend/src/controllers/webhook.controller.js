@@ -456,7 +456,7 @@ export const testLogisticsWebhook = asyncHandler(async (req, res) => {
 
   // Forward to main handler with dummy provider
   req.params.provider = 'dummy';
-  req.headers['x-logistics-secret'] = 'test_mode';
+  req.headers['x-logistics-secret'] = process.env.LOGISTICS_WEBHOOK_SECRET || 'test_mode';
   req.body = testPayload;
 
   return logisticsWebhook(req, res);

@@ -127,7 +127,7 @@ export interface TicketFilters {
  * List tickets with filters
  */
 export async function listTickets(filters: TicketFilters = {}) {
-  const params: any = {};
+  const params: Record<string, string> = {};
   
   if (filters.status) {
     params.status = Array.isArray(filters.status) ? filters.status.join(',') : filters.status;
@@ -266,7 +266,7 @@ export async function reopenTicket(ticketId: string, reason: string) {
 export async function addMessage(
   ticketId: string, 
   message: string, 
-  options?: { is_internal?: boolean; attachments?: any[] }
+  options?: { is_internal?: boolean; attachments?: { url: string; name: string; type: string }[] }
 ) {
   const response = await apiClient.post<{
     success: boolean;
@@ -310,7 +310,7 @@ export async function submitFeedback(
     message: string;
     data: {
       ticket: Ticket;
-      review: any;
+      review: { id: string; rating: number; comment?: string };
     };
   }>(`/tickets/${ticketId}/submit-feedback`, {
     rating,
@@ -339,7 +339,7 @@ export async function getTicketStats(filters?: { date_from?: string; date_to?: s
 export async function getActivityLog(ticketId: string) {
   const response = await apiClient.get<{
     success: boolean;
-    data: any[];
+    data: { id: string; action: string; details?: Record<string, unknown>; created_at: string; user?: { id: string; name: string } }[];
   }>(`/tickets/${ticketId}/activity`);
 
   return response.data;

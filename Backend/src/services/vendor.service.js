@@ -94,7 +94,7 @@ class VendorService {
   async getVendorById(id) {
     const { data: vendor, error } = await supabaseAdmin
       .from('vendors')
-      .select('*')
+      .select('id, name, company_name, phone, email, address, pan_number, balance, total_purchases, total_payments, is_active, created_at, updated_at')
       .eq('id', id)
       .single();
 
@@ -636,7 +636,7 @@ class VendorService {
     // Return payment record
     const { data: payment } = await supabaseAdmin
       .from('vendor_payments')
-      .select('*')
+      .select('id, name, company_name, phone, email, address, pan_number, balance, total_purchases, total_payments, is_active, created_at, updated_at')
       .eq('id', result.payment_id)
       .single();
 
@@ -736,100 +736,67 @@ class VendorService {
   }
 
   /**
-   * Get vendor ledger (hisab-kitab)
+   * Get vendor ledger (hisab-kitab) from vendor_ledger table
    * @param {string} vendorId - Vendor UUID
    * @param {Object} options - Query options
-   * @returns {Object} Ledger with supplies and payments
+   * @returns {Object} Ledger with transactions
    */
   async getVendorLedger(vendorId, options = {}) {
     const {
-      page = 1,
       limit = 50,
+      offset = 0,
       start_date,
       end_date,
       type = 'all',
     } = options;
 
-    const from = (page - 1) * limit;
-    const to = from + limit - 1;
+    // Build query on vendor_ledger table
+    let query = supabaseAdmin
+      .from('vendor_ledger')
+      .select('*', { count: 'exact' })
+      .eq('vendor_id', vendorId)
+      .order('transaction_date', { ascending: false, nullsFirst: false })
+      .order('created_at', { ascending: false });
 
-    // Get vendor
-    const vendor = await this.getVendorById(vendorId);
-
-    // Build ledger entries from supplies and payments
-    let entries = [];
-
-    if (type === 'all' || type === 'supplies') {
-      let supplyQuery = supabaseAdmin
-        .from('vendor_supplies')
-        .select('id, supply_number, total_amount, status, created_at')
-        .eq('vendor_id', vendorId);
-
-      if (start_date) supplyQuery = supplyQuery.gte('created_at', start_date);
-      if (end_date) supplyQuery = supplyQuery.lte('created_at', end_date);
-
-      const { data: supplies } = await supplyQuery;
-
-      entries = entries.concat((supplies || []).map(s => ({
-        id: s.id,
-        type: 'supply',
-        reference: s.supply_number,
-        debit: s.total_amount,
-        credit: 0,
-        status: s.status,
-        date: s.created_at,
-      })));
+    // Filter by type if specified
+    if (type !== 'all') {
+      query = query.eq('entry_type', type);
     }
 
-    if (type === 'all' || type === 'payments') {
-      let paymentQuery = supabaseAdmin
-        .from('transactions')
-        .select('id, transaction_number, amount, payment_mode, reference_number, created_at')
-        .eq('vendor_id', vendorId)
-        .eq('type', 'vendor_payment');
-
-      if (start_date) paymentQuery = paymentQuery.gte('created_at', start_date);
-      if (end_date) paymentQuery = paymentQuery.lte('created_at', end_date);
-
-      const { data: payments } = await paymentQuery;
-
-      entries = entries.concat((payments || []).map(p => ({
-        id: p.id,
-        type: 'payment',
-        reference: p.transaction_number,
-        debit: 0,
-        credit: p.amount,
-        payment_mode: p.payment_mode,
-        payment_reference: p.reference_number,
-        date: p.created_at,
-      })));
+    // Date filters
+    if (start_date) {
+      query = query.gte('transaction_date', start_date);
+    }
+    if (end_date) {
+      query = query.lte('transaction_date', end_date);
     }
 
-    // Sort by date
-    entries.sort((a, b) => new Date(b.date) - new Date(a.date));
+    // Apply pagination
+    query = query.range(offset, offset + limit - 1);
 
-    // Paginate
-    const total = entries.length;
-    const paginatedEntries = entries.slice(from, to + 1);
+    const { data: ledgerEntries, error, count } = await query;
+
+    if (error) {
+      throw new Error(`Failed to fetch vendor ledger: ${error.message}`);
+    }
 
     return {
-      vendor: {
-        id: vendor.id,
-        name: vendor.name,
-        phone: vendor.phone,
-        balance: vendor.balance,
-      },
-      entries: paginatedEntries,
-      summary: {
-        total_supplies: entries.filter(e => e.type === 'supply').reduce((sum, e) => sum + e.debit, 0),
-        total_payments: entries.filter(e => e.type === 'payment').reduce((sum, e) => sum + e.credit, 0),
-        current_balance: vendor.balance,
-      },
+      data: (ledgerEntries || []).map(entry => ({
+        id: entry.id,
+        entry_type: entry.entry_type,
+        reference_no: entry.reference_no,
+        description: entry.description,
+        debit: parseFloat(entry.debit) || 0,
+        credit: parseFloat(entry.credit) || 0,
+        running_balance: parseFloat(entry.running_balance) || 0,
+        transaction_date: entry.transaction_date,
+        created_at: entry.created_at,
+      })),
       pagination: {
-        page,
+        total: count || 0,
         limit,
-        total,
-        totalPages: Math.ceil(total / limit),
+        offset,
+        hasMore: (offset + limit) < (count || 0),
       },
     };
   }

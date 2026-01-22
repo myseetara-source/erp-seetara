@@ -60,6 +60,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { cn } from '@/lib/utils';
+import { formatCurrency } from '@/lib/utils/currency';
 import apiClient from '@/lib/api/apiClient';
 import { toast } from 'sonner';
 
@@ -205,7 +206,7 @@ function TaskCard({ task, index, onAction, isDragging }: TaskCardProps) {
             {/* Amount */}
             <div className="text-right">
               <p className="font-bold text-gray-900">
-                Rs. {task.total_amount?.toLocaleString()}
+                {formatCurrency(task.total_amount || 0)}
               </p>
             </div>
           </div>
@@ -275,7 +276,7 @@ interface StatusModalProps {
   task: Task | null;
   isOpen: boolean;
   onClose: () => void;
-  onSubmit: (result: DeliveryResult, data: any) => void;
+  onSubmit: (result: DeliveryResult, data: { reason?: string; collected_cash?: number; notes?: string }) => void;
   isSubmitting: boolean;
 }
 
@@ -333,7 +334,7 @@ function StatusModal({ task, isOpen, onClose, onSubmit, isSubmitting }: StatusMo
             <p className="font-medium">{task.customer?.name}</p>
             <p className="text-sm text-gray-500">{task.shipping_address}</p>
             <p className="text-sm font-bold text-orange-600 mt-1">
-              Amount: Rs. {task.total_amount?.toLocaleString()}
+              Amount: {formatCurrency(task.total_amount || 0)}
               {isCOD && <span className="text-green-600 ml-2">(COD)</span>}
             </p>
           </div>
@@ -378,7 +379,7 @@ function StatusModal({ task, isOpen, onClose, onSubmit, isSubmitting }: StatusMo
           {/* Delivered - Cash Collection */}
           {isDelivered && isCOD && (
             <div className="space-y-2">
-              <label className="text-sm font-medium">Cash Collected (Rs.)</label>
+              <label className="text-sm font-medium">Cash Collected (NPR)</label>
               <div className="relative">
                 <Banknote className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-green-500" />
                 <Input
@@ -536,7 +537,7 @@ export default function RiderAppPage() {
   };
 
   // Handle status update
-  const handleStatusUpdate = async (result: DeliveryResult, data: any) => {
+  const handleStatusUpdate = async (result: DeliveryResult, data: { reason?: string; collected_cash?: number; notes?: string }) => {
     if (!selectedTask) return;
 
     setIsSubmitting(true);
@@ -550,16 +551,16 @@ export default function RiderAppPage() {
 
       toast.success(
         result === 'delivered' 
-          ? `Delivered! Collected Rs. ${data.collected_cash?.toLocaleString() || 0}`
+          ? `Delivered! Collected ${formatCurrency(data.collected_cash || 0)}`
           : 'Status updated'
       );
 
       setIsModalOpen(false);
       setSelectedTask(null);
       fetchData();
-    } catch (error: any) {
-      console.error('Failed to update status:', error);
-      toast.error(error.response?.data?.message || 'Failed to update status');
+    } catch (error: unknown) {
+      const err = error as { response?: { data?: { message?: string } } };
+      toast.error(err.response?.data?.message || 'Failed to update status');
     } finally {
       setIsSubmitting(false);
     }
@@ -639,7 +640,7 @@ export default function RiderAppPage() {
           <AlertTriangle className="w-5 h-5 text-yellow-600" />
           <div className="flex-1">
             <p className="text-sm font-medium text-yellow-800">
-              Cash Balance: Rs. {cashSummary?.current_balance.toLocaleString()}
+              Cash Balance: {formatCurrency(cashSummary?.current_balance || 0)}
             </p>
             <p className="text-xs text-yellow-600">Please settle with admin soon</p>
           </div>

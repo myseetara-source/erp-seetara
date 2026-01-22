@@ -407,6 +407,103 @@ export const getVendorStats = asyncHandler(async (req, res) => {
 });
 
 // =============================================================================
+// VENDOR TRANSACTIONS (Combined Stats + Ledger) - O(1) Architecture
+// =============================================================================
+
+/**
+ * Get vendor transactions with summary
+ * GET /vendors/:id/transactions
+ * 
+ * ARCHITECTURE: O(1) Scalable
+ * - Stats are read from denormalized columns in vendors table (instant)
+ * - Transaction history is fetched from vendor_ledger (paginated)
+ * 
+ * SECURITY: Admin only - Financial data
+ */
+export const getVendorTransactions = asyncHandler(async (req, res) => {
+  const userRole = req.user?.role;
+  const vendorId = req.params.id;
+
+  // Only admins can see transactions
+  if (!canSeeFinancials(userRole)) {
+    return res.status(403).json({
+      success: false,
+      error: {
+        code: 'FORBIDDEN',
+        message: 'You do not have permission to view vendor transactions',
+      },
+    });
+  }
+
+  // Get vendor with denormalized stats (O(1) lookup)
+  const vendor = await vendorService.getVendorById(vendorId);
+  
+  if (!vendor) {
+    return res.status(404).json({
+      success: false,
+      error: {
+        code: 'NOT_FOUND',
+        message: 'Vendor not found',
+      },
+    });
+  }
+
+  // Get paginated transactions from ledger (with fallback)
+  const { limit = 50, offset = 0 } = req.query;
+  let ledger = { data: [], pagination: { total: 0, limit: parseInt(limit), offset: parseInt(offset), hasMore: false } };
+  
+  try {
+    ledger = await vendorService.getVendorLedger(vendorId, { 
+      limit: parseInt(limit), 
+      offset: parseInt(offset),
+    });
+    logger.info('Vendor ledger fetched', { 
+      vendorId, 
+      transactionCount: ledger.data?.length || 0,
+      total: ledger.pagination?.total || 0,
+    });
+  } catch (ledgerError) {
+    // Log error but continue - ledger table might not exist yet
+    logger.warn('Failed to fetch vendor ledger, using empty fallback', { 
+      vendorId, 
+      error: ledgerError.message,
+      stack: ledgerError.stack,
+    });
+  }
+
+  // Build summary from denormalized columns (instant!) - fallback to 0 if columns don't exist
+  const summary = {
+    total_purchases: vendor.total_purchases || 0,
+    total_payments: vendor.total_payments || 0,
+    total_returns: vendor.total_returns || 0,
+    current_balance: vendor.balance || 0,
+    purchase_count: vendor.purchase_count || 0,
+    payment_count: vendor.payment_count || 0,
+    last_purchase_date: vendor.last_purchase_date || null,
+    last_payment_date: vendor.last_payment_date || null,
+  };
+
+  res.json({
+    success: true,
+    data: {
+      vendor: {
+        id: vendor.id,
+        name: vendor.name,
+        company_name: vendor.company_name,
+      },
+      transactions: ledger.data || [],
+      summary,
+      pagination: ledger.pagination || {
+        total: 0,
+        limit: parseInt(limit),
+        offset: parseInt(offset),
+        hasMore: false,
+      },
+    },
+  });
+});
+
+// =============================================================================
 // VENDOR PORTAL ENDPOINTS (Vendor's own data)
 // =============================================================================
 
@@ -475,6 +572,7 @@ export default {
   getVendorLedger,
   getVendorSummary,
   getVendorStats,
+  getVendorTransactions,
   // Portal
   getVendorProfile,
   getOwnLedger,

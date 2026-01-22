@@ -25,7 +25,7 @@ export const listTemplates = asyncHandler(async (req, res) => {
 
   let query = supabase
     .from('sms_templates')
-    .select('*')
+    .select('id, phone, message, template, status, provider_response, sent_at, created_at')
     .order('slug', { ascending: true });
 
   if (category) {
@@ -58,7 +58,7 @@ export const getTemplate = asyncHandler(async (req, res) => {
 
   const { data: template, error } = await supabase
     .from('sms_templates')
-    .select('*')
+    .select('id, phone, message, template, status, provider_response, sent_at, created_at')
     .eq('slug', slug)
     .single();
 

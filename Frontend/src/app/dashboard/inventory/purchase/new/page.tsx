@@ -8,7 +8,7 @@
  */
 
 import { useState, useEffect, useCallback } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { 
   ArrowLeft, 
   Plus, 
@@ -57,6 +57,8 @@ interface PurchaseLineItem {
 
 export default function NewPurchasePage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const preselectedVendorId = searchParams.get('vendorId');
   
   // Form state
   const [vendorId, setVendorId] = useState('');
@@ -67,10 +69,14 @@ export default function NewPurchasePage() {
   // Counter for generating unique IDs (prevents hydration issues)
   const [itemCounter, setItemCounter] = useState(0);
   
-  // Set initial date on client only (prevents hydration mismatch)
+  // Set initial date and pre-selected vendor on client only (prevents hydration mismatch)
   useEffect(() => {
     setInvoiceDate(new Date().toISOString().split('T')[0]);
-  }, []);
+    // Auto-select vendor if passed via URL (from Vendor page)
+    if (preselectedVendorId) {
+      setVendorId(preselectedVendorId);
+    }
+  }, [preselectedVendorId]);
   const [items, setItems] = useState<PurchaseLineItem[]>([]);
   
   // Data state

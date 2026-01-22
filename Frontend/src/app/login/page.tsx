@@ -76,10 +76,10 @@ export default function LoginPage() {
       
       router.refresh();
 
-    } catch (err: any) {
-      console.error('Login error:', err);
+    } catch (err: unknown) {
+      const error = err as { message?: string };
       setError(
-        err.message || 
+        error.message || 
         'Login failed. Please check your credentials.'
       );
     } finally {

@@ -4,6 +4,12 @@
  * These types mirror the backend database schema
  */
 
+// Re-export vendor-specific types
+export * from './vendor';
+
+// Re-export common utility types
+export * from './common';
+
 // =============================================================================
 // CORE ENTITIES
 // =============================================================================

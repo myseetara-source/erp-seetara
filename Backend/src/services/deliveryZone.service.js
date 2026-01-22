@@ -170,7 +170,7 @@ class DeliveryZoneService {
   async getZoneById(id) {
     const { data, error } = await supabaseAdmin
       .from('delivery_zones')
-      .select('*')
+      .select('id, name, zone_type, is_active, created_at')
       .eq('id', id)
       .single();
 

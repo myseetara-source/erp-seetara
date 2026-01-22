@@ -275,7 +275,7 @@ class SMSService {
     try {
       const { data: template, error } = await supabaseAdmin
         .from('sms_templates')
-        .select('*')
+        .select('id, phone, message, template, status, provider_response, sent_at, created_at')
         .eq('slug', slug)
         .single();
 

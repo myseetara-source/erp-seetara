@@ -1,14 +1,12 @@
 'use client';
 
 /**
- * Vendor Simple List - Staff View (Read-Only)
- * Clean, simple table layout for non-admin users
+ * Vendor Simple List - Role-Based View
+ * Shows different columns based on user role:
  * 
- * Features:
- * - Search and filter
- * - Read-only vendor list
- * - No financial data (balance hidden)
- * - No payment/portal access features
+ * - Admin: Full access (Name, Contact, Balance, PAN, Status)
+ * - Manager: Contact info (Name, Phone, Email, Address, Status)
+ * - Staff/CSR: Basic info only (Company Name, Status)
  */
 
 import { useState, useEffect } from 'react';
@@ -18,10 +16,12 @@ import {
   Building2,
   Phone,
   Mail,
-  Loader2,
   CheckCircle,
   XCircle,
   ExternalLink,
+  MapPin,
+  CreditCard,
+  FileText,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -37,6 +37,7 @@ import {
 import { Skeleton } from '@/components/ui/skeleton';
 import apiClient from '@/lib/api/apiClient';
 import { toast } from 'sonner';
+import { useAuth } from '@/hooks/useAuth';
 
 // =============================================================================
 // TYPES
@@ -48,7 +49,25 @@ interface Vendor {
   company_name?: string;
   phone: string;
   email?: string;
+  address?: string;
+  pan_number?: string;
+  balance?: number;
   is_active: boolean;
+}
+
+// =============================================================================
+// PERMISSION HELPER
+// =============================================================================
+
+type UserRole = 'admin' | 'manager' | 'operator' | 'rider' | 'vendor' | string;
+
+function getVendorPermissions(role: UserRole) {
+  return {
+    canViewContact: ['admin', 'manager'].includes(role), // Phone, Email, Address
+    canViewFinancials: role === 'admin', // Balance, PAN
+    canViewDetails: role !== 'operator', // View detail link
+    isBasicStaff: role === 'operator', // CSR/Staff - minimal view
+  };
 }
 
 // =============================================================================
@@ -60,6 +79,11 @@ export default function VendorSimpleList() {
   const [isLoading, setIsLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [showInactive, setShowInactive] = useState(false);
+  
+  // Get user role for permission-based UI
+  const { user } = useAuth();
+  const userRole = user?.role || 'operator';
+  const permissions = getVendorPermissions(userRole);
 
   // Load vendors
   useEffect(() => {
@@ -83,6 +107,12 @@ export default function VendorSimpleList() {
     if (!showInactive && !v.is_active) return false;
     return true;
   });
+
+  // Format currency
+  const formatCurrency = (amount?: number) => {
+    if (amount === undefined || amount === null) return '—';
+    return `Rs. ${amount.toLocaleString('en-NP', { minimumFractionDigits: 2 })}`;
+  };
 
   return (
     <div className="p-6">
@@ -139,46 +169,97 @@ export default function VendorSimpleList() {
           <Table>
             <TableHeader>
               <TableRow className="bg-gray-50">
-                <TableHead>Vendor</TableHead>
-                <TableHead>Contact</TableHead>
-                <TableHead>Status</TableHead>
-                <TableHead className="w-12"></TableHead>
+                <TableHead className="min-w-[200px]">Vendor</TableHead>
+                {permissions.canViewContact && (
+                  <TableHead className="min-w-[180px]">Contact</TableHead>
+                )}
+                {permissions.canViewFinancials && (
+                  <TableHead className="min-w-[120px] text-right">Balance</TableHead>
+                )}
+                {permissions.canViewFinancials && (
+                  <TableHead className="min-w-[100px]">PAN</TableHead>
+                )}
+                <TableHead className="w-24">Status</TableHead>
+                {permissions.canViewDetails && (
+                  <TableHead className="w-12"></TableHead>
+                )}
               </TableRow>
             </TableHeader>
             <TableBody>
               {filteredVendors.map((vendor) => (
                 <TableRow key={vendor.id} className="hover:bg-gray-50">
+                  {/* Vendor Name - Always Visible */}
                   <TableCell>
                     <div className="flex items-center gap-3">
-                      <div className={`w-10 h-10 rounded-full flex items-center justify-center text-white font-semibold ${
+                      <div className={`w-10 h-10 rounded-full flex items-center justify-center text-white font-semibold shrink-0 ${
                         vendor.is_active 
                           ? 'bg-gradient-to-br from-orange-400 to-amber-500' 
                           : 'bg-gray-300'
                       }`}>
                         {vendor.name.charAt(0).toUpperCase()}
                       </div>
-                      <div>
-                        <div className="font-medium text-gray-900">{vendor.name}</div>
+                      <div className="min-w-0">
+                        <div className="font-medium text-gray-900 truncate">{vendor.name}</div>
                         {vendor.company_name && (
-                          <div className="text-sm text-gray-500">{vendor.company_name}</div>
+                          <div className="text-sm text-gray-500 truncate">{vendor.company_name}</div>
                         )}
                       </div>
                     </div>
                   </TableCell>
-                  <TableCell>
-                    <div className="space-y-1">
-                      <div className="flex items-center gap-1.5 text-gray-600">
-                        <Phone className="w-3.5 h-3.5" />
-                        <span>{vendor.phone}</span>
-                      </div>
-                      {vendor.email && (
-                        <div className="flex items-center gap-1.5 text-sm text-gray-500">
-                          <Mail className="w-3.5 h-3.5" />
-                          <span>{vendor.email}</span>
+
+                  {/* Contact - Admin & Manager Only */}
+                  {permissions.canViewContact && (
+                    <TableCell>
+                      <div className="space-y-1">
+                        <div className="flex items-center gap-1.5 text-gray-600">
+                          <Phone className="w-3.5 h-3.5 shrink-0" />
+                          <span className="truncate">{vendor.phone}</span>
                         </div>
+                        {vendor.email && (
+                          <div className="flex items-center gap-1.5 text-sm text-gray-500">
+                            <Mail className="w-3.5 h-3.5 shrink-0" />
+                            <span className="truncate">{vendor.email}</span>
+                          </div>
+                        )}
+                        {vendor.address && (
+                          <div className="flex items-center gap-1.5 text-sm text-gray-400">
+                            <MapPin className="w-3.5 h-3.5 shrink-0" />
+                            <span className="truncate">{vendor.address}</span>
+                          </div>
+                        )}
+                      </div>
+                    </TableCell>
+                  )}
+
+                  {/* Balance - Admin Only */}
+                  {permissions.canViewFinancials && (
+                    <TableCell className="text-right">
+                      <div className={`font-medium ${
+                        (vendor.balance || 0) > 0 ? 'text-red-600' : 'text-gray-600'
+                      }`}>
+                        {formatCurrency(vendor.balance)}
+                      </div>
+                      {(vendor.balance || 0) > 0 && (
+                        <div className="text-xs text-gray-400">Payable</div>
                       )}
-                    </div>
-                  </TableCell>
+                    </TableCell>
+                  )}
+
+                  {/* PAN - Admin Only */}
+                  {permissions.canViewFinancials && (
+                    <TableCell>
+                      {vendor.pan_number ? (
+                        <div className="flex items-center gap-1.5 text-gray-600">
+                          <FileText className="w-3.5 h-3.5 shrink-0" />
+                          <span className="font-mono text-sm">{vendor.pan_number}</span>
+                        </div>
+                      ) : (
+                        <span className="text-gray-300">—</span>
+                      )}
+                    </TableCell>
+                  )}
+
+                  {/* Status - Always Visible */}
                   <TableCell>
                     {vendor.is_active ? (
                       <Badge className="bg-green-100 text-green-700 hover:bg-green-100">
@@ -192,13 +273,17 @@ export default function VendorSimpleList() {
                       </Badge>
                     )}
                   </TableCell>
-                  <TableCell>
-                    <Link href={`/dashboard/vendors/${vendor.id}`}>
-                      <Button variant="ghost" size="sm" className="text-gray-500 hover:text-orange-600">
-                        <ExternalLink className="w-4 h-4" />
-                      </Button>
-                    </Link>
-                  </TableCell>
+
+                  {/* View Details - Admin & Manager Only */}
+                  {permissions.canViewDetails && (
+                    <TableCell>
+                      <Link href={`/dashboard/vendors/${vendor.id}`}>
+                        <Button variant="ghost" size="sm" className="text-gray-500 hover:text-orange-600">
+                          <ExternalLink className="w-4 h-4" />
+                        </Button>
+                      </Link>
+                    </TableCell>
+                  )}
                 </TableRow>
               ))}
             </TableBody>

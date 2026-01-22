@@ -19,6 +19,7 @@ import {
   GetObjectCommand,
   HeadObjectCommand,
 } from '@aws-sdk/client-s3';
+import { getSignedUrl as getS3SignedUrl } from '@aws-sdk/s3-request-presigner';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import { createLogger } from '../utils/logger.js';
 import config from '../config/index.js';
@@ -281,6 +282,101 @@ class StorageService {
     } catch {
       // If not a valid URL, assume it's already a key
       return url;
+    }
+  }
+
+  /**
+   * Generate a presigned URL for direct upload from frontend
+   * This allows clients to upload directly to R2 without going through our server
+   * 
+   * @param {string} filename - Original filename (can be pre-formatted by frontend)
+   * @param {Object} options - Options
+   * @param {string} options.folder - Folder path (e.g., 'vendor-receipts')
+   * @param {string} options.contentType - MIME type
+   * @param {number} options.expiresIn - URL validity in seconds (default: 300 = 5 min)
+   * @returns {Promise<Object>} { uploadUrl, publicUrl, key }
+   */
+  async getPresignedUploadUrl(filename, options = {}) {
+    const { 
+      folder = 'uploads', 
+      contentType = 'application/octet-stream',
+      expiresIn = 300,
+    } = options;
+
+    // Generate organized path: vendor-receipts/2026/01/Bank_UmeshPvtLtd_Ref8829_20260122_a3f2.jpg
+    // We keep the frontend's intelligent filename and just add a short hash for uniqueness
+    const now = new Date();
+    const year = now.getFullYear();
+    const month = String(now.getMonth() + 1).padStart(2, '0');
+    const shortHash = uuidv4().split('-')[0].substring(0, 4); // 4-char hash for uniqueness
+    
+    const ext = path.extname(filename).toLowerCase();
+    const baseName = path.basename(filename, ext);
+    
+    // If filename looks pre-formatted (contains underscore), preserve it
+    // Otherwise, sanitize it
+    const isPreFormatted = baseName.includes('_') && baseName.length > 10;
+    
+    let safeName;
+    if (isPreFormatted) {
+      // Keep the intelligent filename from frontend, just sanitize special chars
+      safeName = baseName
+        .replace(/[^a-zA-Z0-9_-]/g, '')
+        .substring(0, 50);
+    } else {
+      // Fallback: sanitize for random uploads
+      safeName = baseName
+        .toLowerCase()
+        .replace(/[^a-z0-9]/g, '-')
+        .substring(0, 30);
+    }
+    
+    // Final path: vendor-receipts/2026/01/Bank_UmeshPvtLtd_Ref8829_20260122_a3f2.jpg
+    const fileKey = `${folder}/${year}/${month}/${safeName}_${shortHash}${ext}`;
+
+    // If R2 not configured, return mock URLs (for development)
+    if (!this.isConfigured) {
+      logger.warn('R2 not configured - returning mock presigned URL');
+      return {
+        uploadUrl: `https://placeholder.com/upload/${fileKey}`,
+        publicUrl: `https://placeholder.com/${fileKey}`,
+        key: fileKey,
+        mock: true,
+      };
+    }
+
+    try {
+      const command = new PutObjectCommand({
+        Bucket: this.bucket,
+        Key: fileKey,
+        ContentType: contentType,
+      });
+
+      const uploadUrl = await getS3SignedUrl(this.client, command, { expiresIn });
+
+      // Generate public URL for viewing after upload
+      const publicUrl = this.publicUrl 
+        ? `${this.publicUrl}/${fileKey}`
+        : uploadUrl.split('?')[0]; // Remove query params for public access
+
+      logger.info('Presigned upload URL generated', {
+        key: fileKey,
+        contentType,
+        expiresIn,
+      });
+
+      return {
+        uploadUrl,
+        publicUrl,
+        key: fileKey,
+      };
+
+    } catch (error) {
+      logger.error('Failed to generate presigned upload URL', { 
+        error: error.message, 
+        filename,
+      });
+      throw new Error(`Failed to generate upload URL: ${error.message}`);
     }
   }
 }

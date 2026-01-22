@@ -446,7 +446,7 @@ export const getLedger = asyncHandler(async (req, res) => {
 
   let query = supabaseAdmin
     .from('transactions')
-    .select('*')
+    .select('id, name, company_name, phone, email, balance, is_active, created_at')
     .eq('vendor_id', vendorId)
     .order('created_at', { ascending: true });
 

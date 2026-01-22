@@ -168,6 +168,23 @@ router.get(
   vendorController.getVendorLedger
 );
 
+/**
+ * Get vendor transactions (combined stats + ledger)
+ * GET /vendors/:id/transactions
+ * 
+ * ARCHITECTURE: O(1) Scalable
+ * - Stats from denormalized columns (instant)
+ * - Transaction history from vendor_ledger (paginated)
+ * 
+ * SECURITY: Admin only - Financial data
+ */
+router.get(
+  '/:id/transactions',
+  authorize('admin'),
+  validateParams(vendorIdSchema),
+  vendorController.getVendorTransactions
+);
+
 // =============================================================================
 // SUPPLIES (Stock Purchases) - Staff can create, Admin can manage
 // =============================================================================

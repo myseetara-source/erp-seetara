@@ -9,6 +9,7 @@ import {
   uploadFile,
   uploadMultipleFiles,
   deleteFile,
+  getPresignedUploadUrl,
 } from '../controllers/upload.controller.js';
 import { authenticate } from '../middleware/auth.middleware.js'; // Audit Fix CRIT-005: Enabled auth
 
@@ -76,6 +77,20 @@ router.post('/multiple', upload.array('files', 10), uploadMultipleFiles);
  * @access  Authenticated users
  */
 router.delete('/', deleteFile);
+
+/**
+ * @route   POST /upload/presign
+ * @desc    Get a presigned URL for direct upload to R2
+ * @access  Admin/Manager only
+ * @body    { filename: string, contentType: string, folder?: string }
+ * @returns { uploadUrl: string, publicUrl: string, key: string, expiresIn: number }
+ * 
+ * Usage:
+ * 1. Call this endpoint to get a presigned URL
+ * 2. PUT the file directly to the uploadUrl
+ * 3. Store the publicUrl in your database
+ */
+router.post('/presign', getPresignedUploadUrl);
 
 // =============================================================================
 // ERROR HANDLER FOR MULTER

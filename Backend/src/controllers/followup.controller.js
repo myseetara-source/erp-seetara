@@ -12,6 +12,9 @@
 
 import { supabaseAdmin } from '../config/supabase.js';
 import { AppError, catchAsync } from '../utils/errors.js';
+import { createLogger } from '../utils/logger.js';
+
+const logger = createLogger('FollowupController');
 
 // Valid response statuses
 const VALID_STATUSES = [
@@ -83,7 +86,7 @@ export const createFollowup = catchAsync(async (req, res) => {
     .single();
 
   if (followupError) {
-    console.error('[FollowupController] Create error:', followupError);
+    logger.error('[FollowupController] Create error:', followupError);
     throw new AppError('Failed to create follow-up record', 500, 'DATABASE_ERROR');
   }
 
@@ -160,7 +163,7 @@ export const getOrderFollowups = catchAsync(async (req, res) => {
     .order('attempt_number', { ascending: true });
 
   if (error) {
-    console.error('[FollowupController] Get order followups error:', error);
+    logger.error('[FollowupController] Get order followups error:', error);
     throw new AppError('Failed to fetch follow-ups', 500, 'DATABASE_ERROR');
   }
 
@@ -215,7 +218,7 @@ export const getPendingFollowups = catchAsync(async (req, res) => {
   const { data, error, count } = await query;
 
   if (error) {
-    console.error('[FollowupController] Get pending followups error:', error);
+    logger.error('[FollowupController] Get pending followups error:', error);
     throw new AppError('Failed to fetch pending follow-ups', 500, 'DATABASE_ERROR');
   }
 
@@ -290,7 +293,7 @@ export const getStaffPerformance = catchAsync(async (req, res) => {
     .lte('created_at', endDate);
 
   if (error) {
-    console.error('[FollowupController] Get performance error:', error);
+    logger.error('[FollowupController] Get performance error:', error);
     throw new AppError('Failed to fetch performance data', 500, 'DATABASE_ERROR');
   }
 
@@ -372,7 +375,7 @@ export const updateFollowup = catchAsync(async (req, res) => {
     .single();
 
   if (error) {
-    console.error('[FollowupController] Update error:', error);
+    logger.error('[FollowupController] Update error:', error);
     throw new AppError('Failed to update follow-up', 500, 'DATABASE_ERROR');
   }
 

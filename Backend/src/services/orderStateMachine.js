@@ -557,7 +557,7 @@ export async function determineFulfillmentTypeFromDB(city, supabaseClient) {
     });
 
     if (error) {
-      console.warn('Failed to lookup delivery zone from DB, using fallback', { error });
+      logger.warn('Failed to lookup delivery zone from DB, using fallback', { error });
       return {
         fulfillment_type: determineFulfillmentType(city),
         zone_info: null,
@@ -585,7 +585,7 @@ export async function determineFulfillmentTypeFromDB(city, supabaseClient) {
       source: 'database',
     };
   } catch (err) {
-    console.error('Error in determineFulfillmentTypeFromDB', { error: err });
+    logger.error('Error in determineFulfillmentTypeFromDB', { error: err });
     return {
       fulfillment_type: determineFulfillmentType(city),
       zone_info: null,

@@ -44,7 +44,7 @@ export const createProduct = asyncHandler(async (req, res) => {
       data: maskProductFinancials(product, userRole),
     });
   } catch (error) {
-    console.error('[ProductController] Create product error:', error.message, error.details || '');
+    logger.error('[ProductController] Create product error:', error.message, error.details || '');
     throw error;
   }
 });
@@ -190,7 +190,7 @@ export const searchProducts = asyncHandler(async (req, res) => {
   const { data: products, error } = await query;
 
   if (error) {
-    console.error('[ProductSearch] Error:', error);
+    logger.error('[ProductSearch] Error:', error);
     return res.json({ success: true, data: [] });
   }
 
@@ -332,7 +332,7 @@ const searchProductsFullMode = async (req, res, { isAdmin, limitNum, hasQuery, q
   const { data: products, error } = await query;
 
   if (error) {
-    console.error('[ProductSearch] Error:', error);
+    logger.error('[ProductSearch] Error:', error);
     return res.json({ success: true, data: [] });
   }
 
@@ -392,7 +392,7 @@ export const getProductVariants = asyncHandler(async (req, res) => {
     .order('created_at', { ascending: true });
 
   if (error) {
-    console.error('[GetProductVariants] Error:', error);
+    logger.error('[GetProductVariants] Error:', error);
     return res.status(500).json({ success: false, message: 'Failed to fetch variants' });
   }
 

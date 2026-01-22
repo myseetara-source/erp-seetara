@@ -119,7 +119,7 @@ export const getUser = asyncHandler(async (req, res) => {
 
   const { data: user, error } = await supabaseAdmin
     .from('users')
-    .select('*')
+    .select('id, email, name, phone, role, vendor_id, is_active, avatar_url, created_at, updated_at')
     .eq('id', id)
     .single();
 
@@ -260,7 +260,7 @@ export const updateUser = asyncHandler(async (req, res) => {
   // Get current user data
   const { data: currentUser, error: fetchError } = await supabaseAdmin
     .from('users')
-    .select('*')
+    .select('id, email, name, phone, role, vendor_id, is_active, avatar_url, created_at, updated_at')
     .eq('id', id)
     .single();
 
@@ -338,7 +338,7 @@ export const toggleUserStatus = asyncHandler(async (req, res) => {
   // Get current user
   const { data: user, error: fetchError } = await supabaseAdmin
     .from('users')
-    .select('*')
+    .select('id, email, name, phone, role, vendor_id, is_active, avatar_url, created_at, updated_at')
     .eq('id', id)
     .single();
 

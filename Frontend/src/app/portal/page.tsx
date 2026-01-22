@@ -123,7 +123,7 @@ export default function VendorPortalDashboard() {
       } else {
         throw new Error(response.data.message);
       }
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error('Dashboard load error:', err);
       
       if (err.response?.status === 401 || err.response?.status === 403) {

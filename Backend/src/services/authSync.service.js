@@ -26,7 +26,7 @@ export async function processPendingRoleSyncs() {
     // Get all pending syncs
     const { data: pendingSyncs, error: fetchError } = await supabaseAdmin
       .from('pending_role_syncs')
-      .select('*')
+      .select('id, email, name, phone, role, vendor_id, is_active')
       .eq('sync_status', 'pending')
       .order('created_at', { ascending: true })
       .limit(100);
@@ -199,7 +199,7 @@ export async function syncAllUsers() {
 export async function getSyncStatus() {
   const { data, error } = await supabaseAdmin
     .from('role_sync_status')
-    .select('*')
+    .select('id, email, name, phone, role, vendor_id, is_active')
     .limit(100);
 
   if (error) {

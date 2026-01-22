@@ -47,6 +47,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { cn } from '@/lib/utils';
+import { formatCurrency } from '@/lib/utils/currency';
 import { useFullOrderForm, ProductOption } from '@/hooks/useOrderForm';
 import { ProductVariantSelect, VariantOption } from '@/components/form/ProductVariantSelect';
 
@@ -415,10 +416,10 @@ export default function NewOrderPage() {
                               </div>
                             </td>
                             <td className="px-4 py-3 text-right font-medium">
-                              Rs. {item.unit_price.toLocaleString()}
+                              {formatCurrency(item.unit_price)}
                             </td>
                             <td className="px-4 py-3 text-right font-bold text-orange-600">
-                              Rs. {(item.quantity * item.unit_price).toLocaleString()}
+                              {formatCurrency(item.quantity * item.unit_price)}
                             </td>
                             <td className="px-4 py-3">
                               <button
@@ -515,23 +516,23 @@ export default function NewOrderPage() {
                 <div className="space-y-3">
                   <div className="flex justify-between text-sm">
                     <span className="text-gray-600">Subtotal ({watchedItems.length} items)</span>
-                    <span className="font-medium">Rs. {subtotal.toLocaleString()}</span>
+                    <span className="font-medium">{formatCurrency(subtotal)}</span>
                   </div>
                   <div className="flex justify-between text-sm">
                     <span className="text-gray-600">Delivery Charge</span>
-                    <span className="font-medium">Rs. {(watch('delivery_charge') || 0).toLocaleString()}</span>
+                    <span className="font-medium">{formatCurrency(watch('delivery_charge') || 0)}</span>
                   </div>
                   <div className="flex justify-between text-sm">
                     <span className="text-gray-600">Discount</span>
-                    <span className="font-medium text-red-500">-Rs. {(watch('discount_amount') || 0).toLocaleString()}</span>
+                    <span className="font-medium text-red-500">-{formatCurrency(watch('discount_amount') || 0)}</span>
                   </div>
                   <div className="flex justify-between text-sm">
                     <span className="text-gray-600">Prepaid</span>
-                    <span className="font-medium text-green-600">-Rs. {(watch('prepaid_amount') || 0).toLocaleString()}</span>
+                    <span className="font-medium text-green-600">-{formatCurrency(watch('prepaid_amount') || 0)}</span>
                   </div>
                   <div className="border-t border-gray-200 pt-3 flex justify-between">
                     <span className="text-lg font-bold text-gray-900">COD Amount</span>
-                    <span className="text-lg font-bold text-orange-600">Rs. {codAmount.toLocaleString()}</span>
+                    <span className="text-lg font-bold text-orange-600">{formatCurrency(codAmount)}</span>
                   </div>
                 </div>
               </div>
