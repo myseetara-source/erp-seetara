@@ -22,18 +22,11 @@
  */
 
 import { Router } from 'express';
-// Legacy controllers (v1)
-import {
-  createAdjustment,
-  reportDamage,
-  listAdjustments,
-  listDamages,
-  getMovementHistory,
+// Unified controllers - all inventory operations use the transaction system
+import inventoryController, {
   getInventoryValuation,
   getLowStockAlerts,
 } from '../controllers/inventory.controller.js';
-// New unified controllers (v2)
-import inventoryTransactionController from '../controllers/inventory.controller.js';
 import { authenticate, authorize } from '../middleware/auth.middleware.js';
 import { validateBody, validateQuery } from '../middleware/validate.middleware.js';
 import { z } from 'zod';
@@ -74,7 +67,7 @@ const movementQuerySchema = paginationSchema.extend({
 // =============================================================================
 
 /**
- * Create stock adjustment
+ * Create stock adjustment (LEGACY - redirects to unified transaction)
  * POST /inventory/adjustments
  * 
  * SECURITY: Staff CAN create adjustments
@@ -83,11 +76,11 @@ const movementQuerySchema = paginationSchema.extend({
 router.post(
   '/adjustments',
   validateBody(createAdjustmentSchema),
-  createAdjustment
+  inventoryController.createInventoryTransaction
 );
 
 /**
- * List stock adjustments
+ * List stock adjustments (LEGACY - uses unified transaction list)
  * GET /inventory/adjustments
  * 
  * SECURITY: All authenticated, financial data masked
@@ -95,11 +88,11 @@ router.post(
 router.get(
   '/adjustments',
   validateQuery(movementQuerySchema),
-  listAdjustments
+  inventoryController.listInventoryTransactions
 );
 
 /**
- * Report damage
+ * Report damage (LEGACY - redirects to unified transaction)
  * POST /inventory/damages
  * 
  * SECURITY: Staff CAN report damages
@@ -108,11 +101,11 @@ router.get(
 router.post(
   '/damages',
   validateBody(reportDamageSchema),
-  reportDamage
+  inventoryController.createInventoryTransaction
 );
 
 /**
- * List damages
+ * List damages (LEGACY - uses unified transaction list)
  * GET /inventory/damages
  * 
  * SECURITY: All authenticated, loss amounts masked for non-admins
@@ -123,7 +116,7 @@ router.get(
     from_date: z.string().optional(),
     to_date: z.string().optional(),
   })),
-  listDamages
+  inventoryController.listInventoryTransactions
 );
 
 /**
@@ -137,7 +130,7 @@ router.get(
   validateQuery(paginationSchema.extend({
     variant_id: uuidSchema,
   })),
-  getMovementHistory
+  inventoryController.getVariantStockMovements
 );
 
 /**
@@ -187,7 +180,7 @@ router.get(
  * @query page, limit, type, vendor_id, from_date, to_date, search
  * SECURITY: All authenticated, cost data masked for non-admins
  */
-router.get('/transactions', inventoryTransactionController.listInventoryTransactions);
+router.get('/transactions', inventoryController.listInventoryTransactions);
 
 /**
  * Get next invoice number
@@ -195,7 +188,7 @@ router.get('/transactions', inventoryTransactionController.listInventoryTransact
  * 
  * @query type (purchase|purchase_return|damage|adjustment)
  */
-router.get('/transactions/next-invoice', inventoryTransactionController.getNextInvoiceNumber);
+router.get('/transactions/next-invoice', inventoryController.getNextInvoiceNumber);
 
 /**
  * List pending approvals
@@ -207,7 +200,7 @@ router.get('/transactions/next-invoice', inventoryTransactionController.getNextI
 router.get(
   '/transactions/pending',
   authorize('admin'),
-  inventoryTransactionController.listPendingApprovals
+  inventoryController.listPendingApprovals
 );
 
 /**
@@ -216,7 +209,7 @@ router.get(
  * 
  * SECURITY: All authenticated, cost data masked for non-admins
  */
-router.get('/transactions/:id', inventoryTransactionController.getInventoryTransaction);
+router.get('/transactions/:id', inventoryController.getInventoryTransaction);
 
 /**
  * Create new inventory transaction
@@ -225,7 +218,7 @@ router.get('/transactions/:id', inventoryTransactionController.getInventoryTrans
  * Handles: PURCHASE, PURCHASE_RETURN, DAMAGE, ADJUSTMENT
  * SECURITY: Staff can create, cost data hidden from staff responses
  */
-router.post('/transactions', inventoryTransactionController.createInventoryTransaction);
+router.post('/transactions', inventoryController.createInventoryTransaction);
 
 /**
  * Void an inventory transaction
@@ -237,7 +230,7 @@ router.post('/transactions', inventoryTransactionController.createInventoryTrans
 router.post(
   '/transactions/:id/void',
   authorize('admin'),
-  inventoryTransactionController.voidInventoryTransaction
+  inventoryController.voidTransaction
 );
 
 /**
@@ -250,7 +243,7 @@ router.post(
 router.post(
   '/transactions/:id/approve',
   authorize('admin'),
-  inventoryTransactionController.approveTransaction
+  inventoryController.approveTransaction
 );
 
 /**
@@ -263,7 +256,7 @@ router.post(
 router.post(
   '/transactions/:id/reject',
   authorize('admin'),
-  inventoryTransactionController.rejectTransaction
+  inventoryController.rejectTransaction
 );
 
 /**
@@ -272,7 +265,7 @@ router.post(
  * 
  * SECURITY: All authenticated, cost data masked for non-admins
  */
-router.get('/variants/:variantId/movements', inventoryTransactionController.getVariantStockMovements);
+router.get('/variants/:variantId/movements', inventoryController.getVariantStockMovements);
 
 /**
  * Search purchase invoices (for Purchase Return linking)
@@ -280,6 +273,6 @@ router.get('/variants/:variantId/movements', inventoryTransactionController.getV
  * 
  * @query vendor_id, invoice_no, limit
  */
-router.get('/purchases/search', inventoryTransactionController.searchPurchaseInvoices);
+router.get('/purchases/search', inventoryController.searchPurchaseInvoices);
 
 export default router;
