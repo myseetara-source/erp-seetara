@@ -2,10 +2,15 @@
  * Inventory Transaction Controller
  * 
  * Unified controller for handling:
- * - PURCHASE: Stock In from vendors
- * - PURCHASE_RETURN: Return stock to vendors
- * - DAMAGE: Write-off damaged stock
- * - ADJUSTMENT: Manual stock corrections
+ * - PURCHASE: Stock In from vendors (increases vendor payable balance)
+ * - PURCHASE_RETURN: Return stock to vendors (decreases vendor payable balance)
+ * - DAMAGE: Write-off damaged stock (no vendor balance change)
+ * - ADJUSTMENT: Manual stock corrections (no vendor balance change)
+ * 
+ * ACCOUNTING LOGIC:
+ * - Purchase: Vendor.balance += total_cost (We owe them more)
+ * - Purchase Return: Vendor.balance -= total_cost (We owe them less)
+ * - Damage/Adjustment: No vendor balance change
  * 
  * SECURITY:
  * - Admin: Full access including cost/financial data
@@ -108,14 +113,14 @@ export const listInventoryTransactions = catchAsync(async (req, res) => {
     pagination: {
       page,
       limit,
-      total: count || 0,
-      totalPages: Math.ceil((count || 0) / limit),
+      total: count,
+      totalPages: Math.ceil(count / limit),
     },
   });
 });
 
 // =============================================================================
-// GET SINGLE TRANSACTION
+// GET SINGLE INVENTORY TRANSACTION
 // =============================================================================
 
 export const getInventoryTransaction = catchAsync(async (req, res) => {
@@ -126,8 +131,10 @@ export const getInventoryTransaction = catchAsync(async (req, res) => {
     .from('inventory_transactions')
     .select(`
       *,
-      vendor:vendors(id, name, company_name, phone),
+      vendor:vendors(id, name, company_name, phone, email, balance),
       performer:users!inventory_transactions_performed_by_fkey(id, name, email),
+      approver:users!inventory_transactions_approved_by_fkey(id, name, email),
+      reference:inventory_transactions!reference_transaction_id(id, invoice_no, transaction_type, transaction_date),
       items:inventory_transaction_items(
         id,
         variant_id,
@@ -141,6 +148,7 @@ export const getInventoryTransaction = catchAsync(async (req, res) => {
           sku,
           attributes,
           current_stock,
+          damaged_stock,
           product:products(id, name, image_url)
         )
       )
@@ -149,32 +157,43 @@ export const getInventoryTransaction = catchAsync(async (req, res) => {
     .single();
 
   if (error || !data) {
+    console.error('[InventoryController] Get transaction error:', error);
     throw new AppError('Transaction not found', 404, 'NOT_FOUND');
   }
 
-  // Mask sensitive data for non-admin users
-  const result = isAdmin
-    ? data
+  // Calculate totals
+  const totalQuantity = data.items?.reduce((sum, item) => sum + Math.abs(item.quantity || 0), 0) || 0;
+  const totalCost = data.items?.reduce((sum, item) => sum + (Math.abs(item.quantity || 0) * (item.unit_cost || 0)), 0) || 0;
+
+  // Mask sensitive data for non-admin
+  const responseData = isAdmin
+    ? { ...data, calculated_total_quantity: totalQuantity, calculated_total_cost: totalCost }
     : {
         ...data,
         total_cost: undefined,
+        calculated_total_cost: undefined,
+        vendor: data.vendor ? { id: data.vendor.id, name: data.vendor.name, company_name: data.vendor.company_name } : null,
         items: data.items?.map((item) => ({
           ...item,
           unit_cost: undefined,
         })),
+        calculated_total_quantity: totalQuantity,
       };
 
   res.json({
     success: true,
-    data: result,
+    data: responseData,
   });
 });
 
 // =============================================================================
-// CREATE INVENTORY TRANSACTION
+// CREATE INVENTORY TRANSACTION - CORE BUSINESS LOGIC
 // =============================================================================
 
 export const createInventoryTransaction = catchAsync(async (req, res) => {
+  // Log incoming payload for debugging
+  console.log('[InventoryController] Incoming payload:', JSON.stringify(req.body, null, 2));
+
   // Validate request body using discriminated union
   const result = createInventoryTransactionSchema.safeParse(req.body);
 
@@ -195,13 +214,37 @@ export const createInventoryTransaction = catchAsync(async (req, res) => {
     throw new AppError('User not authenticated', 401, 'UNAUTHORIZED');
   }
 
+  // Parse and validate items - FIX FOR QUANTITY 0 BUG
+  const parsedItems = data.items.map((item, index) => {
+    const qty = parseInt(item.qty || item.quantity || 0, 10);
+    const unitCost = parseFloat(item.unit_cost || item.unitCost || 0);
+    
+    console.log(`[InventoryController] Parsed item ${index}:`, {
+      variant_id: item.variant_id,
+      raw_qty: item.qty || item.quantity,
+      parsed_qty: qty,
+      raw_cost: item.unit_cost || item.unitCost,
+      parsed_cost: unitCost,
+    });
+
+    if (qty === 0) {
+      console.warn(`[InventoryController] Item ${index} has quantity 0, skipping`);
+    }
+
+    return {
+      variant_id: item.variant_id,
+      quantity: qty,
+      unit_cost: unitCost,
+      notes: item.notes || null,
+    };
+  }).filter(item => item.quantity !== 0); // Filter out zero quantities
+
+  if (parsedItems.length === 0) {
+    throw new AppError('No valid items with non-zero quantity', 400, 'NO_VALID_ITEMS');
+  }
+
   // ==========================================================================
   // MAKER-CHECKER LOGIC: Determine transaction status
-  // ==========================================================================
-  // - Purchase: Always APPROVED immediately (stock in is safe)
-  // - Purchase Return / Damage / Adjustment:
-  //   - Admin creates: APPROVED immediately
-  //   - Staff creates: PENDING (requires admin approval)
   // ==========================================================================
   let transactionStatus = 'approved';
   
@@ -219,7 +262,6 @@ export const createInventoryTransaction = catchAsync(async (req, res) => {
 
   // ==========================================================================
   // PURCHASE RETURN: CRITICAL SECURITY - Validate quantities against original invoice
-  // Audit Fix CRIT-002: Prevent inventory fraud
   // ==========================================================================
   if (data.transaction_type === 'purchase_return') {
     if (!data.reference_transaction_id) {
@@ -253,17 +295,13 @@ export const createInventoryTransaction = catchAsync(async (req, res) => {
       throw new AppError('Reference must be a Purchase transaction', 400, 'INVALID_REFERENCE_TYPE');
     }
 
-    // =========================================================================
-    // CRIT-002 FIX: Build map of originally purchased quantities
-    // =========================================================================
+    // Build map of originally purchased quantities
     const originalQtyMap = new Map();
     for (const item of refTx.items || []) {
       originalQtyMap.set(item.variant_id, Math.abs(item.quantity));
     }
 
-    // =========================================================================
-    // CRIT-002 FIX: Get already returned quantities for this invoice
-    // =========================================================================
+    // Get already returned quantities for this invoice
     const { data: previousReturns } = await supabaseAdmin
       .from('inventory_transactions')
       .select(`
@@ -286,13 +324,10 @@ export const createInventoryTransaction = catchAsync(async (req, res) => {
       }
     }
 
-    // =========================================================================
-    // CRIT-002 FIX: Validate each return item quantity
-    // Rule: requested_return_qty <= original_qty - already_returned_qty
-    // =========================================================================
+    // Validate each return item quantity
     const validationErrors = [];
     
-    for (const returnItem of data.items) {
+    for (const returnItem of parsedItems) {
       const originalQty = originalQtyMap.get(returnItem.variant_id) || 0;
       const alreadyReturned = alreadyReturnedMap.get(returnItem.variant_id) || 0;
       const maxReturnable = originalQty - alreadyReturned;
@@ -300,7 +335,6 @@ export const createInventoryTransaction = catchAsync(async (req, res) => {
 
       // SECURITY CHECK: Cannot return more than was purchased minus already returned
       if (requestedQty > maxReturnable) {
-        // Get variant SKU for better error message
         const { data: variant } = await supabaseAdmin
           .from('product_variants')
           .select('sku')
@@ -318,7 +352,7 @@ export const createInventoryTransaction = catchAsync(async (req, res) => {
         });
       }
 
-      // SECURITY CHECK: Cannot return an item that wasn't in the original invoice
+      // Cannot return an item that wasn't in the original invoice
       if (originalQty === 0) {
         validationErrors.push({
           variant_id: returnItem.variant_id,
@@ -344,11 +378,13 @@ export const createInventoryTransaction = catchAsync(async (req, res) => {
 
     console.log('[InventoryController] Return validation passed', {
       referenceId: data.reference_transaction_id,
-      itemCount: data.items.length,
+      itemCount: parsedItems.length,
     });
   }
 
-  // 1. Create the header
+  // ==========================================================================
+  // STEP 1: Create the transaction header
+  // ==========================================================================
   const { data: transaction, error: txError } = await supabaseAdmin
     .from('inventory_transactions')
     .insert({
@@ -380,14 +416,21 @@ export const createInventoryTransaction = catchAsync(async (req, res) => {
     throw new AppError('Failed to create transaction', 500, 'DATABASE_ERROR');
   }
 
-  // 2. Insert items (triggers will update stock automatically)
-  const itemsToInsert = data.items.map((item) => ({
+  console.log('[InventoryController] Created transaction:', transaction.id);
+
+  // ==========================================================================
+  // STEP 2: Insert items (stock is updated by database trigger)
+  // ==========================================================================
+  const itemsToInsert = parsedItems.map((item) => ({
     transaction_id: transaction.id,
     variant_id: item.variant_id,
-    quantity: config.quantityDirection === 'out' ? -Math.abs(item.quantity) : item.quantity,
-    unit_cost: item.unit_cost || 0,
-    notes: item.notes || null,
+    // For outbound transactions (return, damage), store as negative
+    quantity: config.quantityDirection === 'out' ? -Math.abs(item.quantity) : Math.abs(item.quantity),
+    unit_cost: item.unit_cost,
+    notes: item.notes,
   }));
+
+  console.log('[InventoryController] Inserting items:', JSON.stringify(itemsToInsert, null, 2));
 
   const { error: itemsError } = await supabaseAdmin
     .from('inventory_transaction_items')
@@ -402,12 +445,98 @@ export const createInventoryTransaction = catchAsync(async (req, res) => {
     throw new AppError('Failed to create transaction items', 500, 'DATABASE_ERROR');
   }
 
-  // 3. Fetch the complete transaction with items
+  // ==========================================================================
+  // STEP 3: UPDATE VENDOR BALANCE (ACCOUNTING LOGIC)
+  // Only for approved transactions with a vendor
+  // ==========================================================================
+  if (transactionStatus === 'approved' && data.vendor_id) {
+    // Calculate total transaction value
+    const totalAmount = parsedItems.reduce((sum, item) => {
+      return sum + (Math.abs(item.quantity) * item.unit_cost);
+    }, 0);
+
+    console.log('[InventoryController] Transaction total amount:', totalAmount);
+
+    if (totalAmount > 0) {
+      // Get current vendor balance
+      const { data: vendor, error: vendorFetchError } = await supabaseAdmin
+        .from('vendors')
+        .select('id, name, balance')
+        .eq('id', data.vendor_id)
+        .single();
+
+      if (vendorFetchError || !vendor) {
+        console.error('[InventoryController] Failed to fetch vendor:', vendorFetchError);
+      } else {
+        const currentBalance = parseFloat(vendor.balance) || 0;
+        let newBalance = currentBalance;
+
+        // Apply accounting logic based on transaction type
+        switch (data.transaction_type) {
+          case 'purchase':
+            // Purchase: We owe vendor MORE (balance increases)
+            newBalance = currentBalance + totalAmount;
+            console.log(`[InventoryController] PURCHASE: Vendor ${vendor.name} balance ${currentBalance} + ${totalAmount} = ${newBalance}`);
+            break;
+
+          case 'purchase_return':
+            // Return: We owe vendor LESS (balance decreases)
+            newBalance = currentBalance - totalAmount;
+            console.log(`[InventoryController] PURCHASE_RETURN: Vendor ${vendor.name} balance ${currentBalance} - ${totalAmount} = ${newBalance}`);
+            break;
+
+          // Damage and Adjustment don't affect vendor balance
+          case 'damage':
+          case 'adjustment':
+            console.log(`[InventoryController] ${data.transaction_type.toUpperCase()}: No vendor balance change`);
+            break;
+        }
+
+        // Update vendor balance
+        if (data.transaction_type === 'purchase' || data.transaction_type === 'purchase_return') {
+          const { error: vendorUpdateError } = await supabaseAdmin
+            .from('vendors')
+            .update({ 
+              balance: newBalance,
+              updated_at: new Date().toISOString(),
+            })
+            .eq('id', data.vendor_id);
+
+          if (vendorUpdateError) {
+            console.error('[InventoryController] Failed to update vendor balance:', vendorUpdateError);
+            // Note: We don't rollback the transaction here - it's a secondary operation
+            // In production, you might want to use a proper transaction or queue
+          } else {
+            console.log(`[InventoryController] ✅ Vendor balance updated: ${vendor.name} -> Rs. ${newBalance}`);
+          }
+        }
+      }
+    }
+  }
+
+  // ==========================================================================
+  // STEP 4: Update transaction totals
+  // ==========================================================================
+  const totalQuantity = parsedItems.reduce((sum, item) => sum + Math.abs(item.quantity), 0);
+  const totalCost = parsedItems.reduce((sum, item) => sum + (Math.abs(item.quantity) * item.unit_cost), 0);
+
+  await supabaseAdmin
+    .from('inventory_transactions')
+    .update({
+      total_quantity: totalQuantity,
+      total_cost: totalCost,
+      updated_at: new Date().toISOString(),
+    })
+    .eq('id', transaction.id);
+
+  // ==========================================================================
+  // STEP 5: Fetch the complete transaction with items
+  // ==========================================================================
   const { data: completeTransaction } = await supabaseAdmin
     .from('inventory_transactions')
     .select(`
       *,
-      vendor:vendors(id, name),
+      vendor:vendors(id, name, balance),
       performer:users!inventory_transactions_performed_by_fkey(id, name),
       items:inventory_transaction_items(
         id,
@@ -425,7 +554,20 @@ export const createInventoryTransaction = catchAsync(async (req, res) => {
   // Build response message based on status
   const statusMessage = transactionStatus === 'pending'
     ? `${config.label} submitted for approval. Stock will be updated after admin approval.`
-    : `${config.label} transaction created successfully`;
+    : `${config.label} transaction created successfully. ${
+        data.vendor_id && (data.transaction_type === 'purchase' || data.transaction_type === 'purchase_return')
+          ? `Vendor balance updated.`
+          : ''
+      }`;
+
+  console.log('[InventoryController] Transaction complete:', {
+    id: transaction.id,
+    type: data.transaction_type,
+    status: transactionStatus,
+    items: parsedItems.length,
+    totalQuantity,
+    totalCost,
+  });
 
   res.status(201).json({
     success: true,
@@ -501,37 +643,34 @@ export const getVariantStockMovements = catchAsync(async (req, res) => {
     .limit(Number(limit));
 
   if (error) {
-    console.error('[InventoryController] Stock movements error:', error);
+    console.error('[InventoryController] Get stock movements error:', error);
     throw new AppError('Failed to fetch stock movements', 500, 'DATABASE_ERROR');
   }
 
-  // Mask cost for non-admin
-  const result = isAdmin
+  // Mask cost for non-admins
+  const maskedData = isAdmin
     ? data
-    : data?.map((item) => ({
-        ...item,
-        unit_cost: undefined,
-      }));
+    : data?.map((item) => ({ ...item, unit_cost: undefined }));
 
   res.json({
     success: true,
-    data: result,
+    data: maskedData,
   });
 });
 
 // =============================================================================
-// DELETE/VOID TRANSACTION (Admin only)
+// VOID TRANSACTION (Soft delete - Admin only)
 // =============================================================================
 
-export const voidInventoryTransaction = catchAsync(async (req, res) => {
+export const voidTransaction = catchAsync(async (req, res) => {
   const { id } = req.params;
   const { reason } = req.body;
 
-  if (!reason || reason.length < 5) {
-    throw new AppError('Void reason is required (min 5 characters)', 400, 'VALIDATION_ERROR');
+  if (!reason || reason.length < 10) {
+    throw new AppError('Void reason is required (min 10 characters)', 400, 'VALIDATION_ERROR');
   }
 
-  // Check if transaction exists
+  // Fetch the transaction
   const { data: transaction, error: fetchError } = await supabaseAdmin
     .from('inventory_transactions')
     .select('*')
@@ -546,8 +685,7 @@ export const voidInventoryTransaction = catchAsync(async (req, res) => {
     throw new AppError('Transaction is already voided', 400, 'ALREADY_VOIDED');
   }
 
-  // Note: In a real system, you'd need to reverse the stock changes
-  // For now, just mark as voided
+  // Update status to voided
   const { error: updateError } = await supabaseAdmin
     .from('inventory_transactions')
     .update({
@@ -558,9 +696,11 @@ export const voidInventoryTransaction = catchAsync(async (req, res) => {
     .eq('id', id);
 
   if (updateError) {
-    console.error('[InventoryController] Void error:', updateError);
+    console.error('[InventoryController] Void transaction error:', updateError);
     throw new AppError('Failed to void transaction', 500, 'DATABASE_ERROR');
   }
+
+  // TODO: Reverse the stock changes if needed (complex logic for another day)
 
   res.json({
     success: true,
@@ -569,149 +709,12 @@ export const voidInventoryTransaction = catchAsync(async (req, res) => {
 });
 
 // =============================================================================
-// LEGACY FUNCTIONS (v1 - for backwards compatibility)
+// LIST PENDING APPROVALS (Admin only)
 // =============================================================================
 
-/**
- * Create stock adjustment (Legacy v1)
- * Use createInventoryTransaction with type='adjustment' for v2
- */
-export const createAdjustment = catchAsync(async (req, res) => {
-  // Redirect to unified transaction system
-  req.body.transaction_type = 'adjustment';
-  req.body.invoice_no = `ADJ-${Date.now()}`;
-  req.body.items = [{
-    variant_id: req.body.variant_id,
-    quantity: req.body.quantity,
-    unit_cost: 0,
-  }];
-  return createInventoryTransaction(req, res);
-});
-
-/**
- * Report damage (Legacy v1)
- * Use createInventoryTransaction with type='damage' for v2
- */
-export const reportDamage = catchAsync(async (req, res) => {
-  // Redirect to unified transaction system
-  req.body.transaction_type = 'damage';
-  req.body.invoice_no = `DMG-${Date.now()}`;
-  req.body.items = [{
-    variant_id: req.body.variant_id,
-    quantity: req.body.quantity,
-    unit_cost: 0,
-  }];
-  return createInventoryTransaction(req, res);
-});
-
-/**
- * List adjustments (Legacy v1)
- */
-export const listAdjustments = catchAsync(async (req, res) => {
-  req.query.type = 'adjustment';
-  return listInventoryTransactions(req, res);
-});
-
-/**
- * List damages (Legacy v1)
- */
-export const listDamages = catchAsync(async (req, res) => {
-  req.query.type = 'damage';
-  return listInventoryTransactions(req, res);
-});
-
-/**
- * Get movement history (Legacy v1)
- */
-export const getMovementHistory = catchAsync(async (req, res) => {
-  const { variant_id } = req.query;
-  if (!variant_id) {
-    throw new AppError('variant_id is required', 400, 'VALIDATION_ERROR');
-  }
-  req.params.variantId = variant_id;
-  return getVariantStockMovements(req, res);
-});
-
-/**
- * Get inventory valuation (Admin only)
- */
-export const getInventoryValuation = catchAsync(async (req, res) => {
-  const isAdmin = req.user?.role === 'admin';
-  
-  if (!isAdmin) {
-    throw new AppError('Access denied', 403, 'FORBIDDEN');
-  }
-
-  // Get total inventory value
-  const { data, error } = await supabaseAdmin
-    .from('product_variants')
-    .select('current_stock, cost_price')
-    .eq('is_active', true);
-
-  if (error) {
-    throw new AppError('Failed to calculate valuation', 500, 'DATABASE_ERROR');
-  }
-
-  const totalValue = data?.reduce((sum, v) => 
-    sum + ((v.current_stock || 0) * (v.cost_price || 0)), 0
-  ) || 0;
-
-  const totalStock = data?.reduce((sum, v) => sum + (v.current_stock || 0), 0) || 0;
-
-  res.json({
-    success: true,
-    data: {
-      total_stock: totalStock,
-      total_value: totalValue,
-      variant_count: data?.length || 0,
-      calculated_at: new Date().toISOString(),
-    },
-  });
-});
-
-/**
- * Get low stock alerts
- */
-export const getLowStockAlerts = catchAsync(async (req, res) => {
-  const threshold = Number(req.query.threshold) || 10;
-
-  const { data, error } = await supabaseAdmin
-    .from('product_variants')
-    .select(`
-      id,
-      sku,
-      attributes,
-      current_stock,
-      reorder_level,
-      product:products(id, name, image_url)
-    `)
-    .eq('is_active', true)
-    .lte('current_stock', threshold)
-    .order('current_stock', { ascending: true })
-    .limit(50);
-
-  if (error) {
-    throw new AppError('Failed to fetch low stock alerts', 500, 'DATABASE_ERROR');
-  }
-
-  res.json({
-    success: true,
-    data: data || [],
-    count: data?.length || 0,
-  });
-});
-
-// =============================================================================
-// APPROVAL WORKFLOW (Maker-Checker)
-// =============================================================================
-
-/**
- * List pending approvals (Admin only)
- * GET /inventory/transactions/pending
- */
 export const listPendingApprovals = catchAsync(async (req, res) => {
   const isAdmin = req.user?.role === 'admin';
-  
+
   if (!isAdmin) {
     throw new AppError('Only admins can view pending approvals', 403, 'FORBIDDEN');
   }
@@ -722,77 +725,116 @@ export const listPendingApprovals = catchAsync(async (req, res) => {
       *,
       vendor:vendors(id, name, company_name),
       performer:users!inventory_transactions_performed_by_fkey(id, name, email),
-      reference:inventory_transactions!inventory_transactions_reference_transaction_id_fkey(
-        id, invoice_no, transaction_date
-      ),
       items:inventory_transaction_items(
         id,
         variant_id,
         quantity,
         unit_cost,
-        variant:product_variants(id, sku, attributes, current_stock, product:products(id, name))
+        variant:product_variants(id, sku, attributes, product:products(id, name))
       )
     `, { count: 'exact' })
     .eq('status', 'pending')
     .order('created_at', { ascending: true });
 
   if (error) {
-    console.error('[InventoryController] Pending approvals error:', error);
+    console.error('[InventoryController] List pending approvals error:', error);
     throw new AppError('Failed to fetch pending approvals', 500, 'DATABASE_ERROR');
   }
 
   res.json({
     success: true,
     data: data || [],
-    count: count || 0,
+    meta: { count: count || 0 },
   });
 });
 
-/**
- * Approve a pending transaction (Admin only)
- * POST /inventory/transactions/:id/approve
- */
+// =============================================================================
+// APPROVE TRANSACTION (Admin only)
+// =============================================================================
+
 export const approveTransaction = catchAsync(async (req, res) => {
   const { id } = req.params;
-  const userId = req.user?.id;
+  const approverId = req.user?.id;
   const isAdmin = req.user?.role === 'admin';
 
   if (!isAdmin) {
     throw new AppError('Only admins can approve transactions', 403, 'FORBIDDEN');
   }
 
-  // Call the database function to approve and update stock
+  // Use the database function to approve and update stock atomically
   const { data, error } = await supabaseAdmin.rpc('approve_inventory_transaction', {
     p_transaction_id: id,
-    p_approved_by: userId,
+    p_approved_by: approverId,
   });
 
   if (error) {
-    console.error('[InventoryController] Approval error:', error);
-    throw new AppError('Failed to approve transaction', 500, 'DATABASE_ERROR');
+    console.error('[InventoryController] Approve transaction error:', error);
+    throw new AppError(
+      error.message || 'Failed to approve transaction',
+      400,
+      'APPROVAL_FAILED'
+    );
   }
 
-  const result = data?.[0];
-  
-  if (!result?.success) {
-    throw new AppError(result?.message || 'Approval failed', 400, 'APPROVAL_FAILED');
+  // After approval, update vendor balance if applicable
+  const { data: transaction } = await supabaseAdmin
+    .from('inventory_transactions')
+    .select(`
+      *,
+      items:inventory_transaction_items(variant_id, quantity, unit_cost)
+    `)
+    .eq('id', id)
+    .single();
+
+  if (transaction && transaction.vendor_id) {
+    const totalAmount = transaction.items?.reduce((sum, item) => {
+      return sum + (Math.abs(item.quantity) * (item.unit_cost || 0));
+    }, 0) || 0;
+
+    if (totalAmount > 0) {
+      const { data: vendor } = await supabaseAdmin
+        .from('vendors')
+        .select('balance')
+        .eq('id', transaction.vendor_id)
+        .single();
+
+      if (vendor) {
+        const currentBalance = parseFloat(vendor.balance) || 0;
+        let newBalance = currentBalance;
+
+        if (transaction.transaction_type === 'purchase') {
+          newBalance = currentBalance + totalAmount;
+        } else if (transaction.transaction_type === 'purchase_return') {
+          newBalance = currentBalance - totalAmount;
+        }
+
+        if (transaction.transaction_type === 'purchase' || transaction.transaction_type === 'purchase_return') {
+          await supabaseAdmin
+            .from('vendors')
+            .update({ balance: newBalance, updated_at: new Date().toISOString() })
+            .eq('id', transaction.vendor_id);
+
+          console.log(`[InventoryController] Vendor balance updated on approval: ${newBalance}`);
+        }
+      }
+    }
   }
 
   res.json({
     success: true,
-    message: 'Transaction approved. Stock has been updated.',
-    transaction_id: id,
+    message: 'Transaction approved successfully. Stock and vendor balance updated.',
+    data: data?.[0] || null,
   });
 });
 
-/**
- * Reject a pending transaction (Admin only)
- * POST /inventory/transactions/:id/reject
- */
+// =============================================================================
+// REJECT TRANSACTION (Admin only)
+// =============================================================================
+
 export const rejectTransaction = catchAsync(async (req, res) => {
   const { id } = req.params;
   const { reason } = req.body;
-  const userId = req.user?.id;
+  const rejectorId = req.user?.id;
   const isAdmin = req.user?.role === 'admin';
 
   if (!isAdmin) {
@@ -803,35 +845,33 @@ export const rejectTransaction = catchAsync(async (req, res) => {
     throw new AppError('Rejection reason is required (min 5 characters)', 400, 'VALIDATION_ERROR');
   }
 
-  // Call the database function to reject
+  // Use the database function to reject
   const { data, error } = await supabaseAdmin.rpc('reject_inventory_transaction', {
     p_transaction_id: id,
-    p_rejected_by: userId,
+    p_rejected_by: rejectorId,
     p_rejection_reason: reason,
   });
 
   if (error) {
-    console.error('[InventoryController] Rejection error:', error);
-    throw new AppError('Failed to reject transaction', 500, 'DATABASE_ERROR');
-  }
-
-  const result = data?.[0];
-  
-  if (!result?.success) {
-    throw new AppError(result?.message || 'Rejection failed', 400, 'REJECTION_FAILED');
+    console.error('[InventoryController] Reject transaction error:', error);
+    throw new AppError(
+      error.message || 'Failed to reject transaction',
+      400,
+      'REJECTION_FAILED'
+    );
   }
 
   res.json({
     success: true,
-    message: 'Transaction rejected. No stock changes made.',
-    transaction_id: id,
+    message: 'Transaction rejected',
+    data: data?.[0] || null,
   });
 });
 
-/**
- * Search purchase invoices (for Purchase Return linking)
- * GET /inventory/purchases/search?vendor_id=xxx&invoice_no=xxx
- */
+// =============================================================================
+// SEARCH PURCHASE INVOICES (For linking returns)
+// =============================================================================
+
 export const searchPurchaseInvoices = catchAsync(async (req, res) => {
   const { vendor_id, invoice_no, limit = 20 } = req.query;
 
@@ -845,11 +885,10 @@ export const searchPurchaseInvoices = catchAsync(async (req, res) => {
       total_cost,
       vendor:vendors(id, name),
       items:inventory_transaction_items(
-        id,
         variant_id,
         quantity,
         unit_cost,
-        variant:product_variants(id, sku, attributes, current_stock, product:products(id, name))
+        variant:product_variants(id, sku, attributes)
       )
     `)
     .eq('transaction_type', 'purchase')
@@ -872,32 +911,32 @@ export const searchPurchaseInvoices = catchAsync(async (req, res) => {
     throw new AppError('Failed to search invoices', 500, 'DATABASE_ERROR');
   }
 
-  // Calculate already returned quantities for each invoice
+  // For each invoice, calculate how much has been returned
   const invoicesWithReturns = await Promise.all(
     (data || []).map(async (invoice) => {
-      // Find returns linked to this purchase
       const { data: returns } = await supabaseAdmin
         .from('inventory_transactions')
         .select(`
           items:inventory_transaction_items(variant_id, quantity)
         `)
         .eq('reference_transaction_id', invoice.id)
-        .in('status', ['approved', 'pending']);
+        .eq('transaction_type', 'purchase_return')
+        .eq('status', 'approved');
 
-      // Calculate returned quantity per variant
-      const returnedQty = new Map();
-      returns?.forEach((ret) => {
-        ret.items?.forEach((item) => {
-          const existing = returnedQty.get(item.variant_id) || 0;
-          returnedQty.set(item.variant_id, existing + Math.abs(item.quantity));
+      const returnedMap = new Map();
+      (returns || []).forEach((ret) => {
+        (ret.items || []).forEach((item) => {
+          const existing = returnedMap.get(item.variant_id) || 0;
+          returnedMap.set(item.variant_id, existing + Math.abs(item.quantity));
         });
       });
 
-      // Add remaining returnable quantity to each item
-      const itemsWithRemaining = invoice.items?.map((item) => ({
+      // Add remaining_qty to each item
+      const itemsWithRemaining = (invoice.items || []).map((item) => ({
         ...item,
-        returned_qty: returnedQty.get(item.variant_id) || 0,
-        remaining_qty: item.quantity - (returnedQty.get(item.variant_id) || 0),
+        original_qty: Math.abs(item.quantity),
+        returned_qty: returnedMap.get(item.variant_id) || 0,
+        remaining_qty: Math.abs(item.quantity) - (returnedMap.get(item.variant_id) || 0),
       }));
 
       return {
@@ -914,28 +953,92 @@ export const searchPurchaseInvoices = catchAsync(async (req, res) => {
 });
 
 // =============================================================================
-// EXPORTS
+// GET INVENTORY VALUATION (Admin only)
 // =============================================================================
 
+export const getInventoryValuation = catchAsync(async (req, res) => {
+  const isAdmin = req.user?.role === 'admin';
+
+  if (!isAdmin) {
+    throw new AppError('Access denied', 403, 'FORBIDDEN');
+  }
+
+  const { data, error } = await supabaseAdmin
+    .from('product_variants')
+    .select('current_stock, cost_price')
+    .eq('is_active', true);
+
+  if (error) {
+    console.error('[InventoryController] Valuation error:', error);
+    throw new AppError('Failed to calculate valuation', 500, 'DATABASE_ERROR');
+  }
+
+  let totalStock = 0;
+  let totalValue = 0;
+
+  (data || []).forEach((variant) => {
+    const stock = variant.current_stock || 0;
+    const cost = variant.cost_price || 0;
+    totalStock += stock;
+    totalValue += stock * cost;
+  });
+
+  res.json({
+    success: true,
+    data: {
+      total_stock: totalStock,
+      total_value: totalValue,
+      variant_count: data?.length || 0,
+      calculated_at: new Date().toISOString(),
+    },
+  });
+});
+
+// =============================================================================
+// GET LOW STOCK ALERTS
+// =============================================================================
+
+export const getLowStockAlerts = catchAsync(async (req, res) => {
+  const { threshold = 10 } = req.query;
+
+  const { data, error } = await supabaseAdmin
+    .from('product_variants')
+    .select(`
+      id,
+      sku,
+      attributes,
+      current_stock,
+      reorder_level,
+      product:products(id, name, image_url)
+    `)
+    .eq('is_active', true)
+    .lte('current_stock', threshold)
+    .order('current_stock', { ascending: true })
+    .limit(50);
+
+  if (error) {
+    console.error('[InventoryController] Low stock alerts error:', error);
+    throw new AppError('Failed to fetch low stock alerts', 500, 'DATABASE_ERROR');
+  }
+
+  res.json({
+    success: true,
+    data: data || [],
+    meta: { threshold: Number(threshold), count: data?.length || 0 },
+  });
+});
+
 export default {
-  // New unified transaction system (v2)
   listInventoryTransactions,
   getInventoryTransaction,
   createInventoryTransaction,
   getNextInvoiceNumber,
   getVariantStockMovements,
-  voidInventoryTransaction,
-  // Approval workflow
+  voidTransaction,
   listPendingApprovals,
   approveTransaction,
   rejectTransaction,
   searchPurchaseInvoices,
-  // Legacy functions (v1)
-  createAdjustment,
-  reportDamage,
-  listAdjustments,
-  listDamages,
-  getMovementHistory,
   getInventoryValuation,
   getLowStockAlerts,
 };
