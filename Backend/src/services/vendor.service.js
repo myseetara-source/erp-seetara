@@ -22,15 +22,49 @@ class VendorService {
 
   /**
    * Create a new vendor
-   * @param {Object} data - Vendor data
+   * @param {Object} data - Vendor data (may be camelCase or snake_case)
    * @returns {Object} Created vendor
    */
   async createVendor(data) {
+    // Map frontend camelCase to database snake_case
+    // Support both naming conventions for backward compatibility
+    const vendorData = {
+      name: data.name || data.contactName,
+      company_name: data.company_name || data.companyName,
+      phone: data.phone,
+      alt_phone: data.alt_phone || data.altPhone,
+      email: data.email,
+      address: data.address,
+      gst_number: data.gst_number || data.gstNumber,
+      pan_number: data.pan_number || data.panNumber,
+      bank_details: data.bank_details || data.bankDetails || {},
+      balance: data.balance || 0,
+      credit_limit: data.credit_limit || data.creditLimit || 0,
+      payment_terms: data.payment_terms || data.paymentTerms || 30,
+      is_active: data.is_active !== undefined ? data.is_active : true,
+      notes: data.notes,
+    };
+
+    // Remove undefined fields
+    Object.keys(vendorData).forEach(key => {
+      if (vendorData[key] === undefined) {
+        delete vendorData[key];
+      }
+    });
+
+    // Validate required fields
+    if (!vendorData.name) {
+      throw new ValidationError('Vendor name is required');
+    }
+    if (!vendorData.phone) {
+      throw new ValidationError('Vendor phone is required');
+    }
+
     // Check for duplicate phone
     const { data: existing } = await supabaseAdmin
       .from('vendors')
       .select('id')
-      .eq('phone', data.phone)
+      .eq('phone', vendorData.phone)
       .single();
 
     if (existing) {
@@ -39,12 +73,12 @@ class VendorService {
 
     const { data: vendor, error } = await supabaseAdmin
       .from('vendors')
-      .insert(data)
+      .insert(vendorData)
       .select()
       .single();
 
     if (error) {
-      logger.error('Failed to create vendor', { error });
+      logger.error('Failed to create vendor', { error, vendorData });
       throw new DatabaseError('Failed to create vendor', error);
     }
 
@@ -74,16 +108,51 @@ class VendorService {
   /**
    * Update vendor
    * @param {string} id - Vendor UUID
-   * @param {Object} data - Update data
+   * @param {Object} data - Update data (may be camelCase or snake_case)
    * @returns {Object} Updated vendor
    */
   async updateVendor(id, data) {
-    // Check phone conflict if updating
-    if (data.phone) {
+    // Map frontend camelCase to database snake_case
+    const updateData = {};
+    
+    // Map all possible fields
+    if (data.name !== undefined || data.contactName !== undefined) {
+      updateData.name = data.name || data.contactName;
+    }
+    if (data.company_name !== undefined || data.companyName !== undefined) {
+      updateData.company_name = data.company_name || data.companyName;
+    }
+    if (data.phone !== undefined) updateData.phone = data.phone;
+    if (data.alt_phone !== undefined || data.altPhone !== undefined) {
+      updateData.alt_phone = data.alt_phone || data.altPhone;
+    }
+    if (data.email !== undefined) updateData.email = data.email;
+    if (data.address !== undefined) updateData.address = data.address;
+    if (data.gst_number !== undefined || data.gstNumber !== undefined) {
+      updateData.gst_number = data.gst_number || data.gstNumber;
+    }
+    if (data.pan_number !== undefined || data.panNumber !== undefined) {
+      updateData.pan_number = data.pan_number || data.panNumber;
+    }
+    if (data.bank_details !== undefined || data.bankDetails !== undefined) {
+      updateData.bank_details = data.bank_details || data.bankDetails;
+    }
+    if (data.balance !== undefined) updateData.balance = data.balance;
+    if (data.credit_limit !== undefined || data.creditLimit !== undefined) {
+      updateData.credit_limit = data.credit_limit || data.creditLimit;
+    }
+    if (data.payment_terms !== undefined || data.paymentTerms !== undefined) {
+      updateData.payment_terms = data.payment_terms || data.paymentTerms;
+    }
+    if (data.is_active !== undefined) updateData.is_active = data.is_active;
+    if (data.notes !== undefined) updateData.notes = data.notes;
+
+    // Check phone conflict if updating phone
+    if (updateData.phone) {
       const { data: existing } = await supabaseAdmin
         .from('vendors')
         .select('id')
-        .eq('phone', data.phone)
+        .eq('phone', updateData.phone)
         .neq('id', id)
         .single();
 
@@ -94,7 +163,7 @@ class VendorService {
 
     const { data: vendor, error } = await supabaseAdmin
       .from('vendors')
-      .update(data)
+      .update(updateData)
       .eq('id', id)
       .select()
       .single();

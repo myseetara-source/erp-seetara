@@ -72,8 +72,9 @@ export default function AddVendorPage() {
       setTimeout(() => {
         router.push('/dashboard/vendors');
       }, 1500);
-    } catch (error: any) {
-      setSubmitError(error.message || 'Failed to create vendor');
+    } catch (error: unknown) {
+      const err = error as { response?: { data?: { error?: { message?: string } } }; message?: string };
+      setSubmitError(err.response?.data?.error?.message || err.message || 'Failed to create vendor');
     } finally {
       setIsSubmitting(false);
     }

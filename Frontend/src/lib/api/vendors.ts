@@ -1,174 +1,160 @@
 /**
  * Vendor API Functions
+ * 
+ * Type-safe vendor CRUD operations.
+ * 
+ * NOTE: Mock data removed for production. API errors are thrown to the caller.
  */
 
 import apiClient from './apiClient';
+import type { ApiResponse } from './apiClient';
+
+// =============================================================================
+// TYPES
+// =============================================================================
 
 export interface Vendor {
   id: string;
   name: string;
+  company_name?: string | null;
   phone: string;
-  email?: string;
-  company_name?: string;
-  address?: string;
-  pan_number?: string;
+  alt_phone?: string | null;
+  email?: string | null;
+  address?: string | null;
+  gst_number?: string | null;
+  pan_number?: string | null;
+  bank_details?: Record<string, unknown>;
   balance: number;
+  credit_limit?: number;
+  payment_terms?: number;
   is_active: boolean;
+  notes?: string | null;
   created_at: string;
   updated_at: string;
 }
 
+/**
+ * Data for creating a new vendor
+ * Uses camelCase for frontend convenience - backend maps to snake_case
+ */
 export interface CreateVendorData {
-  name: string;
+  name: string;           // or contactName (backend accepts both)
   phone: string;
   email?: string;
-  company_name?: string;
+  company_name?: string;  // or companyName
   address?: string;
-  pan_number?: string;
+  pan_number?: string;    // or panNumber
+  gst_number?: string;
+  alt_phone?: string;
+  notes?: string;
 }
 
-// Mock data for development
-const MOCK_VENDORS: Vendor[] = [
-  {
-    id: 'v1',
-    name: 'Ramesh Shrestha',
-    phone: '9841000001',
-    email: 'ramesh@abc.com',
-    company_name: 'ABC Trading Co.',
-    address: 'Kalimati, Kathmandu',
-    pan_number: '123456789',
-    balance: 125000,
-    is_active: true,
-    created_at: '2025-12-01T10:00:00Z',
-    updated_at: '2026-01-15T10:00:00Z',
-  },
-  {
-    id: 'v2',
-    name: 'Sita Gurung',
-    phone: '9841000002',
-    email: 'sita@xyz.com',
-    company_name: 'XYZ Wholesale',
-    address: 'New Road, Kathmandu',
-    balance: 45000,
-    is_active: true,
-    created_at: '2025-11-15T10:00:00Z',
-    updated_at: '2026-01-10T10:00:00Z',
-  },
-  {
-    id: 'v3',
-    name: 'Hari Maharjan',
-    phone: '9841000003',
-    company_name: 'Nepal Imports Pvt. Ltd.',
-    address: 'Patan, Lalitpur',
-    balance: 0,
-    is_active: false,
-    created_at: '2025-10-01T10:00:00Z',
-    updated_at: '2025-12-01T10:00:00Z',
-  },
-];
+export interface VendorQueryParams {
+  search?: string;
+  is_active?: boolean;
+  has_balance?: boolean;
+  page?: number;
+  limit?: number;
+}
+
+// =============================================================================
+// API FUNCTIONS
+// =============================================================================
 
 /**
  * Get all vendors
  */
-export async function getVendors(params?: { search?: string; is_active?: boolean }): Promise<Vendor[]> {
-  try {
-    const response = await apiClient.get<{ success: boolean; data: Vendor[] }>('/vendors', { params });
-    return response.data.data || [];
-  } catch (error) {
-    console.warn('Using mock vendors', error);
-    let vendors = [...MOCK_VENDORS];
-    if (params?.search) {
-      const search = params.search.toLowerCase();
-      vendors = vendors.filter(v => 
-        v.name.toLowerCase().includes(search) || 
-        v.company_name?.toLowerCase().includes(search) ||
-        v.phone.includes(search)
-      );
-    }
-    if (params?.is_active !== undefined) {
-      vendors = vendors.filter(v => v.is_active === params.is_active);
-    }
-    return vendors;
-  }
+export async function getVendors(params?: VendorQueryParams): Promise<Vendor[]> {
+  const response = await apiClient.get<ApiResponse<Vendor[]>>('/vendors', { params });
+  return response.data.data || [];
 }
 
 /**
  * Get vendor by ID
  */
 export async function getVendorById(id: string): Promise<Vendor> {
-  try {
-    const response = await apiClient.get<{ success: boolean; data: Vendor }>(`/vendors/${id}`);
-    return response.data.data;
-  } catch (error) {
-    const vendor = MOCK_VENDORS.find(v => v.id === id);
-    if (!vendor) throw new Error('Vendor not found');
-    return vendor;
-  }
+  const response = await apiClient.get<ApiResponse<Vendor>>(`/vendors/${id}`);
+  return response.data.data;
 }
 
 /**
  * Create a new vendor
  */
 export async function createVendor(data: CreateVendorData): Promise<Vendor> {
-  try {
-    const response = await apiClient.post<{ success: boolean; data: Vendor }>('/vendors', data);
-    return response.data.data;
-  } catch (error: any) {
-    if (error.code === 'ERR_NETWORK') {
-      return {
-        id: `mock-${Date.now()}`,
-        ...data,
-        balance: 0,
-        is_active: true,
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
-      };
-    }
-    throw error;
-  }
+  const response = await apiClient.post<ApiResponse<Vendor>>('/vendors', data);
+  return response.data.data;
 }
 
 /**
  * Update vendor
  */
 export async function updateVendor(id: string, data: Partial<CreateVendorData>): Promise<Vendor> {
-  try {
-    const response = await apiClient.patch<{ success: boolean; data: Vendor }>(`/vendors/${id}`, data);
-    return response.data.data;
-  } catch (error: any) {
-    if (error.code === 'ERR_NETWORK') {
-      const vendor = MOCK_VENDORS.find(v => v.id === id);
-      if (!vendor) throw new Error('Vendor not found');
-      return { ...vendor, ...data, updated_at: new Date().toISOString() };
-    }
-    throw error;
-  }
+  const response = await apiClient.patch<ApiResponse<Vendor>>(`/vendors/${id}`, data);
+  return response.data.data;
 }
 
 /**
  * Toggle vendor active status
  */
 export async function toggleVendorStatus(id: string): Promise<Vendor> {
-  try {
-    const response = await apiClient.patch<{ success: boolean; data: Vendor }>(`/vendors/${id}/toggle-status`);
-    return response.data.data;
-  } catch (error: any) {
-    if (error.code === 'ERR_NETWORK') {
-      const vendor = MOCK_VENDORS.find(v => v.id === id);
-      if (!vendor) throw new Error('Vendor not found');
-      return { ...vendor, is_active: !vendor.is_active };
-    }
-    throw error;
-  }
+  const response = await apiClient.patch<ApiResponse<Vendor>>(`/vendors/${id}/toggle-status`);
+  return response.data.data;
 }
 
 /**
- * Delete vendor
+ * Delete vendor (soft delete / deactivate)
  */
 export async function deleteVendor(id: string): Promise<void> {
-  try {
-    await apiClient.delete(`/vendors/${id}`);
-  } catch (error: any) {
-    if (error.code !== 'ERR_NETWORK') throw error;
-  }
+  await apiClient.delete(`/vendors/${id}`);
+}
+
+/**
+ * Get vendor ledger (financial history)
+ */
+export async function getVendorLedger(
+  id: string, 
+  params?: { page?: number; limit?: number; type?: 'all' | 'supplies' | 'payments' }
+): Promise<{
+  vendor: Pick<Vendor, 'id' | 'name' | 'phone' | 'balance'>;
+  entries: Array<{
+    id: string;
+    type: 'supply' | 'payment';
+    reference: string;
+    debit: number;
+    credit: number;
+    date: string;
+  }>;
+  summary: {
+    total_supplies: number;
+    total_payments: number;
+    current_balance: number;
+  };
+  pagination: {
+    page: number;
+    limit: number;
+    total: number;
+    totalPages: number;
+  };
+}> {
+  const response = await apiClient.get(`/vendors/${id}/ledger`, { params });
+  return response.data.data;
+}
+
+/**
+ * Get vendor summary/stats
+ */
+export async function getVendorSummary(id: string): Promise<{
+  vendor: Vendor;
+  stats: {
+    total_supplies: number;
+    total_purchase_value?: number;
+    total_payments?: number;
+    outstanding_balance?: number;
+    average_order_value?: number;
+    last_supply_date: string | null;
+    last_payment_date?: string | null;
+  };
+}> {
+  const response = await apiClient.get(`/vendors/${id}/summary`);
+  return response.data.data;
 }
