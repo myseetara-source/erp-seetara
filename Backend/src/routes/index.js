@@ -82,8 +82,7 @@ router.get('/categories', asyncHandler(async (req, res) => {
   const { data, error } = await query;
   
   if (error) {
-    console.warn('[Routes] Categories fallback error:', error);
-    // Fallback to extracting from products
+    // Fallback to extracting from products (categories table might not exist)
     const { data: products } = await supabaseAdmin
       .from('products')
       .select('category')
@@ -137,8 +136,7 @@ router.get('/brands', asyncHandler(async (req, res) => {
   const { data, error } = await query;
   
   if (error) {
-    console.warn('[Routes] Brands fallback error:', error);
-    // Fallback to extracting from products
+    // Fallback to extracting from products (brands table might not exist)
     const { data: products } = await supabaseAdmin
       .from('products')
       .select('brand')

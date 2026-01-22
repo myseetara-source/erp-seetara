@@ -5,6 +5,9 @@
 
 import { ZodError } from 'zod';
 import { ValidationError } from '../utils/errors.js';
+import { createLogger } from '../utils/logger.js';
+
+const logger = createLogger('Validation');
 
 /**
  * Create validation middleware for request body
@@ -26,36 +29,13 @@ export const validateBody = (schema) => {
           expected: err.expected,
         }));
         
-        // =====================================================================
-        // ENHANCED LOGGING FOR DEBUGGING
-        // =====================================================================
-        console.log('\n' + '='.repeat(70));
-        console.log('[VALIDATION ERROR] ' + req.method + ' ' + req.path);
-        console.log('='.repeat(70));
-        
-        // Log each field error clearly
-        details.forEach((err, i) => {
-          console.log(`\n❌ Error ${i + 1}:`);
-          console.log(`   Field:    ${err.field || '(root)'}`);
-          console.log(`   Message:  ${err.message}`);
-          console.log(`   Code:     ${err.code}`);
-          if (err.received) console.log(`   Received: ${err.received}`);
-          if (err.expected) console.log(`   Expected: ${err.expected}`);
+        // Log validation errors (debug level only - not in production)
+        logger.debug('Validation failed', {
+          method: req.method,
+          path: req.path,
+          errorCount: details.length,
+          fields: details.map(d => d.field),
         });
-        
-        // Log the problematic fields from request body
-        console.log('\n📦 Received Body (relevant fields):');
-        const problemFields = details.map(d => d.field.split('.')[0]);
-        problemFields.forEach(field => {
-          if (field && req.body[field] !== undefined) {
-            console.log(`   ${field}: ${JSON.stringify(req.body[field], null, 2).substring(0, 200)}`);
-          }
-        });
-        
-        // Log flattened error for easy copy-paste
-        console.log('\n📋 Flattened Errors:');
-        console.log(JSON.stringify(error.flatten(), null, 2));
-        console.log('='.repeat(70) + '\n');
         
         return next(new ValidationError('Validation failed', details));
       }

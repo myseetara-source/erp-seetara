@@ -20,6 +20,9 @@ import {
   maskProductFinancials,
   canSeeFinancials,
 } from '../utils/dataMasking.js';
+import { createLogger } from '../utils/logger.js';
+
+const logger = createLogger('ProductController');
 
 /**
  * Create a new product
@@ -28,8 +31,8 @@ import {
  * SECURITY: Admin only (product pricing involves cost data)
  */
 export const createProduct = asyncHandler(async (req, res) => {
-  // Log the incoming request body for debugging
-  console.log('[ProductController] Create product request:', JSON.stringify(req.body, null, 2));
+  // Log the incoming request body for debugging (debug level only)
+  logger.debug('Create product request', { name: req.body?.name });
   
   try {
     const product = await productService.createProduct(req.body);

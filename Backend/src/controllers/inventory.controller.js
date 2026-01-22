@@ -25,6 +25,10 @@ import {
 } from '../validations/inventory.validation.js';
 import { AppError, catchAsync } from '../utils/errors.js';
 import { maskSensitiveData } from '../utils/dataMasking.js';
+import { createLogger } from '../utils/logger.js';
+
+// Logger instance for this controller
+const logger = createLogger('InventoryController');
 
 // =============================================================================
 // LIST INVENTORY TRANSACTIONS
@@ -191,8 +195,8 @@ export const getInventoryTransaction = catchAsync(async (req, res) => {
 // =============================================================================
 
 export const createInventoryTransaction = catchAsync(async (req, res) => {
-  // Log incoming payload for debugging
-  console.log('[InventoryController] Incoming payload:', JSON.stringify(req.body, null, 2));
+  // Log incoming payload for debugging (only in development)
+  logger.debug('Incoming payload', { body: req.body });
 
   // Validate request body using discriminated union
   const result = createInventoryTransactionSchema.safeParse(req.body);
@@ -219,16 +223,14 @@ export const createInventoryTransaction = catchAsync(async (req, res) => {
     const qty = parseInt(item.qty || item.quantity || 0, 10);
     const unitCost = parseFloat(item.unit_cost || item.unitCost || 0);
     
-    console.log(`[InventoryController] Parsed item ${index}:`, {
+    logger.debug(`Parsed item ${index}`, {
       variant_id: item.variant_id,
       raw_qty: item.qty || item.quantity,
       parsed_qty: qty,
-      raw_cost: item.unit_cost || item.unitCost,
-      parsed_cost: unitCost,
     });
 
     if (qty === 0) {
-      console.warn(`[InventoryController] Item ${index} has quantity 0, skipping`);
+      logger.warn(`Item ${index} has quantity 0, skipping`);
     }
 
     return {
@@ -250,7 +252,7 @@ export const createInventoryTransaction = catchAsync(async (req, res) => {
   
   if (data.transaction_type !== 'purchase' && !isAdmin) {
     transactionStatus = 'pending';
-    console.log(`[InventoryController] Transaction set to PENDING (created by ${userRole})`);
+    logger.info(`Transaction set to PENDING`, { userRole });
   }
 
   // ==========================================================================
@@ -376,7 +378,7 @@ export const createInventoryTransaction = catchAsync(async (req, res) => {
       );
     }
 
-    console.log('[InventoryController] Return validation passed', {
+    logger.debug('Return validation passed', {
       referenceId: data.reference_transaction_id,
       itemCount: parsedItems.length,
     });
@@ -416,7 +418,7 @@ export const createInventoryTransaction = catchAsync(async (req, res) => {
     throw new AppError('Failed to create transaction', 500, 'DATABASE_ERROR');
   }
 
-  console.log('[InventoryController] Created transaction:', transaction.id);
+  logger.info('Created transaction', { transactionId: transaction.id });
 
   // ==========================================================================
   // STEP 2: Insert items (stock is updated by database trigger)
@@ -430,7 +432,7 @@ export const createInventoryTransaction = catchAsync(async (req, res) => {
     notes: item.notes,
   }));
 
-  console.log('[InventoryController] Inserting items:', JSON.stringify(itemsToInsert, null, 2));
+  logger.debug('Inserting items', { count: itemsToInsert.length });
 
   const { error: itemsError } = await supabaseAdmin
     .from('inventory_transaction_items')
@@ -455,7 +457,7 @@ export const createInventoryTransaction = catchAsync(async (req, res) => {
       return sum + (Math.abs(item.quantity) * item.unit_cost);
     }, 0);
 
-    console.log('[InventoryController] Transaction total amount:', totalAmount);
+    logger.debug('Transaction total amount', { totalAmount });
 
     if (totalAmount > 0) {
       // Get current vendor balance
@@ -476,19 +478,19 @@ export const createInventoryTransaction = catchAsync(async (req, res) => {
           case 'purchase':
             // Purchase: We owe vendor MORE (balance increases)
             newBalance = currentBalance + totalAmount;
-            console.log(`[InventoryController] PURCHASE: Vendor ${vendor.name} balance ${currentBalance} + ${totalAmount} = ${newBalance}`);
+            logger.info('PURCHASE: Vendor balance updated', { vendor: vendor.name, from: currentBalance, add: totalAmount, to: newBalance });
             break;
 
           case 'purchase_return':
             // Return: We owe vendor LESS (balance decreases)
             newBalance = currentBalance - totalAmount;
-            console.log(`[InventoryController] PURCHASE_RETURN: Vendor ${vendor.name} balance ${currentBalance} - ${totalAmount} = ${newBalance}`);
+            logger.info('PURCHASE_RETURN: Vendor balance updated', { vendor: vendor.name, from: currentBalance, subtract: totalAmount, to: newBalance });
             break;
 
           // Damage and Adjustment don't affect vendor balance
           case 'damage':
           case 'adjustment':
-            console.log(`[InventoryController] ${data.transaction_type.toUpperCase()}: No vendor balance change`);
+            logger.debug(`${data.transaction_type.toUpperCase()}: No vendor balance change`);
             break;
         }
 
@@ -507,7 +509,7 @@ export const createInventoryTransaction = catchAsync(async (req, res) => {
             // Note: We don't rollback the transaction here - it's a secondary operation
             // In production, you might want to use a proper transaction or queue
           } else {
-            console.log(`[InventoryController] ✅ Vendor balance updated: ${vendor.name} -> Rs. ${newBalance}`);
+            logger.info('Vendor balance updated', { vendor: vendor.name, newBalance });
           }
         }
       }
@@ -560,13 +562,12 @@ export const createInventoryTransaction = catchAsync(async (req, res) => {
           : ''
       }`;
 
-  console.log('[InventoryController] Transaction complete:', {
+  logger.info('Transaction complete', {
     id: transaction.id,
     type: data.transaction_type,
     status: transactionStatus,
     items: parsedItems.length,
     totalQuantity,
-    totalCost,
   });
 
   res.status(201).json({
@@ -814,7 +815,7 @@ export const approveTransaction = catchAsync(async (req, res) => {
             .update({ balance: newBalance, updated_at: new Date().toISOString() })
             .eq('id', transaction.vendor_id);
 
-          console.log(`[InventoryController] Vendor balance updated on approval: ${newBalance}`);
+          logger.info('Vendor balance updated on approval', { newBalance });
         }
       }
     }
