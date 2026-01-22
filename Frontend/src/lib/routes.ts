@@ -136,6 +136,21 @@ export const API_ROUTES = {
   },
 
   // ---------------------------------------------------------------------------
+  // USERS (Admin Team Management)
+  // ---------------------------------------------------------------------------
+  USERS: {
+    LIST: `${BASE_URL}/users`,
+    CREATE: `${BASE_URL}/users`,
+    DETAIL: (id: string) => `${BASE_URL}/users/${id}`,
+    UPDATE: (id: string) => `${BASE_URL}/users/${id}`,
+    DELETE: (id: string) => `${BASE_URL}/users/${id}`,
+    TOGGLE_STATUS: (id: string) => `${BASE_URL}/users/${id}/status`,
+    RESET_PASSWORD: (id: string) => `${BASE_URL}/users/${id}/reset-password`,
+    ACTIVITY: (id: string) => `${BASE_URL}/users/${id}/activity`,
+    ROLES: `${BASE_URL}/users/roles`,
+  },
+
+  // ---------------------------------------------------------------------------
   // VENDORS
   // ---------------------------------------------------------------------------
   VENDORS: {
@@ -146,6 +161,8 @@ export const API_ROUTES = {
     DELETE: (id: string) => `${BASE_URL}/vendors/${id}`,
     PURCHASES: (id: string) => `${BASE_URL}/vendors/${id}/purchases`,
     LEDGER: (id: string) => `${BASE_URL}/vendors/${id}/ledger`,
+    STATS: (id: string) => `${BASE_URL}/vendors/${id}/stats`,
+    PAYMENT: (id: string) => `${BASE_URL}/vendors/${id}/payment`,
   },
 
   // ---------------------------------------------------------------------------
