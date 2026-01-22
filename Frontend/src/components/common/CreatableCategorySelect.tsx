@@ -272,8 +272,9 @@ export const CreatableCategorySelect = forwardRef<
 
     // Check if we should show "Create" option
     const queryTrimmed = query.trim();
-    const exactMatch = categories.some(
-      cat => cat.name.toLowerCase() === queryTrimmed.toLowerCase()
+    const safeCategories = Array.isArray(categories) ? categories : [];
+    const exactMatch = safeCategories.some(
+      cat => cat?.name?.toLowerCase() === queryTrimmed.toLowerCase()
     );
     const showCreateOption = queryTrimmed.length > 0 && !exactMatch && !isLoading;
 
@@ -353,10 +354,10 @@ export const CreatableCategorySelect = forwardRef<
             {/* Categories List */}
             {!isLoading && (
               <ul className="max-h-60 overflow-y-auto py-1">
-                {categories.map((category, index) => (
+                {safeCategories.map((category, index) => (
                   <li
-                    key={category.id}
-                    onClick={() => handleSelect(category)}
+                    key={category?.id || index}
+                    onClick={() => category && handleSelect(category)}
                     onMouseEnter={() => setHighlightedIndex(index)}
                     className={cn(
                       'flex items-center justify-between px-4 py-2.5 cursor-pointer transition-colors',
@@ -367,16 +368,16 @@ export const CreatableCategorySelect = forwardRef<
                   >
                     <div className="flex items-center gap-2">
                       <Tag className="w-4 h-4 text-gray-400" />
-                      <span className="text-sm text-gray-900">{category.name}</span>
+                      <span className="text-sm text-gray-900">{category?.name || 'Unknown'}</span>
                     </div>
-                    {category.name === value && (
+                    {category?.name === value && (
                       <Check className="w-4 h-4 text-orange-500" />
                     )}
                   </li>
                 ))}
 
                 {/* Empty State */}
-                {categories.length === 0 && !showCreateOption && (
+                {safeCategories.length === 0 && !showCreateOption && (
                   <li className="px-4 py-3 text-sm text-gray-500 text-center">
                     No categories found
                   </li>

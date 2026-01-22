@@ -299,7 +299,7 @@ export function ProductMatrixSelect({
                       <span>{product.brand || 'No brand'}</span>
                       <span>•</span>
                       <Badge variant="secondary" className="text-xs">
-                        {product.variants.length} variants
+                        {product.variants?.length || 0} variants
                       </Badge>
                     </div>
                   </div>
@@ -337,7 +337,7 @@ export function ProductMatrixSelect({
         </Button>
         <div className="flex-1">
           <h3 className="font-semibold text-gray-900">{selectedProduct.name}</h3>
-          <p className="text-sm text-gray-500">{selectedProduct.variants.length} variants</p>
+          <p className="text-sm text-gray-500">{selectedProduct.variants?.length || 0} variants</p>
         </div>
       </div>
 

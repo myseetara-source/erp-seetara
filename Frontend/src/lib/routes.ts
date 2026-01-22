@@ -13,7 +13,15 @@
  * // With ID: apiClient.get(API_ROUTES.ORDERS.DETAIL('uuid'))
  */
 
-const BASE_URL = '/api/v1';
+/**
+ * NOTE: apiClient.baseURL already includes '/api/v1'
+ * So routes here should NOT include the prefix to avoid double prefixing.
+ * 
+ * apiClient.baseURL = 'http://localhost:3000/api/v1'
+ * API_ROUTES.ORDERS.LIST = '/orders'
+ * Result: 'http://localhost:3000/api/v1/orders' ✅
+ */
+const BASE_URL = ''; // Empty - baseURL already has /api/v1
 
 // =============================================================================
 // API ROUTES OBJECT
@@ -23,7 +31,7 @@ export const API_ROUTES = {
   // ---------------------------------------------------------------------------
   // HEALTH & SYSTEM
   // ---------------------------------------------------------------------------
-  HEALTH: `${BASE_URL}/health`,
+  HEALTH: '/health',
   
   // ---------------------------------------------------------------------------
   // AUTHENTICATION
