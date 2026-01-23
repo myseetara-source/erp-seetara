@@ -50,6 +50,7 @@ import { cn } from '@/lib/utils';
 import apiClient from '@/lib/api/apiClient';
 import { toast } from 'sonner';
 import RecordPaymentModal from './RecordPaymentModal';
+import TransactionDetailPanel from './TransactionDetailPanel';
 import { formatCurrency } from '@/lib/utils/currency';
 import type { 
   Vendor, 
@@ -57,6 +58,13 @@ import type {
   LedgerEntry, 
   VendorFilterTab as FilterTab 
 } from '@/types/vendor';
+
+// Selected Transaction Type
+interface SelectedTransaction {
+  id: string;
+  entryType: 'purchase' | 'purchase_return' | 'payment';
+  referenceId: string | null;
+}
 
 const FILTER_TABS: { key: FilterTab; label: string; icon?: React.ReactNode }[] = [
   { key: 'all', label: 'All' },
@@ -252,6 +260,7 @@ function VendorDetailView({ vendorId, onTransactionSuccess }: VendorDetailViewPr
   
   // Modal states
   const [showPaymentModal, setShowPaymentModal] = useState(false);
+  const [selectedTransaction, setSelectedTransaction] = useState<SelectedTransaction | null>(null);
 
   // Fetch vendor data function (extracted for reuse after modal actions)
   const fetchVendorData = useCallback(async () => {
@@ -537,9 +546,14 @@ function VendorDetailView({ vendorId, onTransactionSuccess }: VendorDetailViewPr
                   const isReturn = tx.entry_type === 'purchase_return';
                   
                   return (
-                    <div 
+                    <button 
                       key={tx.id} 
-                      className="flex items-center gap-2.5 py-2 px-1 hover:bg-gray-50 transition-colors"
+                      className="w-full flex items-center gap-2.5 py-2 px-1 hover:bg-orange-50 transition-colors cursor-pointer text-left"
+                      onClick={() => setSelectedTransaction({
+                        id: tx.id,
+                        entryType: tx.entry_type as 'purchase' | 'purchase_return' | 'payment',
+                        referenceId: tx.reference_id,
+                      })}
                     >
                       {/* Icon - Compact */}
                       <div className={cn(
@@ -587,7 +601,7 @@ function VendorDetailView({ vendorId, onTransactionSuccess }: VendorDetailViewPr
                           Bal: {formatCurrency(tx.running_balance || 0)}
                         </p>
                       </div>
-                    </div>
+                    </button>
                   );
                 })}
               </div>
@@ -628,6 +642,15 @@ function VendorDetailView({ vendorId, onTransactionSuccess }: VendorDetailViewPr
         vendorId={vendor.id}
         vendorName={vendor.company_name || vendor.name}
         currentBalance={vendor.balance}
+      />
+
+      {/* Transaction Detail Panel (Slide-over) */}
+      <TransactionDetailPanel
+        transactionId={selectedTransaction?.id || null}
+        entryType={selectedTransaction?.entryType || null}
+        referenceId={selectedTransaction?.referenceId || null}
+        onClose={() => setSelectedTransaction(null)}
+        vendorName={vendor.company_name || vendor.name}
       />
 
     </div>
