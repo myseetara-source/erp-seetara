@@ -438,20 +438,128 @@ export const getLowStockAlerts = catchAsync(async (req, res) => {
 import { supabaseAdmin } from '../config/supabase.js';
 
 /**
- * Get inventory dashboard summary (ADVANCED)
+ * Build fallback dashboard from simple queries when RPC fails
+ */
+async function buildFallbackDashboard(isAdmin) {
+  try {
+    // Get current stock value from product_variants
+    const { data: stockData } = await supabaseAdmin
+      .from('product_variants')
+      .select('current_stock, cost_price')
+      .gt('current_stock', 0);
+    
+    const totalUnits = stockData?.reduce((sum, v) => sum + (v.current_stock || 0), 0) || 0;
+    const totalValue = stockData?.reduce((sum, v) => sum + ((v.current_stock || 0) * (v.cost_price || 0)), 0) || 0;
+    
+    // Get low stock count
+    const { count: lowStockCount } = await supabaseAdmin
+      .from('product_variants')
+      .select('id', { count: 'exact', head: true })
+      .lt('current_stock', 10)
+      .gt('current_stock', 0);
+    
+    // Get this month's purchases
+    const startOfMonth = new Date();
+    startOfMonth.setDate(1);
+    startOfMonth.setHours(0, 0, 0, 0);
+    
+    const { data: purchases } = await supabaseAdmin
+      .from('inventory_transactions')
+      .select('total_cost')
+      .eq('transaction_type', 'purchase')
+      .eq('status', 'approved')
+      .gte('created_at', startOfMonth.toISOString());
+    
+    const purchaseValue = purchases?.reduce((sum, p) => sum + (p.total_cost || 0), 0) || 0;
+    
+    // Get damage total
+    const { data: damages } = await supabaseAdmin
+      .from('inventory_transactions')
+      .select('total_cost')
+      .eq('transaction_type', 'damage')
+      .eq('status', 'approved')
+      .gte('created_at', startOfMonth.toISOString());
+    
+    const damageValue = damages?.reduce((sum, d) => sum + (d.total_cost || 0), 0) || 0;
+    
+    // Get pending approvals
+    const { count: pendingCount } = await supabaseAdmin
+      .from('inventory_transactions')
+      .select('id', { count: 'exact', head: true })
+      .eq('status', 'pending');
+    
+    // Get recent transactions
+    const { data: recentTx } = await supabaseAdmin
+      .from('inventory_transactions')
+      .select(`
+        id, invoice_no, transaction_type, status, total_cost, transaction_date,
+        vendor:vendors(name)
+      `)
+      .order('created_at', { ascending: false })
+      .limit(5);
+    
+    return {
+      total_stock_value: {
+        value: isAdmin ? totalValue : '***',
+        units: totalUnits,
+        active_variants: stockData?.length || 0,
+      },
+      inventory_turnover: {
+        this_month: {
+          stock_in: isAdmin ? purchaseValue : '***',
+          stock_in_qty: purchases?.length || 0,
+          stock_out: isAdmin ? damageValue : '***',
+          stock_out_qty: damages?.length || 0,
+        },
+      },
+      critical_stock: {
+        count: lowStockCount || 0,
+        items: [],
+      },
+      damage_loss: {
+        this_month: {
+          total_value: isAdmin ? damageValue : '***',
+          units_damaged: damages?.length || 0,
+        },
+      },
+      purchase_summary: {
+        total_value: isAdmin ? purchaseValue : '***',
+        count: purchases?.length || 0,
+      },
+      return_summary: {
+        total_value: 0,
+        count: 0,
+      },
+      pending_actions: {
+        pending_approvals: pendingCount || 0,
+        out_of_stock: 0,
+      },
+      recent_transactions: recentTx || [],
+      generated_at: new Date().toISOString(),
+    };
+  } catch (err) {
+    logger.error('Fallback dashboard failed', { error: err.message });
+    return {
+      total_stock_value: { value: 0, units: 0 },
+      inventory_turnover: { this_month: { stock_in: 0, stock_out: 0 } },
+      critical_stock: { count: 0, items: [] },
+      damage_loss: { this_month: { total_value: 0 } },
+      pending_actions: { pending_approvals: 0 },
+      recent_transactions: [],
+      generated_at: new Date().toISOString(),
+    };
+  }
+}
+
+/**
+ * Get inventory dashboard summary
  * GET /inventory/dashboard
- * 
- * Query Parameters:
- * - start_date: ISO date string (default: start of current month)
- * - end_date: ISO date string (default: now)
- * - vendor_id: UUID (optional, filter by vendor)
  * 
  * Returns comprehensive metrics in a single call:
  * - Total Stock Value (inventory valuation)
  * - Inventory Turnover (monthly in/out)
  * - Critical Stock (below threshold)
  * - Damage Loss (this month's loss)
- * - Stock Trend (7-day sparkline data)
  * - Pending Actions
  * - Recent Transactions
  */
@@ -459,43 +567,21 @@ export const getDashboardSummary = catchAsync(async (req, res) => {
   const isAdmin = ['admin', 'manager'].includes(req.user?.role);
   const userRole = req.user?.role || 'staff';
   
-  // Parse date range from query params
-  const { start_date, end_date, vendor_id } = req.query;
-  
-  // Call the new get_inventory_metrics RPC with date filtering
+  // Simplified: No date filtering - fetch current/all-time data
+  // Call the get_inventory_metrics RPC without date params for all-time data
   const { data, error } = await supabaseAdmin.rpc('get_inventory_metrics', {
-    p_start_date: start_date || null,
-    p_end_date: end_date || null,
-    p_vendor_id: vendor_id || null,
+    p_start_date: null,
+    p_end_date: null,
+    p_vendor_id: null,
     p_user_role: userRole,
   });
 
   if (error) {
-    logger.error('Dashboard RPC failed', { error });
+    logger.error('Dashboard RPC failed, using fallback', { error: error.message });
     
-    // Try fallback to older RPC
-    const { data: fallbackData, error: fallbackError } = await supabaseAdmin
-      .rpc('get_inventory_dashboard_stats');
-    
-    if (!fallbackError && fallbackData) {
-      return res.json({ success: true, data: fallbackData });
-    }
-    
-    // Ultimate fallback
-    return res.json({
-      success: true,
-      data: {
-        total_stock_value: { value: isAdmin ? 0 : '***', units: 0 },
-        inventory_turnover: { this_month: { stock_in: isAdmin ? 0 : '***', stock_out: isAdmin ? 0 : '***' } },
-        critical_stock: { count: 0, items: [] },
-        damage_loss: { this_month: { total_value: isAdmin ? 0 : '***' } },
-        stock_trend: [],
-        pending_actions: { pending_approvals: 0, out_of_stock: 0 },
-        recent_transactions: [],
-        generated_at: new Date().toISOString(),
-        fallback: true,
-      },
-    });
+    // Try fallback to simpler queries
+    const fallbackData = await buildFallbackDashboard(isAdmin);
+    return res.json({ success: true, data: fallbackData });
   }
 
   // Mask financial data for non-admins

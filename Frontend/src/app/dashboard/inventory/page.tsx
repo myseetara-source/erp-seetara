@@ -14,18 +14,18 @@
  * Performance: Optimized for 100M+ records
  */
 
-import { useState, useMemo } from 'react';
+import { useMemo } from 'react';
 import Link from 'next/link';
 import { useQuery } from '@tanstack/react-query';
 import { 
   AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
-  BarChart, Bar, Legend,
+  Legend,
 } from 'recharts';
 import { 
-  Package, TrendingUp, TrendingDown, AlertTriangle, Plus, ArrowRight,
-  Loader2, FileText, Calendar, PackagePlus, PackageMinus, Settings,
-  CheckCircle, RefreshCw, Clock, DollarSign, AlertOctagon, Activity,
-  Trash2, BarChart3, ArrowUpRight, ArrowDownRight, Boxes, ShoppingCart,
+  Package, TrendingUp, AlertTriangle, Plus, ArrowRight,
+  Loader2, FileText, PackagePlus, PackageMinus, Settings,
+  RefreshCw, Clock, DollarSign,
+  Trash2, BarChart3, ArrowUpRight, ArrowDownRight,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -34,8 +34,6 @@ import { cn } from '@/lib/utils';
 import apiClient from '@/lib/api/apiClient';
 import { formatCurrency } from '@/lib/utils/currency';
 import { useAuth } from '@/hooks/useAuth';
-import { DateRangePicker, type DateRange } from '@/components/ui/date-range-picker';
-import { startOfMonth } from 'date-fns';
 
 // =============================================================================
 // TYPES
@@ -368,23 +366,15 @@ function StockMovementChart({ data, canSeeFinancials }: { data: DashboardData | 
 
 export default function InventoryPage() {
   const { canSeeFinancials } = useAuth();
-  const [dateRange, setDateRange] = useState<DateRange>({
-    from: startOfMonth(new Date()),
-    to: new Date(),
-  });
 
-  // React Query for data fetching with caching
+  // React Query for data fetching with caching - NO date filter, fetches all-time current data
   const { data, isLoading, error, refetch, isFetching } = useQuery<DashboardData>({
-    queryKey: ['inventory-dashboard', dateRange.from?.toISOString(), dateRange.to?.toISOString()],
+    queryKey: ['inventory-dashboard'],
     queryFn: async () => {
-      const params = new URLSearchParams();
-      if (dateRange.from) params.append('start_date', dateRange.from.toISOString());
-      if (dateRange.to) params.append('end_date', dateRange.to.toISOString());
-      
-      const response = await apiClient.get(`/inventory/dashboard?${params.toString()}`);
+      const response = await apiClient.get('/inventory/dashboard');
       return response.data.data;
     },
-    staleTime: 30 * 1000, // 30 seconds
+    staleTime: 60 * 1000, // 1 minute cache
     refetchInterval: 2 * 60 * 1000, // Auto-refresh every 2 minutes
   });
 
@@ -412,13 +402,6 @@ export default function InventoryPage() {
         </div>
         
         <div className="flex flex-wrap items-center gap-3">
-          {/* Date Range Picker */}
-          <DateRangePicker
-            value={dateRange}
-            onChange={setDateRange}
-            className="w-[240px]"
-          />
-          
           <Button
             variant="outline"
             size="sm"
