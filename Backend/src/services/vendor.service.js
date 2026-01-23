@@ -808,7 +808,8 @@ class VendorService {
    * @returns {Object} Ledger entry
    */
   async getLedgerEntryById(entryId) {
-    const { data, error } = await supabaseAdmin
+    // First get the ledger entry
+    const { data: ledgerData, error: ledgerError } = await supabaseAdmin
       .from('vendor_ledger')
       .select(`
         id,
@@ -822,8 +823,6 @@ class VendorService {
         description,
         transaction_date,
         performed_by,
-        payment_method,
-        receipt_url,
         notes,
         created_at,
         vendor:vendors(id, name, company_name)
@@ -831,30 +830,49 @@ class VendorService {
       .eq('id', entryId)
       .single();
 
-    if (error) {
-      if (error.code === 'PGRST116') {
+    if (ledgerError) {
+      if (ledgerError.code === 'PGRST116') {
         throw new NotFoundError('Ledger entry not found');
       }
-      throw new DatabaseError(`Failed to fetch ledger entry: ${error.message}`);
+      throw new DatabaseError(`Failed to fetch ledger entry: ${ledgerError.message}`);
+    }
+
+    let paymentMethod = 'cash';
+    let receiptUrl = null;
+    let paymentNotes = ledgerData.notes;
+
+    // For payment entries, fetch additional details from vendor_payments table
+    if (ledgerData.entry_type === 'payment' && ledgerData.reference_id) {
+      const { data: paymentData } = await supabaseAdmin
+        .from('vendor_payments')
+        .select('payment_method, receipt_url, notes, reference_number')
+        .eq('id', ledgerData.reference_id)
+        .single();
+
+      if (paymentData) {
+        paymentMethod = paymentData.payment_method || 'cash';
+        receiptUrl = paymentData.receipt_url;
+        paymentNotes = paymentData.notes || ledgerData.notes;
+      }
     }
 
     return {
-      id: data.id,
-      vendor_id: data.vendor_id,
-      entry_type: data.entry_type,
-      reference_id: data.reference_id,
-      reference_no: data.reference_no,
-      debit: parseFloat(data.debit) || 0,
-      credit: parseFloat(data.credit) || 0,
-      running_balance: parseFloat(data.running_balance) || 0,
-      description: data.description,
-      transaction_date: data.transaction_date,
-      performed_by: data.performed_by,
-      payment_method: data.payment_method || 'cash',
-      receipt_url: data.receipt_url,
-      notes: data.notes,
-      created_at: data.created_at,
-      vendor: data.vendor,
+      id: ledgerData.id,
+      vendor_id: ledgerData.vendor_id,
+      entry_type: ledgerData.entry_type,
+      reference_id: ledgerData.reference_id,
+      reference_no: ledgerData.reference_no,
+      debit: parseFloat(ledgerData.debit) || 0,
+      credit: parseFloat(ledgerData.credit) || 0,
+      running_balance: parseFloat(ledgerData.running_balance) || 0,
+      description: ledgerData.description,
+      transaction_date: ledgerData.transaction_date,
+      performed_by: ledgerData.performed_by,
+      payment_method: paymentMethod,
+      receipt_url: receiptUrl,
+      notes: paymentNotes,
+      created_at: ledgerData.created_at,
+      vendor: ledgerData.vendor,
     };
   }
 }

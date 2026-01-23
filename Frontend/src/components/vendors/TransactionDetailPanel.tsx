@@ -186,7 +186,7 @@ export default function TransactionDetailPanel({
 
   // Fetch transaction details when selected
   useEffect(() => {
-    if (!transactionId || !referenceId) {
+    if (!transactionId) {
       setInventoryTx(null);
       setPayment(null);
       return;
@@ -200,16 +200,30 @@ export default function TransactionDetailPanel({
 
       try {
         if (entryType === 'purchase' || entryType === 'purchase_return') {
+          // For purchase/return, we need the reference_id (inventory transaction ID)
+          if (!referenceId) {
+            setError('No inventory reference found');
+            setIsLoading(false);
+            return;
+          }
+          
           // Fetch inventory transaction details using reference_id
           const response = await apiClient.get(`/inventory/transactions/${referenceId}`);
           if (response.data.success && response.data.data) {
-            setInventoryTx(response.data.data);
+            const txData = response.data.data;
+            // Ensure total_cost is properly set from items if missing
+            if (!txData.total_cost || txData.total_cost === 0) {
+              txData.total_cost = (txData.items || []).reduce(
+                (sum: number, item: TransactionItem) => sum + (item.quantity * item.unit_cost), 
+                0
+              );
+            }
+            setInventoryTx(txData);
           } else {
             setError('Transaction not found');
           }
         } else if (entryType === 'payment') {
-          // Fetch payment details from vendor ledger entry
-          // The transactionId here is the ledger entry ID
+          // For payments, use the ledger entry ID directly
           const response = await apiClient.get(`/vendors/ledger-entry/${transactionId}`);
           if (response.data.success && response.data.data) {
             const ledgerEntry = response.data.data as LedgerPaymentEntry;
@@ -272,79 +286,113 @@ export default function TransactionDetailPanel({
 
     return (
       <>
-        {/* Purchase/Return Invoice */}
+        {/* Purchase/Return Invoice - Professional Design */}
         {(isPurchase || isReturn) && inventoryTx && (
           <div className="space-y-4">
-            {/* Invoice Header */}
+            {/* Official Document Header */}
             <div className={cn(
-              'rounded-lg p-4 text-white',
-              isPurchase ? 'bg-gradient-to-r from-blue-600 to-blue-500' : 'bg-gradient-to-r from-orange-600 to-orange-500'
+              'rounded-lg overflow-hidden shadow-sm border',
+              isPurchase ? 'border-blue-200' : 'border-orange-200'
             )}>
-              <div className="flex items-center justify-between mb-2">
-                <span className="text-xs opacity-80">Invoice No.</span>
-                <StatusBadge status={inventoryTx.status} />
+              {/* Company Header */}
+              <div className={cn(
+                'px-4 py-3 text-center',
+                isPurchase ? 'bg-gradient-to-r from-blue-600 to-blue-500' : 'bg-gradient-to-r from-orange-600 to-orange-500'
+              )}>
+                <div className="flex items-center justify-center gap-2 mb-1">
+                  <Package className="w-5 h-5 text-white/80" />
+                  <span className="text-white font-bold text-sm uppercase tracking-wide">
+                    Seetara ERP
+                  </span>
+                </div>
+                <p className="text-white/70 text-[10px]">
+                  {isPurchase ? 'PURCHASE INVOICE' : 'RETURN VOUCHER'}
+                </p>
               </div>
-              <p className="text-lg font-bold">{inventoryTx.invoice_no}</p>
-              <p className="text-xs opacity-80 mt-1">
-                {new Date(inventoryTx.transaction_date).toLocaleDateString('en-IN', {
-                  day: 'numeric', month: 'long', year: 'numeric'
-                })}
-              </p>
-            </div>
-
-            {/* Vendor */}
-            {vendorName && (
-              <div className="flex items-center gap-2 p-3 bg-gray-50 rounded-lg">
-                <Building2 className="w-4 h-4 text-gray-400" />
-                <div>
-                  <p className="text-[10px] text-gray-400 uppercase">Vendor</p>
-                  <p className="text-sm font-medium text-gray-900">{vendorName}</p>
+              
+              {/* Invoice Info */}
+              <div className="bg-white px-4 py-3 border-b border-gray-100">
+                <div className="flex justify-between items-start">
+                  <div>
+                    <p className="text-[10px] text-gray-400 uppercase">Invoice No.</p>
+                    <p className="text-sm font-bold text-gray-900">{inventoryTx.invoice_no}</p>
+                  </div>
+                  <div className="text-right">
+                    <p className="text-[10px] text-gray-400 uppercase">Date</p>
+                    <p className="text-sm font-medium text-gray-700">
+                      {new Date(inventoryTx.transaction_date).toLocaleDateString('en-IN', {
+                        day: '2-digit', month: 'short', year: 'numeric'
+                      })}
+                    </p>
+                  </div>
+                </div>
+                <div className="mt-2 pt-2 border-t border-dashed border-gray-200 flex justify-between items-center">
+                  <div className="flex items-center gap-1.5">
+                    <Building2 className="w-3.5 h-3.5 text-gray-400" />
+                    <span className="text-xs text-gray-600">{vendorName || 'Vendor'}</span>
+                  </div>
+                  <StatusBadge status={inventoryTx.status} />
                 </div>
               </div>
-            )}
+            </div>
 
-            {/* Items Table */}
-            <div className="border border-gray-200 rounded-lg overflow-hidden">
-              <div className="bg-gray-50 px-3 py-2 border-b border-gray-200">
-                <span className="text-xs font-semibold text-gray-600 uppercase">Items</span>
-              </div>
-              <div className="divide-y divide-gray-100 max-h-48 overflow-auto">
-                {inventoryTx.items && inventoryTx.items.length > 0 ? (
-                  inventoryTx.items.map((item, idx) => (
-                    <div key={idx} className="px-3 py-2 hover:bg-gray-50">
-                      <div className="flex justify-between items-start">
-                        <div className="flex-1 min-w-0">
-                          <p className="text-sm font-medium text-gray-900 truncate">
-                            {item.variant?.product?.name || 'Unknown Product'}
+            {/* Items Table - Professional */}
+            <div className="border border-gray-200 rounded-lg overflow-hidden shadow-sm">
+              <table className="w-full text-xs">
+                <thead className="bg-gray-50 border-b border-gray-200">
+                  <tr>
+                    <th className="px-3 py-2 text-left font-semibold text-gray-600 uppercase">Item</th>
+                    <th className="px-2 py-2 text-center font-semibold text-gray-600 uppercase w-12">Qty</th>
+                    <th className="px-2 py-2 text-right font-semibold text-gray-600 uppercase w-20">Rate</th>
+                    <th className="px-3 py-2 text-right font-semibold text-gray-600 uppercase w-24">Amount</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-100">
+                  {inventoryTx.items && inventoryTx.items.length > 0 ? (
+                    inventoryTx.items.map((item, idx) => (
+                      <tr key={idx} className="hover:bg-gray-50">
+                        <td className="px-3 py-2">
+                          <p className="font-medium text-gray-900 truncate max-w-[140px]">
+                            {item.variant?.product?.name || 'Unknown'}
                           </p>
                           {item.variant?.sku && (
-                            <p className="text-[10px] text-gray-400">SKU: {item.variant.sku}</p>
+                            <p className="text-[10px] text-gray-400">{item.variant.sku}</p>
                           )}
-                        </div>
-                        <div className="text-right ml-2">
-                          <p className="text-sm font-semibold text-gray-900">
-                            {formatCurrency(item.quantity * item.unit_cost)}
-                          </p>
-                          <p className="text-[10px] text-gray-400">
-                            {item.quantity} × {formatCurrency(item.unit_cost)}
-                          </p>
-                        </div>
-                      </div>
-                    </div>
-                  ))
-                ) : (
-                  <div className="px-3 py-6 text-center text-gray-400 text-sm">
-                    No items found
-                  </div>
-                )}
-              </div>
-              {/* Total */}
-              <div className="px-3 py-2 bg-gray-50 border-t border-gray-200 flex justify-between items-center">
-                <span className="text-sm font-semibold text-gray-700">Total</span>
-                <span className="text-lg font-bold text-green-600">
-                  {formatCurrency(inventoryTx.total_cost)}
-                </span>
-              </div>
+                        </td>
+                        <td className="px-2 py-2 text-center font-medium text-gray-700">
+                          {item.quantity}
+                        </td>
+                        <td className="px-2 py-2 text-right text-gray-600">
+                          {formatCurrency(item.unit_cost)}
+                        </td>
+                        <td className="px-3 py-2 text-right font-semibold text-gray-900">
+                          {formatCurrency(item.quantity * item.unit_cost)}
+                        </td>
+                      </tr>
+                    ))
+                  ) : (
+                    <tr>
+                      <td colSpan={4} className="px-3 py-6 text-center text-gray-400">
+                        No items found
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+                {/* Grand Total Footer */}
+                <tfoot className="bg-gray-50 border-t-2 border-gray-300">
+                  <tr>
+                    <td colSpan={3} className="px-3 py-2.5 text-right font-bold text-gray-700 uppercase">
+                      Grand Total
+                    </td>
+                    <td className={cn(
+                      'px-3 py-2.5 text-right font-bold text-lg',
+                      isPurchase ? 'text-blue-600' : 'text-orange-600'
+                    )}>
+                      {formatCurrency(inventoryTx.total_cost)}
+                    </td>
+                  </tr>
+                </tfoot>
+              </table>
             </div>
 
             {/* Notes */}
@@ -352,87 +400,124 @@ export default function TransactionDetailPanel({
               <div className="p-3 bg-amber-50 border border-amber-200 rounded-lg">
                 <div className="flex items-center gap-1 mb-1">
                   <FileText className="w-3 h-3 text-amber-600" />
-                  <span className="text-xs font-medium text-amber-800">Notes</span>
+                  <span className="text-xs font-medium text-amber-800">Remarks</span>
                 </div>
                 <p className="text-xs text-amber-700">{inventoryTx.notes}</p>
               </div>
             )}
+
+            {/* Footer - Processed By */}
+            <div className="text-center pt-2 border-t border-dashed border-gray-200">
+              <p className="text-[10px] text-gray-400">
+                Processed on {new Date(inventoryTx.transaction_date).toLocaleDateString('en-IN')} • System Generated
+              </p>
+            </div>
           </div>
         )}
 
-        {/* Payment Receipt */}
+        {/* Payment Receipt - Professional Voucher Design */}
         {isPaymentType && payment && (
           <div className="space-y-4">
-            {/* Payment Header */}
-            <div className="bg-gradient-to-r from-green-600 to-emerald-600 rounded-lg p-4 text-white text-center">
-              <p className="text-xs opacity-80 mb-1">Payment Amount</p>
-              <p className="text-3xl font-bold">{formatCurrency(payment.amount)}</p>
-              <p className="text-xs opacity-80 mt-2">
-                {new Date(payment.payment_date).toLocaleDateString('en-IN', {
-                  day: 'numeric', month: 'long', year: 'numeric'
-                })}
-              </p>
+            {/* Payment Voucher Header */}
+            <div className="rounded-lg overflow-hidden shadow-sm border border-green-200">
+              {/* Company Header */}
+              <div className="bg-gradient-to-r from-green-600 to-emerald-600 px-4 py-3 text-center">
+                <div className="flex items-center justify-center gap-2 mb-1">
+                  <CreditCard className="w-5 h-5 text-white/80" />
+                  <span className="text-white font-bold text-sm uppercase tracking-wide">
+                    Seetara ERP
+                  </span>
+                </div>
+                <p className="text-white/70 text-[10px]">PAYMENT VOUCHER</p>
+              </div>
+              
+              {/* Payment Info */}
+              <div className="bg-white px-4 py-3">
+                <div className="text-center mb-3">
+                  <p className="text-[10px] text-gray-400 uppercase mb-1">Amount Paid</p>
+                  <p className="text-3xl font-bold text-green-600">{formatCurrency(payment.amount)}</p>
+                </div>
+                <div className="flex justify-between items-center pt-2 border-t border-dashed border-gray-200">
+                  <div>
+                    <p className="text-[10px] text-gray-400">Voucher No.</p>
+                    <p className="text-xs font-semibold text-gray-900">{payment.reference_number || 'N/A'}</p>
+                  </div>
+                  <div className="text-right">
+                    <p className="text-[10px] text-gray-400">Date</p>
+                    <p className="text-xs font-medium text-gray-700">
+                      {new Date(payment.payment_date).toLocaleDateString('en-IN', {
+                        day: '2-digit', month: 'short', year: 'numeric'
+                      })}
+                    </p>
+                  </div>
+                </div>
+              </div>
             </div>
 
-            {/* Payment Details */}
+            {/* Payment Details Grid */}
             <div className="grid grid-cols-2 gap-3">
-              <div className="p-3 bg-gray-50 rounded-lg">
-                <p className="text-[10px] text-gray-400 uppercase">Method</p>
+              <div className="p-3 bg-gray-50 rounded-lg border border-gray-100">
+                <div className="flex items-center gap-1.5 mb-1">
+                  <CreditCard className="w-3 h-3 text-gray-400" />
+                  <p className="text-[10px] text-gray-400 uppercase">Method</p>
+                </div>
                 <p className="text-sm font-medium text-gray-900 capitalize">
                   {payment.payment_method?.replace('_', ' ') || 'Cash'}
                 </p>
               </div>
-              <div className="p-3 bg-gray-50 rounded-lg">
-                <p className="text-[10px] text-gray-400 uppercase">Reference</p>
-                <p className="text-sm font-medium text-gray-900">
-                  {payment.reference_number || '-'}
+              <div className="p-3 bg-gray-50 rounded-lg border border-gray-100">
+                <div className="flex items-center gap-1.5 mb-1">
+                  <Building2 className="w-3 h-3 text-gray-400" />
+                  <p className="text-[10px] text-gray-400 uppercase">Paid To</p>
+                </div>
+                <p className="text-sm font-medium text-gray-900 truncate">
+                  {vendorName || 'Vendor'}
                 </p>
               </div>
             </div>
 
-            {/* Vendor */}
-            {vendorName && (
-              <div className="flex items-center gap-2 p-3 bg-gray-50 rounded-lg">
-                <Building2 className="w-4 h-4 text-green-500" />
-                <div>
-                  <p className="text-[10px] text-gray-400 uppercase">Paid To</p>
-                  <p className="text-sm font-medium text-gray-900">{vendorName}</p>
-                </div>
-              </div>
-            )}
-
-            {/* Receipt Image */}
+            {/* Receipt Image - High Quality Preview */}
             {payment.receipt_url && (
-              <div className="border border-gray-200 rounded-lg overflow-hidden">
+              <div className="border border-gray-200 rounded-lg overflow-hidden shadow-sm">
                 <div className="bg-gray-50 px-3 py-2 border-b border-gray-200 flex items-center justify-between">
-                  <div className="flex items-center gap-1">
-                    <ImageIcon className="w-3 h-3 text-gray-400" />
-                    <span className="text-xs font-medium text-gray-600">Receipt</span>
+                  <div className="flex items-center gap-1.5">
+                    <ImageIcon className="w-3.5 h-3.5 text-gray-500" />
+                    <span className="text-xs font-semibold text-gray-700">Receipt Attachment</span>
                   </div>
-                  <Button 
-                    variant="ghost" 
-                    size="sm"
-                    className="h-6 text-xs"
-                    onClick={() => setShowImagePreview(true)}
-                  >
-                    <ZoomIn className="w-3 h-3 mr-1" />
-                    View
-                  </Button>
+                  <div className="flex gap-1">
+                    <Button 
+                      variant="ghost" 
+                      size="sm"
+                      className="h-6 text-xs hover:bg-blue-50 hover:text-blue-600"
+                      onClick={() => setShowImagePreview(true)}
+                    >
+                      <ZoomIn className="w-3 h-3 mr-1" />
+                      View Full
+                    </Button>
+                    <Button 
+                      variant="ghost" 
+                      size="sm"
+                      className="h-6 text-xs hover:bg-gray-100"
+                      onClick={() => window.open(payment.receipt_url!, '_blank')}
+                    >
+                      <ExternalLink className="w-3 h-3" />
+                    </Button>
+                  </div>
                 </div>
                 <div 
-                  className="p-3 cursor-pointer hover:bg-gray-50"
+                  className="p-4 bg-gray-100 cursor-pointer hover:bg-gray-200 transition-colors"
                   onClick={() => setShowImagePreview(true)}
                 >
                   <img
                     src={payment.receipt_url}
-                    alt="Receipt"
-                    className="max-h-32 mx-auto rounded shadow-sm"
+                    alt="Payment Receipt"
+                    className="max-h-40 mx-auto rounded-lg shadow-md border border-white"
                   />
                 </div>
               </div>
             )}
 
-            {/* Notes */}
+            {/* Notes/Remarks */}
             {payment.notes && (
               <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg">
                 <div className="flex items-center gap-1 mb-1">
@@ -442,6 +527,13 @@ export default function TransactionDetailPanel({
                 <p className="text-xs text-blue-700">{payment.notes}</p>
               </div>
             )}
+
+            {/* Footer */}
+            <div className="text-center pt-2 border-t border-dashed border-gray-200">
+              <p className="text-[10px] text-gray-400">
+                Processed on {new Date(payment.payment_date).toLocaleDateString('en-IN')} • System Generated
+              </p>
+            </div>
           </div>
         )}
 

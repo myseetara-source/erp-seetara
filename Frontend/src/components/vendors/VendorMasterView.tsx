@@ -598,12 +598,18 @@ function VendorDetailView({ vendorId, onTransactionSuccess, onSelectTransaction,
                       <div className="text-right flex-shrink-0">
                         <p className={cn(
                           'text-sm font-semibold',
-                          isPayment ? 'text-green-600' : 'text-gray-900'
+                          isPayment ? 'text-green-600' : 
+                          isPurchase ? 'text-blue-600' : 'text-orange-600'
                         )}>
-                          {isPayment ? '-' : '+'}{formatCurrency(tx.debit || tx.credit || 0)}
+                          {/* Payment = minus (money going out), Purchase = plus (we owe more), Return = plus (credit to us) */}
+                          {isPayment ? '-' : isPurchase ? '+' : '+'}{formatCurrency(
+                            isPayment ? (tx.credit || 0) : 
+                            isPurchase ? (tx.debit || 0) : 
+                            (tx.credit || 0)
+                          )}
                         </p>
                         <p className="text-[10px] text-gray-400">
-                          Bal: {formatCurrency(tx.running_balance || 0)}
+                          Bal: {formatCurrency(Math.abs(tx.running_balance || 0))}
                         </p>
                       </div>
                     </button>
