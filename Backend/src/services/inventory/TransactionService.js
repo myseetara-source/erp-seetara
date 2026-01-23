@@ -40,10 +40,10 @@ class TransactionService {
       .select(`
         id, invoice_no, transaction_type, transaction_date, total_cost, status, notes, created_at,
         vendor:vendors(id, name, company_name),
-        created_by_user:users!created_by(id, name),
+        performed_by_user:users!performed_by(id, name),
         approved_by_user:users!approved_by(id, name),
         items:inventory_transaction_items(
-          id, variant_id, quantity_fresh, quantity_damaged, unit_cost, reason,
+          id, variant_id, quantity, unit_cost, notes,
           variant:product_variants(id, sku, product:products(id, name))
         )
       `, { count: 'exact' })
@@ -78,10 +78,10 @@ class TransactionService {
       .select(`
         *,
         vendor:vendors(id, name, company_name, phone),
-        created_by_user:users!created_by(id, name, email),
+        performed_by_user:users!performed_by(id, name, email),
         approved_by_user:users!approved_by(id, name, email),
         items:inventory_transaction_items(
-          *,
+          id, variant_id, quantity, unit_cost, source_type, stock_before, stock_after, notes,
           variant:product_variants(id, sku, current_stock, product:products(id, name, image_url))
         )
       `)
@@ -139,7 +139,7 @@ class TransactionService {
 
     // Calculate total cost
     const totalCost = parsedItems.reduce(
-      (sum, item) => sum + ((item.quantity_fresh + item.quantity_damaged) * item.unit_cost),
+      (sum, item) => sum + (Math.abs(item.quantity_fresh + item.quantity_damaged) * item.unit_cost),
       0
     );
 
@@ -150,14 +150,15 @@ class TransactionService {
         invoice_no: invoiceNo,
         transaction_type: data.transaction_type,
         vendor_id: data.vendor_id || null,
-        transaction_date: data.transaction_date || new Date().toISOString(),
+        transaction_date: data.transaction_date || new Date().toISOString().split('T')[0],
         reference_transaction_id: data.reference_transaction_id || null,
         total_cost: totalCost,
         status: transactionStatus,
         notes: data.notes || null,
-        created_by: userId,
+        reason: data.reason || null,
+        performed_by: userId,
         approved_by: isAdmin ? userId : null,
-        approved_at: isAdmin ? new Date().toISOString() : null,
+        approval_date: isAdmin ? new Date().toISOString() : null,
       })
       .select()
       .single();
@@ -171,14 +172,21 @@ class TransactionService {
     }
 
     // Insert items
-    const itemRecords = parsedItems.map(item => ({
-      transaction_id: transaction.id,
-      variant_id: item.variant_id,
-      quantity_fresh: item.quantity_fresh,
-      quantity_damaged: item.quantity_damaged,
-      unit_cost: item.unit_cost,
-      reason: item.reason || null,
-    }));
+    // quantity is positive for stock in (purchase), negative for stock out (damage, return)
+    const itemRecords = parsedItems.map(item => {
+      let qty = item.quantity_fresh + item.quantity_damaged;
+      // For damage and returns, quantity should be negative
+      if (['damage', 'purchase_return', 'adjustment'].includes(data.transaction_type)) {
+        qty = -Math.abs(qty);
+      }
+      return {
+        transaction_id: transaction.id,
+        variant_id: item.variant_id,
+        quantity: qty,
+        unit_cost: item.unit_cost,
+        notes: item.reason || null,
+      };
+    });
 
     const { error: itemsError } = await supabaseAdmin
       .from('inventory_transaction_items')
@@ -301,7 +309,7 @@ class TransactionService {
     // Validate quantities don't exceed original purchase
     const { data: originalPurchase } = await supabaseAdmin
       .from('inventory_transactions')
-      .select('items:inventory_transaction_items(variant_id, quantity_fresh, quantity_damaged)')
+      .select('items:inventory_transaction_items(variant_id, quantity)')
       .eq('id', data.reference_transaction_id)
       .single();
 
@@ -311,20 +319,18 @@ class TransactionService {
 
     const purchaseMap = new Map();
     for (const item of originalPurchase.items || []) {
-      purchaseMap.set(item.variant_id, {
-        fresh: item.quantity_fresh || 0,
-        damaged: item.quantity_damaged || 0,
-      });
+      purchaseMap.set(item.variant_id, Math.abs(item.quantity || 0));
     }
 
     for (const returnItem of parsedItems) {
-      const purchased = purchaseMap.get(returnItem.variant_id);
-      if (!purchased) {
+      const purchasedQty = purchaseMap.get(returnItem.variant_id);
+      if (!purchasedQty) {
         throw new AppError(`Variant ${returnItem.variant_id} was not in the original purchase`, 400);
       }
 
-      if (returnItem.quantity_fresh > purchased.fresh) {
-        throw new AppError(`Cannot return more fresh units than purchased`, 400);
+      const returnQty = returnItem.quantity_fresh + returnItem.quantity_damaged;
+      if (returnQty > purchasedQty) {
+        throw new AppError(`Cannot return more units than purchased`, 400);
       }
     }
   }
@@ -334,7 +340,7 @@ class TransactionService {
    */
   async _updateVendorBalance(vendorId, transactionType, items) {
     const totalAmount = items.reduce(
-      (sum, item) => sum + ((item.quantity_fresh + item.quantity_damaged) * item.unit_cost),
+      (sum, item) => sum + (Math.abs(item.quantity_fresh + item.quantity_damaged) * item.unit_cost),
       0
     );
 
