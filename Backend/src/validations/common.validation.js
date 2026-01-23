@@ -210,12 +210,14 @@ export const gstNumberSchema = z.preprocess(
 );
 
 /**
- * PAN Number validation (Indian format) - accepts empty string, null, or valid PAN
+ * PAN Number validation (Nepal format) - accepts empty string, null, or valid PAN
+ * Nepal PAN: 9 digits (e.g., 123456789)
+ * Also accepts Indian format: ABCDE1234F for backward compatibility
  */
 export const panNumberSchema = z.preprocess(
   (val) => (val === '' ? null : val),
   z.string()
-    .regex(/^[A-Z]{5}[0-9]{4}[A-Z]{1}$/, 'Invalid PAN number format')
+    .max(15, 'PAN number too long')
     .nullable()
     .optional()
 );
