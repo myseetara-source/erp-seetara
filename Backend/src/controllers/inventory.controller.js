@@ -441,6 +441,11 @@ import { supabaseAdmin } from '../config/supabase.js';
  * Get inventory dashboard summary (ADVANCED)
  * GET /inventory/dashboard
  * 
+ * Query Parameters:
+ * - start_date: ISO date string (default: start of current month)
+ * - end_date: ISO date string (default: now)
+ * - vendor_id: UUID (optional, filter by vendor)
+ * 
  * Returns comprehensive metrics in a single call:
  * - Total Stock Value (inventory valuation)
  * - Inventory Turnover (monthly in/out)
@@ -452,16 +457,25 @@ import { supabaseAdmin } from '../config/supabase.js';
  */
 export const getDashboardSummary = catchAsync(async (req, res) => {
   const isAdmin = ['admin', 'manager'].includes(req.user?.role);
-
-  // Call the advanced RPC function
-  const { data, error } = await supabaseAdmin.rpc('get_inventory_dashboard_stats');
+  const userRole = req.user?.role || 'staff';
+  
+  // Parse date range from query params
+  const { start_date, end_date, vendor_id } = req.query;
+  
+  // Call the new get_inventory_metrics RPC with date filtering
+  const { data, error } = await supabaseAdmin.rpc('get_inventory_metrics', {
+    p_start_date: start_date || null,
+    p_end_date: end_date || null,
+    p_vendor_id: vendor_id || null,
+    p_user_role: userRole,
+  });
 
   if (error) {
     logger.error('Dashboard RPC failed', { error });
     
-    // Try fallback to simpler RPC
+    // Try fallback to older RPC
     const { data: fallbackData, error: fallbackError } = await supabaseAdmin
-      .rpc('get_inventory_dashboard_summary');
+      .rpc('get_inventory_dashboard_stats');
     
     if (!fallbackError && fallbackData) {
       return res.json({ success: true, data: fallbackData });
@@ -471,10 +485,10 @@ export const getDashboardSummary = catchAsync(async (req, res) => {
     return res.json({
       success: true,
       data: {
-        total_stock_value: { value: 0, units: 0 },
-        inventory_turnover: { this_month: { stock_in: 0, stock_out: 0 } },
+        total_stock_value: { value: isAdmin ? 0 : '***', units: 0 },
+        inventory_turnover: { this_month: { stock_in: isAdmin ? 0 : '***', stock_out: isAdmin ? 0 : '***' } },
         critical_stock: { count: 0, items: [] },
-        damage_loss: { this_month: { total_value: 0 } },
+        damage_loss: { this_month: { total_value: isAdmin ? 0 : '***' } },
         stock_trend: [],
         pending_actions: { pending_approvals: 0, out_of_stock: 0 },
         recent_transactions: [],

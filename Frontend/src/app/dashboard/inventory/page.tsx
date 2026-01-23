@@ -1,53 +1,41 @@
 'use client';
 
 /**
- * World-Class Inventory Dashboard
- * 
- * International Standard Metrics:
- * 1. Total Stock Value (Inventory Valuation)
- * 2. Inventory Turnover (Monthly In vs Out)
- * 3. Critical Stock (Below Threshold)
- * 4. Damage Loss (Monthly Loss)
+ * World-Class Inventory Dashboard (Enterprise Grade)
  * 
  * Features:
- * - Single RPC call for all data (no 429 errors)
- * - 7-day stock trend sparkline
- * - Quick actions for damage entry
- * - Product movement report
+ * - Single RPC call for all metrics (no 429 errors)
+ * - React Query for caching & deduplication
+ * - Date range filtering with presets
+ * - Trend indicators with percentage change
+ * - Stock movement chart (Recharts)
+ * - Role-based data visibility
+ * 
+ * Performance: Optimized for 100M+ records
  */
 
-import { useEffect, useState, useCallback } from 'react';
+import { useState, useMemo } from 'react';
 import Link from 'next/link';
+import { useQuery } from '@tanstack/react-query';
 import { 
-  Package, 
-  TrendingUp, 
-  TrendingDown, 
-  AlertTriangle,
-  Plus,
-  ArrowRight,
-  Loader2,
-  FileText,
-  Calendar,
-  PackagePlus,
-  PackageMinus,
-  Settings,
-  CheckCircle,
-  RefreshCw,
-  Clock,
-  DollarSign,
-  AlertOctagon,
-  Activity,
-  Trash2,
-  BarChart3,
-  ArrowUpRight,
-  ArrowDownRight,
+  AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
+  BarChart, Bar, Legend,
+} from 'recharts';
+import { 
+  Package, TrendingUp, TrendingDown, AlertTriangle, Plus, ArrowRight,
+  Loader2, FileText, Calendar, PackagePlus, PackageMinus, Settings,
+  CheckCircle, RefreshCw, Clock, DollarSign, AlertOctagon, Activity,
+  Trash2, BarChart3, ArrowUpRight, ArrowDownRight, Boxes, ShoppingCart,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { cn } from '@/lib/utils';
 import apiClient from '@/lib/api/apiClient';
 import { formatCurrency } from '@/lib/utils/currency';
 import { useAuth } from '@/hooks/useAuth';
+import { DateRangePicker, type DateRange } from '@/components/ui/date-range-picker';
+import { startOfMonth } from 'date-fns';
 
 // =============================================================================
 // TYPES
@@ -85,7 +73,7 @@ interface DashboardData {
     last_month: {
       total_value: number | string;
     };
-    recent: DamageEntry[];
+    recent: unknown[];
   };
   stock_trend: TrendDay[];
   pending_actions: {
@@ -93,6 +81,21 @@ interface DashboardData {
     out_of_stock: number;
   };
   recent_transactions: Transaction[];
+  purchase_summary: {
+    total_value: number | string;
+    total_units: number;
+    count: number;
+    trend_percent: number;
+  };
+  return_summary: {
+    total_value: number | string;
+    total_units: number;
+    count: number;
+  };
+  date_range: {
+    start: string;
+    end: string;
+  };
   generated_at: string;
 }
 
@@ -106,14 +109,6 @@ interface CriticalItem {
   selling_price: number;
 }
 
-interface DamageEntry {
-  id: string;
-  invoice_no: string;
-  total_cost: number | string;
-  date: string;
-  notes: string;
-}
-
 interface TrendDay {
   day: string;
   net_change: number;
@@ -124,7 +119,7 @@ interface Transaction {
   invoice_no: string;
   transaction_type: 'purchase' | 'purchase_return' | 'damage' | 'adjustment';
   status: string;
-  total_cost: number | string;
+  total_cost: number | string | null;
   transaction_date: string;
   vendor?: { name: string };
 }
@@ -144,51 +139,23 @@ const STATUS_CONFIG: Record<string, { label: string; color: string }> = {
 };
 
 // =============================================================================
-// SPARKLINE COMPONENT
+// TREND INDICATOR COMPONENT
 // =============================================================================
 
-function Sparkline({ data, color = 'orange' }: { data: TrendDay[]; color?: string }) {
-  if (!data || data.length === 0) return null;
+function TrendIndicator({ value, label }: { value: number; label?: string }) {
+  if (value === 0) return null;
   
-  const values = data.map(d => d.net_change);
-  const min = Math.min(...values, 0);
-  const max = Math.max(...values, 0);
-  const range = max - min || 1;
-  
-  const width = 120;
-  const height = 32;
-  const padding = 2;
-  
-  const points = values.map((v, i) => {
-    const x = padding + (i / (values.length - 1)) * (width - padding * 2);
-    const y = height - padding - ((v - min) / range) * (height - padding * 2);
-    return `${x},${y}`;
-  }).join(' ');
-  
-  const colorClass = color === 'green' ? 'stroke-green-500' : 
-                     color === 'red' ? 'stroke-red-500' : 'stroke-orange-500';
+  const isPositive = value > 0;
   
   return (
-    <svg width={width} height={height} className="overflow-visible">
-      <polyline
-        fill="none"
-        strokeWidth="2"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        className={colorClass}
-        points={points}
-      />
-      {/* Zero line */}
-      <line 
-        x1={padding} 
-        y1={height - padding - ((0 - min) / range) * (height - padding * 2)}
-        x2={width - padding}
-        y2={height - padding - ((0 - min) / range) * (height - padding * 2)}
-        className="stroke-gray-200"
-        strokeWidth="1"
-        strokeDasharray="2,2"
-      />
-    </svg>
+    <span className={cn(
+      'text-xs font-medium flex items-center gap-0.5',
+      isPositive ? 'text-green-600' : 'text-red-600'
+    )}>
+      {isPositive ? <ArrowUpRight className="w-3 h-3" /> : <ArrowDownRight className="w-3 h-3" />}
+      {Math.abs(value)}%
+      {label && <span className="text-gray-400 ml-1">{label}</span>}
+    </span>
   );
 }
 
@@ -203,50 +170,132 @@ interface MetricCardProps {
   icon: React.ElementType;
   iconBg: string;
   iconColor: string;
-  trend?: { value: number; label: string };
-  sparklineData?: TrendDay[];
+  trend?: number;
+  trendLabel?: string;
   onClick?: () => void;
   isLoading?: boolean;
+  href?: string;
 }
 
 function MetricCard({ 
   title, value, subtitle, icon: Icon, iconBg, iconColor, 
-  trend, sparklineData, onClick, isLoading 
+  trend, trendLabel, onClick, isLoading, href
 }: MetricCardProps) {
-  return (
-    <div 
-      className={cn(
-        "bg-white rounded-xl shadow-sm border border-gray-200 p-6 transition-all",
-        onClick && "cursor-pointer hover:shadow-md hover:border-orange-200"
-      )}
-      onClick={onClick}
-    >
-      <div className="flex items-start justify-between mb-4">
-        <div className={cn("w-12 h-12 rounded-xl flex items-center justify-center", iconBg)}>
-          <Icon className={cn("w-6 h-6", iconColor)} />
+  const content = (
+    <Card className={cn(
+      'transition-all hover:shadow-md',
+      (onClick || href) && 'cursor-pointer hover:border-orange-200'
+    )}>
+      <CardContent className="p-6">
+        <div className="flex items-start justify-between">
+          <div className={cn('w-12 h-12 rounded-xl flex items-center justify-center', iconBg)}>
+            <Icon className={cn('w-6 h-6', iconColor)} />
+          </div>
+          {trend !== undefined && <TrendIndicator value={trend} label={trendLabel} />}
         </div>
-        {sparklineData && <Sparkline data={sparklineData} />}
-      </div>
-      
-      <div className="text-2xl font-bold text-gray-900 mb-1">
-        {isLoading ? <Loader2 className="w-6 h-6 animate-spin" /> : value}
-      </div>
-      
-      <div className="flex items-center justify-between">
-        <span className="text-sm text-gray-500">{title}</span>
-        {trend && (
-          <span className={cn(
-            "text-xs font-medium flex items-center gap-0.5",
-            trend.value >= 0 ? "text-green-600" : "text-red-600"
-          )}>
-            {trend.value >= 0 ? <ArrowUpRight className="w-3 h-3" /> : <ArrowDownRight className="w-3 h-3" />}
-            {Math.abs(trend.value)}% {trend.label}
-          </span>
-        )}
-      </div>
-      
-      {subtitle && <div className="text-xs text-gray-400 mt-1">{subtitle}</div>}
-    </div>
+        
+        <div className="mt-4">
+          <div className="text-2xl font-bold text-gray-900">
+            {isLoading ? <Loader2 className="w-6 h-6 animate-spin" /> : value}
+          </div>
+          <div className="text-sm text-gray-500 mt-1">{title}</div>
+          {subtitle && <div className="text-xs text-gray-400 mt-0.5">{subtitle}</div>}
+        </div>
+      </CardContent>
+    </Card>
+  );
+
+  if (href) {
+    return <Link href={href} className="block">{content}</Link>;
+  }
+
+  return <div onClick={onClick}>{content}</div>;
+}
+
+// =============================================================================
+// MINI CHART FOR SPARKLINE
+// =============================================================================
+
+function MiniSparkline({ data }: { data: TrendDay[] }) {
+  if (!data || data.length === 0) return null;
+
+  const chartData = data.map(d => ({
+    day: d.day?.slice(5) || '',
+    value: d.net_change,
+  }));
+
+  return (
+    <ResponsiveContainer width="100%" height={60}>
+      <AreaChart data={chartData} margin={{ top: 5, right: 0, left: 0, bottom: 0 }}>
+        <defs>
+          <linearGradient id="colorValue" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="5%" stopColor="#f97316" stopOpacity={0.3}/>
+            <stop offset="95%" stopColor="#f97316" stopOpacity={0}/>
+          </linearGradient>
+        </defs>
+        <Area
+          type="monotone"
+          dataKey="value"
+          stroke="#f97316"
+          strokeWidth={2}
+          fill="url(#colorValue)"
+        />
+      </AreaChart>
+    </ResponsiveContainer>
+  );
+}
+
+// =============================================================================
+// STOCK MOVEMENT CHART
+// =============================================================================
+
+function StockMovementChart({ data, canSeeFinancials }: { data: DashboardData | null; canSeeFinancials: boolean }) {
+  const chartData = useMemo(() => {
+    if (!data) return [];
+    
+    return [
+      {
+        name: 'Stock In',
+        value: data.purchase_summary?.total_units || 0,
+        amount: canSeeFinancials && typeof data.purchase_summary?.total_value === 'number' 
+          ? data.purchase_summary.total_value : 0,
+        fill: '#22c55e',
+      },
+      {
+        name: 'Stock Out',
+        value: (data.return_summary?.total_units || 0) + (data.damage_loss?.this_month?.units_damaged || 0),
+        amount: canSeeFinancials && typeof data.inventory_turnover?.this_month?.stock_out === 'number'
+          ? data.inventory_turnover.this_month.stock_out : 0,
+        fill: '#ef4444',
+      },
+      {
+        name: 'Damaged',
+        value: data.damage_loss?.this_month?.units_damaged || 0,
+        amount: canSeeFinancials && typeof data.damage_loss?.this_month?.total_value === 'number'
+          ? data.damage_loss.this_month.total_value : 0,
+        fill: '#f59e0b',
+      },
+    ];
+  }, [data, canSeeFinancials]);
+
+  if (!data) return null;
+
+  return (
+    <ResponsiveContainer width="100%" height={200}>
+      <BarChart data={chartData} layout="vertical" margin={{ top: 5, right: 30, left: 20, bottom: 5 }}>
+        <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
+        <XAxis type="number" tick={{ fontSize: 12 }} />
+        <YAxis dataKey="name" type="category" tick={{ fontSize: 12 }} width={80} />
+        <Tooltip 
+          formatter={(value: number, name: string) => [
+            `${value.toLocaleString()} units`,
+            name
+          ]}
+          contentStyle={{ borderRadius: '8px', border: '1px solid #e5e7eb' }}
+        />
+        <Bar dataKey="value" radius={[0, 4, 4, 0]} />
+      </BarChart>
+    </ResponsiveContainer>
   );
 }
 
@@ -255,81 +304,75 @@ function MetricCard({
 // =============================================================================
 
 export default function InventoryPage() {
-  const [data, setData] = useState<DashboardData | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [lastRefresh, setLastRefresh] = useState<Date | null>(null);
   const { canSeeFinancials } = useAuth();
+  const [dateRange, setDateRange] = useState<DateRange>({
+    from: startOfMonth(new Date()),
+    to: new Date(),
+  });
 
-  const fetchDashboard = useCallback(async () => {
-    setIsLoading(true);
-    setError(null);
-    
-    try {
-      const response = await apiClient.get('/inventory/dashboard');
-      if (response.data.success) {
-        setData(response.data.data);
-        setLastRefresh(new Date());
-      }
-    } catch (err) {
-      console.error('Failed to fetch inventory dashboard:', err);
-      setError('Failed to load dashboard. Please refresh.');
-    } finally {
-      setIsLoading(false);
-    }
-  }, []);
+  // React Query for data fetching with caching
+  const { data, isLoading, error, refetch, isFetching } = useQuery<DashboardData>({
+    queryKey: ['inventory-dashboard', dateRange.from?.toISOString(), dateRange.to?.toISOString()],
+    queryFn: async () => {
+      const params = new URLSearchParams();
+      if (dateRange.from) params.append('start_date', dateRange.from.toISOString());
+      if (dateRange.to) params.append('end_date', dateRange.to.toISOString());
+      
+      const response = await apiClient.get(`/inventory/dashboard?${params.toString()}`);
+      return response.data.data;
+    },
+    staleTime: 30 * 1000, // 30 seconds
+    refetchInterval: 2 * 60 * 1000, // Auto-refresh every 2 minutes
+  });
 
-  useEffect(() => {
-    fetchDashboard();
-  }, [fetchDashboard]);
-
-  // Auto-refresh every 2 minutes
-  useEffect(() => {
-    const interval = setInterval(fetchDashboard, 120000);
-    return () => clearInterval(interval);
-  }, [fetchDashboard]);
-
-  // Calculate turnover ratio
-  const turnoverRatio = data?.inventory_turnover?.this_month 
-    ? (typeof data.inventory_turnover.this_month.stock_out === 'number' && 
-       typeof data.inventory_turnover.this_month.stock_in === 'number' &&
-       data.inventory_turnover.this_month.stock_in > 0)
-      ? ((data.inventory_turnover.this_month.stock_out / data.inventory_turnover.this_month.stock_in) * 100).toFixed(1)
-      : '0'
-    : '0';
+  // Calculate trend percentage for purchases
+  const purchaseTrend = useMemo(() => {
+    if (!data?.purchase_summary) return 0;
+    return data.purchase_summary.trend_percent || 0;
+  }, [data]);
 
   return (
     <div className="p-6 bg-gray-50 min-h-screen">
       {/* Header */}
-      <div className="flex items-center justify-between mb-8">
+      <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4 mb-8">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Inventory Dashboard</h1>
           <p className="text-gray-500 flex items-center gap-2">
             Real-time stock analytics & insights
-            {lastRefresh && (
+            {data?.generated_at && (
               <span className="text-xs text-gray-400 flex items-center gap-1">
                 <Clock className="w-3 h-3" />
-                {lastRefresh.toLocaleTimeString()}
+                {new Date(data.generated_at).toLocaleTimeString()}
               </span>
             )}
           </p>
         </div>
-        <div className="flex gap-3">
+        
+        <div className="flex flex-wrap items-center gap-3">
+          {/* Date Range Picker */}
+          <DateRangePicker
+            value={dateRange}
+            onChange={setDateRange}
+            className="w-[240px]"
+          />
+          
           <Button
             variant="outline"
             size="sm"
-            onClick={fetchDashboard}
-            disabled={isLoading}
+            onClick={() => refetch()}
+            disabled={isFetching}
           >
-            <RefreshCw className={cn("w-4 h-4 mr-2", isLoading && "animate-spin")} />
+            <RefreshCw className={cn('w-4 h-4 mr-2', isFetching && 'animate-spin')} />
             Refresh
           </Button>
+          
           <Link href="/dashboard/inventory/transaction?type=damage">
             <Button variant="outline" size="sm" className="border-red-200 text-red-600 hover:bg-red-50">
               <Trash2 className="w-4 h-4 mr-2" />
               Report Damage
             </Button>
           </Link>
+          
           <Link href="/dashboard/inventory/purchase/new">
             <Button className="bg-orange-500 hover:bg-orange-600 text-white">
               <Plus className="w-4 h-4 mr-2" />
@@ -342,217 +385,145 @@ export default function InventoryPage() {
       {/* Error Banner */}
       {error && (
         <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-lg flex items-center justify-between">
-          <span className="text-red-700">{error}</span>
-          <Button size="sm" variant="ghost" onClick={fetchDashboard}>Retry</Button>
+          <span className="text-red-700">Failed to load dashboard. Please retry.</span>
+          <Button size="sm" variant="ghost" onClick={() => refetch()}>Retry</Button>
         </div>
       )}
 
-      {/* Key Metrics - 4 cards for both admin and staff */}
+      {/* 4 Key Metrics */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-        {/* Card 1: Total Stock (Value for admin, Units for staff) */}
-        {canSeeFinancials ? (
-          <MetricCard
-            title="Total Stock Value"
-            value={typeof data?.total_stock_value?.value === 'number' 
-              ? formatCurrency(data.total_stock_value.value) 
-              : data?.total_stock_value?.value || '***'}
-            subtitle={`${data?.total_stock_value?.units?.toLocaleString() || 0} units in ${data?.total_stock_value?.active_variants || 0} variants`}
-            icon={DollarSign}
-            iconBg="bg-emerald-100"
-            iconColor="text-emerald-600"
-            sparklineData={data?.stock_trend}
-            isLoading={isLoading}
-          />
-        ) : (
-          <MetricCard
-            title="Total Stock"
-            value={`${(data?.total_stock_value?.units || 0).toLocaleString()}`}
-            subtitle={`${data?.total_stock_value?.active_variants || 0} active variants`}
-            icon={Package}
-            iconBg="bg-emerald-100"
-            iconColor="text-emerald-600"
-            isLoading={isLoading}
-          />
-        )}
+        {/* Card 1: Total Stock */}
+        <MetricCard
+          title="Total Stock Value"
+          value={canSeeFinancials && typeof data?.total_stock_value?.value === 'number'
+            ? formatCurrency(data.total_stock_value.value)
+            : `${(data?.total_stock_value?.units || 0).toLocaleString()} units`
+          }
+          subtitle={`${data?.total_stock_value?.active_variants || 0} active variants`}
+          icon={canSeeFinancials ? DollarSign : Package}
+          iconBg="bg-emerald-100"
+          iconColor="text-emerald-600"
+          isLoading={isLoading}
+        />
 
-        {/* Card 2: Stock In (Value for admin, Units for staff) */}
-        {canSeeFinancials ? (
-          <MetricCard
-            title="Stock In This Month"
-            value={typeof data?.inventory_turnover?.this_month?.stock_in === 'number' 
-              ? formatCurrency(data.inventory_turnover.this_month.stock_in) 
-              : '***'}
-            subtitle={`${data?.inventory_turnover?.this_month?.stock_in_qty?.toLocaleString() || 0} units purchased`}
-            icon={TrendingUp}
-            iconBg="bg-blue-100"
-            iconColor="text-blue-600"
-            isLoading={isLoading}
-          />
-        ) : (
-          <MetricCard
-            title="Stock In"
-            value={`${(data?.inventory_turnover?.this_month?.stock_in_qty || 0).toLocaleString()}`}
-            subtitle="Units received this month"
-            icon={TrendingUp}
-            iconBg="bg-blue-100"
-            iconColor="text-blue-600"
-            isLoading={isLoading}
-          />
-        )}
+        {/* Card 2: Stock In */}
+        <MetricCard
+          title="Stock In"
+          value={canSeeFinancials && typeof data?.inventory_turnover?.this_month?.stock_in === 'number'
+            ? formatCurrency(data.inventory_turnover.this_month.stock_in)
+            : `${(data?.inventory_turnover?.this_month?.stock_in_qty || 0).toLocaleString()} units`
+          }
+          subtitle={`${data?.purchase_summary?.count || 0} purchases`}
+          icon={TrendingUp}
+          iconBg="bg-blue-100"
+          iconColor="text-blue-600"
+          trend={purchaseTrend}
+          trendLabel="vs prev"
+          isLoading={isLoading}
+        />
 
-        {/* Card 3: Critical/Low Stock - Visible to ALL */}
-        <Link href="/dashboard/products?filter=low_stock" className="block">
-          <MetricCard
-            title="Low Stock Alert"
-            value={data?.critical_stock?.count || 0}
-            subtitle="Items need restocking"
-            icon={AlertOctagon}
-            iconBg="bg-amber-100"
-            iconColor="text-amber-600"
-            onClick={() => {}}
-            isLoading={isLoading}
-          />
-        </Link>
+        {/* Card 3: Low Stock */}
+        <MetricCard
+          title="Low Stock Alert"
+          value={data?.critical_stock?.count || 0}
+          subtitle="Items need restocking"
+          icon={AlertOctagon}
+          iconBg="bg-amber-100"
+          iconColor="text-amber-600"
+          isLoading={isLoading}
+          href="/dashboard/products?filter=low_stock"
+        />
 
         {/* Card 4: Damage/Out of Stock */}
-        {canSeeFinancials ? (
-          <MetricCard
-            title="Damage Loss"
-            value={typeof data?.damage_loss?.this_month?.total_value === 'number' 
-              ? formatCurrency(data.damage_loss.this_month.total_value) 
-              : data?.damage_loss?.this_month?.total_value || '***'}
-            subtitle={`${data?.damage_loss?.this_month?.units_damaged || 0} units damaged`}
-            icon={Trash2}
-            iconBg="bg-red-100"
-            iconColor="text-red-600"
-            trend={{
-              value: typeof data?.damage_loss?.this_month?.total_value === 'number' &&
-                     typeof data?.damage_loss?.last_month?.total_value === 'number' &&
-                     data.damage_loss.last_month.total_value > 0
-                ? Math.round(((data.damage_loss.this_month.total_value - data.damage_loss.last_month.total_value) / data.damage_loss.last_month.total_value) * 100)
-                : 0,
-              label: 'vs last month'
-            }}
-            isLoading={isLoading}
-          />
-        ) : (
-          <Link href="/dashboard/products?filter=out_of_stock" className="block">
-            <MetricCard
-              title="Out of Stock"
-              value={data?.pending_actions?.out_of_stock || 0}
-              subtitle="Items need immediate action"
-              icon={AlertTriangle}
-              iconBg="bg-red-100"
-              iconColor="text-red-600"
-              onClick={() => {}}
-              isLoading={isLoading}
-            />
-          </Link>
-        )}
+        <MetricCard
+          title={canSeeFinancials ? 'Damage Loss' : 'Out of Stock'}
+          value={canSeeFinancials && typeof data?.damage_loss?.this_month?.total_value === 'number'
+            ? formatCurrency(data.damage_loss.this_month.total_value)
+            : (data?.pending_actions?.out_of_stock || 0)
+          }
+          subtitle={canSeeFinancials 
+            ? `${data?.damage_loss?.this_month?.units_damaged || 0} units damaged`
+            : 'Items unavailable'
+          }
+          icon={canSeeFinancials ? Trash2 : AlertTriangle}
+          iconBg="bg-red-100"
+          iconColor="text-red-600"
+          isLoading={isLoading}
+          href={canSeeFinancials ? undefined : '/dashboard/products?filter=out_of_stock'}
+        />
       </div>
 
-      {/* Stock Movement Summary - Different view for admin vs staff */}
-      <div className="grid grid-cols-1 lg:grid-cols-4 gap-6 mb-8">
-        <div className="lg:col-span-3 bg-white rounded-xl shadow-sm border border-gray-200 p-6">
-          <div className="flex items-center justify-between mb-6">
-            <h2 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
+      {/* Stock Movement & Actions Grid */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
+        {/* Stock Movement Chart */}
+        <Card className="lg:col-span-2">
+          <CardHeader className="flex flex-row items-center justify-between pb-2">
+            <CardTitle className="text-lg font-semibold flex items-center gap-2">
               <BarChart3 className="w-5 h-5 text-orange-500" />
-              {canSeeFinancials ? 'Stock Movement This Month' : 'Monthly Stock Flow'}
-            </h2>
+              Stock Movement
+            </CardTitle>
             <Link href="/dashboard/inventory/movement-report" className="text-sm text-orange-500 hover:text-orange-600 flex items-center gap-1">
               Full Report <ArrowRight className="w-4 h-4" />
             </Link>
-          </div>
-          
-          <div className="grid grid-cols-3 gap-4">
-            {/* Stock In */}
-            <div className="text-center p-5 bg-gradient-to-br from-green-50 to-emerald-50 rounded-xl border border-green-100">
-              <div className="w-12 h-12 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-3">
-                <TrendingUp className="w-6 h-6 text-green-600" />
-              </div>
-              <div className="text-2xl font-bold text-green-700">
-                {canSeeFinancials
-                  ? (typeof data?.inventory_turnover?.this_month?.stock_in === 'number' 
-                      ? formatCurrency(data.inventory_turnover.this_month.stock_in)
-                      : '***')
-                  : (data?.inventory_turnover?.this_month?.stock_in_qty?.toLocaleString() || '0')
-                }
-              </div>
-              <div className="text-sm text-green-600 font-medium">
-                {canSeeFinancials 
-                  ? `${data?.inventory_turnover?.this_month?.stock_in_qty?.toLocaleString() || 0} units`
-                  : 'units received'
-                }
-              </div>
-              <div className="text-xs text-gray-500 mt-2">Stock In (Purchases)</div>
-            </div>
-
-            {/* Stock Out */}
-            <div className="text-center p-5 bg-gradient-to-br from-red-50 to-rose-50 rounded-xl border border-red-100">
-              <div className="w-12 h-12 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-3">
-                <TrendingDown className="w-6 h-6 text-red-600" />
-              </div>
-              <div className="text-2xl font-bold text-red-700">
-                {canSeeFinancials
-                  ? (typeof data?.inventory_turnover?.this_month?.stock_out === 'number' 
-                      ? formatCurrency(data.inventory_turnover.this_month.stock_out)
-                      : '***')
-                  : (data?.inventory_turnover?.this_month?.stock_out_qty?.toLocaleString() || '0')
-                }
-              </div>
-              <div className="text-sm text-red-600 font-medium">
-                {canSeeFinancials 
-                  ? `${data?.inventory_turnover?.this_month?.stock_out_qty?.toLocaleString() || 0} units`
-                  : 'units out'
-                }
-              </div>
-              <div className="text-xs text-gray-500 mt-2">Returns & Damage</div>
-            </div>
-
-            {/* Third Column: Orders Value for admin, Damage Count for staff */}
-            {canSeeFinancials ? (
-              <div className="text-center p-5 bg-gradient-to-br from-blue-50 to-indigo-50 rounded-xl border border-blue-100">
-                <div className="w-12 h-12 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-3">
-                  <Package className="w-6 h-6 text-blue-600" />
-                </div>
-                <div className="text-2xl font-bold text-blue-700">
-                  {typeof data?.inventory_turnover?.this_month?.orders_value === 'number' 
-                    ? formatCurrency(data.inventory_turnover.this_month.orders_value)
-                    : '***'}
-                </div>
-                <div className="text-sm text-blue-600 font-medium">delivered</div>
-                <div className="text-xs text-gray-500 mt-2">Orders Value</div>
+          </CardHeader>
+          <CardContent>
+            {isLoading ? (
+              <div className="h-[200px] flex items-center justify-center">
+                <Loader2 className="w-8 h-8 animate-spin text-gray-400" />
               </div>
             ) : (
-              <div className="text-center p-5 bg-gradient-to-br from-purple-50 to-violet-50 rounded-xl border border-purple-100">
-                <div className="w-12 h-12 bg-purple-100 rounded-full flex items-center justify-center mx-auto mb-3">
-                  <Trash2 className="w-6 h-6 text-purple-600" />
+              <StockMovementChart data={data || null} canSeeFinancials={canSeeFinancials} />
+            )}
+            
+            {/* Summary Cards Below Chart */}
+            <div className="grid grid-cols-3 gap-4 mt-6">
+              <div className="text-center p-4 bg-green-50 rounded-xl">
+                <TrendingUp className="w-6 h-6 text-green-600 mx-auto mb-2" />
+                <div className="text-xl font-bold text-green-700">
+                  {canSeeFinancials && typeof data?.inventory_turnover?.this_month?.stock_in === 'number'
+                    ? formatCurrency(data.inventory_turnover.this_month.stock_in)
+                    : `${(data?.inventory_turnover?.this_month?.stock_in_qty || 0).toLocaleString()}`
+                  }
                 </div>
-                <div className="text-2xl font-bold text-purple-700">
+                <div className="text-xs text-green-600">{canSeeFinancials ? 'Purchase Value' : 'Units In'}</div>
+              </div>
+              
+              <div className="text-center p-4 bg-red-50 rounded-xl">
+                <TrendingDown className="w-6 h-6 text-red-600 mx-auto mb-2" />
+                <div className="text-xl font-bold text-red-700">
+                  {canSeeFinancials && typeof data?.inventory_turnover?.this_month?.stock_out === 'number'
+                    ? formatCurrency(data.inventory_turnover.this_month.stock_out)
+                    : `${(data?.inventory_turnover?.this_month?.stock_out_qty || 0).toLocaleString()}`
+                  }
+                </div>
+                <div className="text-xs text-red-600">{canSeeFinancials ? 'Returns/Damage' : 'Units Out'}</div>
+              </div>
+              
+              <div className="text-center p-4 bg-purple-50 rounded-xl">
+                <Trash2 className="w-6 h-6 text-purple-600 mx-auto mb-2" />
+                <div className="text-xl font-bold text-purple-700">
                   {data?.damage_loss?.this_month?.units_damaged || 0}
                 </div>
-                <div className="text-sm text-purple-600 font-medium">
-                  {data?.damage_loss?.this_month?.transaction_count || 0} entries
-                </div>
-                <div className="text-xs text-gray-500 mt-2">Damaged This Month</div>
+                <div className="text-xs text-purple-600">Damaged Units</div>
               </div>
-            )}
-          </div>
-        </div>
+            </div>
+          </CardContent>
+        </Card>
 
-        {/* Pending Actions / Quick Actions */}
-        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
-          <h3 className="font-semibold text-gray-900 mb-4 flex items-center gap-2">
-            <Clock className="w-5 h-5 text-orange-500" />
-            {canSeeFinancials ? 'Pending Actions' : 'Quick Actions'}
-          </h3>
-          
-          <div className="space-y-3">
+        {/* Quick Actions & Pending */}
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-lg font-semibold flex items-center gap-2">
+              <Clock className="w-5 h-5 text-orange-500" />
+              Quick Actions
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-3">
             <Link href="/dashboard/inventory/transaction?status=pending" className="block">
               <div className="flex items-center justify-between p-3 bg-amber-50 rounded-lg hover:bg-amber-100 transition-colors border border-amber-100">
                 <div className="flex items-center gap-2">
                   <Clock className="w-4 h-4 text-amber-600" />
-                  <span className="text-sm font-medium text-gray-700">Pending</span>
+                  <span className="text-sm font-medium text-gray-700">Pending Approvals</span>
                 </div>
                 <Badge className="bg-amber-500">{data?.pending_actions?.pending_approvals || 0}</Badge>
               </div>
@@ -562,155 +533,169 @@ export default function InventoryPage() {
               <div className="flex items-center justify-between p-3 bg-red-50 rounded-lg hover:bg-red-100 transition-colors border border-red-100">
                 <div className="flex items-center gap-2">
                   <AlertTriangle className="w-4 h-4 text-red-600" />
-                  <span className="text-sm font-medium text-gray-700">No Stock</span>
+                  <span className="text-sm font-medium text-gray-700">Out of Stock</span>
                 </div>
                 <Badge variant="destructive">{data?.pending_actions?.out_of_stock || 0}</Badge>
               </div>
             </Link>
 
-            {/* Quick action buttons for staff */}
-            {!canSeeFinancials && (
-              <>
-                <div className="border-t border-gray-100 my-3" />
-                <Link href="/dashboard/inventory/purchase/new" className="block">
-                  <Button variant="outline" size="sm" className="w-full justify-start gap-2 border-green-200 text-green-700 hover:bg-green-50">
-                    <PackagePlus className="w-4 h-4" />
-                    New Purchase
-                  </Button>
-                </Link>
-                <Link href="/dashboard/inventory/transaction?type=damage" className="block">
-                  <Button variant="outline" size="sm" className="w-full justify-start gap-2 border-red-200 text-red-700 hover:bg-red-50">
-                    <Trash2 className="w-4 h-4" />
-                    Report Damage
-                  </Button>
-                </Link>
-              </>
-            )}
-          </div>
-        </div>
+            <div className="border-t border-gray-100 my-4" />
+            
+            {/* 7-Day Trend Sparkline */}
+            <div className="p-3 bg-gray-50 rounded-lg">
+              <div className="text-xs font-medium text-gray-500 mb-2">7-Day Stock Trend</div>
+              <MiniSparkline data={data?.stock_trend || []} />
+            </div>
+
+            <div className="border-t border-gray-100 my-4" />
+
+            <Link href="/dashboard/inventory/purchase/new" className="block">
+              <Button variant="outline" size="sm" className="w-full justify-start gap-2 border-green-200 text-green-700 hover:bg-green-50">
+                <PackagePlus className="w-4 h-4" />
+                New Purchase Entry
+              </Button>
+            </Link>
+            
+            <Link href="/dashboard/inventory/transaction?type=damage" className="block">
+              <Button variant="outline" size="sm" className="w-full justify-start gap-2 border-red-200 text-red-700 hover:bg-red-50">
+                <Trash2 className="w-4 h-4" />
+                Report Damage
+              </Button>
+            </Link>
+            
+            <Link href="/dashboard/inventory/transaction?type=return" className="block">
+              <Button variant="outline" size="sm" className="w-full justify-start gap-2 border-orange-200 text-orange-700 hover:bg-orange-50">
+                <PackageMinus className="w-4 h-4" />
+                Record Return
+              </Button>
+            </Link>
+          </CardContent>
+        </Card>
       </div>
 
-      {/* Bottom Grid */}
+      {/* Bottom Grid: Transactions & Critical Stock */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Recent Transactions */}
-        <div className="lg:col-span-2 bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
-          <div className="p-6 border-b border-gray-100 flex items-center justify-between">
-            <h2 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
+        <Card className="lg:col-span-2">
+          <CardHeader className="flex flex-row items-center justify-between pb-2">
+            <CardTitle className="text-lg font-semibold flex items-center gap-2">
               <FileText className="w-5 h-5 text-gray-400" />
               Recent Transactions
-            </h2>
+            </CardTitle>
             <Link href="/dashboard/inventory/transaction" className="text-sm text-orange-500 hover:text-orange-600 flex items-center gap-1">
               View All <ArrowRight className="w-4 h-4" />
             </Link>
-          </div>
+          </CardHeader>
+          <CardContent className="p-0">
+            {isLoading ? (
+              <div className="p-12 text-center">
+                <Loader2 className="w-8 h-8 animate-spin mx-auto text-gray-400" />
+              </div>
+            ) : data?.recent_transactions && data.recent_transactions.length > 0 ? (
+              <div className="divide-y divide-gray-100">
+                {data.recent_transactions.slice(0, 6).map((tx) => {
+                  const config = TYPE_CONFIG[tx.transaction_type] || TYPE_CONFIG.adjustment;
+                  const status = STATUS_CONFIG[tx.status] || STATUS_CONFIG.pending;
+                  const Icon = config.icon;
 
-          {isLoading ? (
-            <div className="p-12 text-center">
-              <Loader2 className="w-8 h-8 animate-spin mx-auto text-gray-400" />
-            </div>
-          ) : data?.recent_transactions && data.recent_transactions.length > 0 ? (
-            <div className="divide-y divide-gray-100">
-              {data.recent_transactions.slice(0, 6).map((tx) => {
-                const config = TYPE_CONFIG[tx.transaction_type] || TYPE_CONFIG.adjustment;
-                const status = STATUS_CONFIG[tx.status] || STATUS_CONFIG.pending;
-                const Icon = config.icon;
-
-                return (
-                  <Link 
-                    key={tx.id} 
-                    href={`/dashboard/inventory/transaction/${tx.id}`}
-                    className="flex items-center gap-4 p-4 hover:bg-gray-50 transition-colors"
-                  >
-                    <div className={cn("w-10 h-10 rounded-lg flex items-center justify-center", config.bgColor)}>
-                      <Icon className={cn("w-5 h-5", config.color)} />
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2">
-                        <span className="font-medium text-gray-900">{tx.invoice_no}</span>
-                        <Badge className={cn("text-xs", status.color)}>{status.label}</Badge>
+                  return (
+                    <Link 
+                      key={tx.id} 
+                      href={`/dashboard/inventory/transaction/${tx.id}`}
+                      className="flex items-center gap-4 p-4 hover:bg-gray-50 transition-colors"
+                    >
+                      <div className={cn('w-10 h-10 rounded-lg flex items-center justify-center', config.bgColor)}>
+                        <Icon className={cn('w-5 h-5', config.color)} />
                       </div>
-                      <div className="text-sm text-gray-500 flex items-center gap-2">
-                        <Calendar className="w-3 h-3" />
-                        {new Date(tx.transaction_date).toLocaleDateString()}
-                        {tx.vendor && <span>• {tx.vendor.name}</span>}
-                      </div>
-                    </div>
-                    <div className="text-right">
-                      {canSeeFinancials ? (
-                        <div className="font-medium text-gray-900">
-                          {typeof tx.total_cost === 'number' ? formatCurrency(tx.total_cost) : '***'}
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2">
+                          <span className="font-medium text-gray-900">{tx.invoice_no}</span>
+                          <Badge className={cn('text-xs', status.color)}>{status.label}</Badge>
                         </div>
-                      ) : null}
-                      <div className="text-xs text-gray-400">{config.label}</div>
-                    </div>
-                  </Link>
-                );
-              })}
-            </div>
-          ) : (
-            <div className="p-12 text-center text-gray-400">
-              <Package className="w-12 h-12 mx-auto mb-3 text-gray-300" />
-              <p className="font-medium">No transactions yet</p>
-              <Link href="/dashboard/inventory/purchase/new" className="mt-4 inline-block">
-                <Button className="bg-orange-500 hover:bg-orange-600">
-                  <Plus className="w-4 h-4 mr-2" />
-                  New Purchase
-                </Button>
-              </Link>
-            </div>
-          )}
-        </div>
+                        <div className="text-sm text-gray-500 flex items-center gap-2">
+                          <Calendar className="w-3 h-3" />
+                          {new Date(tx.transaction_date).toLocaleDateString()}
+                          {tx.vendor && <span>• {tx.vendor.name}</span>}
+                        </div>
+                      </div>
+                      <div className="text-right">
+                        {canSeeFinancials && tx.total_cost !== null && (
+                          <div className="font-medium text-gray-900">
+                            {typeof tx.total_cost === 'number' ? formatCurrency(tx.total_cost) : tx.total_cost}
+                          </div>
+                        )}
+                        <div className="text-xs text-gray-400">{config.label}</div>
+                      </div>
+                    </Link>
+                  );
+                })}
+              </div>
+            ) : (
+              <div className="p-12 text-center text-gray-400">
+                <Package className="w-12 h-12 mx-auto mb-3 text-gray-300" />
+                <p className="font-medium">No transactions yet</p>
+                <Link href="/dashboard/inventory/purchase/new" className="mt-4 inline-block">
+                  <Button className="bg-orange-500 hover:bg-orange-600">
+                    <Plus className="w-4 h-4 mr-2" />
+                    New Purchase
+                  </Button>
+                </Link>
+              </div>
+            )}
+          </CardContent>
+        </Card>
 
         {/* Critical Stock Items */}
-        <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
-          <div className="p-6 border-b border-gray-100">
-            <h3 className="font-semibold text-gray-900 flex items-center gap-2">
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-lg font-semibold flex items-center gap-2">
               <AlertTriangle className="w-5 h-5 text-amber-500" />
-              Critical Stock Items
-            </h3>
-          </div>
-
-          {isLoading ? (
-            <div className="p-8 text-center">
-              <Loader2 className="w-6 h-6 animate-spin mx-auto text-gray-400" />
-            </div>
-          ) : data?.critical_stock?.items && data.critical_stock.items.length > 0 ? (
-            <div className="divide-y divide-gray-100 max-h-80 overflow-y-auto">
-              {data.critical_stock.items.slice(0, 8).map((item) => (
-                <div key={item.id} className="p-4 hover:bg-gray-50">
-                  <div className="flex items-center justify-between mb-1">
-                    <span className="font-medium text-gray-900 text-sm truncate max-w-[180px]">
-                      {item.product_name}
-                    </span>
-                    <Badge variant="destructive" className="text-xs">
-                      {item.current_stock} left
-                    </Badge>
+              Critical Stock
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="p-0">
+            {isLoading ? (
+              <div className="p-8 text-center">
+                <Loader2 className="w-6 h-6 animate-spin mx-auto text-gray-400" />
+              </div>
+            ) : data?.critical_stock?.items && data.critical_stock.items.length > 0 ? (
+              <div className="divide-y divide-gray-100 max-h-80 overflow-y-auto">
+                {data.critical_stock.items.slice(0, 8).map((item) => (
+                  <div key={item.id} className="p-4 hover:bg-gray-50">
+                    <div className="flex items-center justify-between mb-1">
+                      <span className="font-medium text-gray-900 text-sm truncate max-w-[180px]">
+                        {item.product_name}
+                      </span>
+                      <Badge variant="destructive" className="text-xs">
+                        {item.current_stock} left
+                      </Badge>
+                    </div>
+                    <div className="flex items-center justify-between text-xs text-gray-500">
+                      <span>{item.sku}</span>
+                      <span>Min: {item.threshold}</span>
+                    </div>
                   </div>
-                  <div className="flex items-center justify-between text-xs text-gray-500">
-                    <span>{item.sku}</span>
-                    <span>Threshold: {item.threshold}</span>
-                  </div>
-                </div>
-              ))}
-            </div>
-          ) : (
-            <div className="p-8 text-center">
-              <CheckCircle className="w-12 h-12 text-green-500 mx-auto mb-2" />
-              <p className="font-medium text-green-700">All Stock Healthy</p>
-              <p className="text-sm text-gray-500">No items below threshold</p>
-            </div>
-          )}
+                ))}
+              </div>
+            ) : (
+              <div className="p-8 text-center">
+                <CheckCircle className="w-12 h-12 text-green-500 mx-auto mb-2" />
+                <p className="font-medium text-green-700">All Stock Healthy</p>
+                <p className="text-sm text-gray-500">No items below threshold</p>
+              </div>
+            )}
 
-          {data?.critical_stock?.count && data.critical_stock.count > 8 && (
-            <div className="p-4 border-t border-gray-100">
-              <Link href="/dashboard/products?filter=low_stock">
-                <Button variant="outline" size="sm" className="w-full">
-                  View All {data.critical_stock.count} Items
-                </Button>
-              </Link>
-            </div>
-          )}
-        </div>
+            {data?.critical_stock?.count && data.critical_stock.count > 8 && (
+              <div className="p-4 border-t border-gray-100">
+                <Link href="/dashboard/products?filter=low_stock">
+                  <Button variant="outline" size="sm" className="w-full">
+                    View All {data.critical_stock.count} Items
+                  </Button>
+                </Link>
+              </div>
+            )}
+          </CardContent>
+        </Card>
       </div>
     </div>
   );

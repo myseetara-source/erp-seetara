@@ -5,6 +5,7 @@
 
 import DashboardLayout from '@/components/layouts/DashboardLayout';
 import ErrorBoundary from '@/components/common/ErrorBoundary';
+import { QueryProvider } from '@/lib/providers/QueryProvider';
 
 export default function Layout({
   children,
@@ -13,7 +14,9 @@ export default function Layout({
 }) {
   return (
     <ErrorBoundary>
-      <DashboardLayout>{children}</DashboardLayout>
+      <QueryProvider>
+        <DashboardLayout>{children}</DashboardLayout>
+      </QueryProvider>
     </ErrorBoundary>
   );
 }
