@@ -200,27 +200,42 @@ export default function TransactionDetailPanel({
 
       try {
         if (entryType === 'purchase' || entryType === 'purchase_return') {
-          // For purchase/return, we need the reference_id (inventory transaction ID)
-          if (!referenceId) {
-            setError('No inventory reference found');
-            setIsLoading(false);
-            return;
-          }
-          
-          // Fetch inventory transaction details using reference_id
-          const response = await apiClient.get(`/inventory/transactions/${referenceId}`);
-          if (response.data.success && response.data.data) {
-            const txData = response.data.data;
-            // Ensure total_cost is properly set from items if missing
-            if (!txData.total_cost || txData.total_cost === 0) {
-              txData.total_cost = (txData.items || []).reduce(
-                (sum: number, item: TransactionItem) => sum + (item.quantity * item.unit_cost), 
-                0
-              );
+          // For purchase/return, try to get from inventory_transactions first
+          if (referenceId) {
+            // Fetch inventory transaction details using reference_id
+            const response = await apiClient.get(`/inventory/transactions/${referenceId}`);
+            if (response.data.success && response.data.data) {
+              const txData = response.data.data;
+              // Ensure total_cost is properly set from items if missing
+              if (!txData.total_cost || txData.total_cost === 0) {
+                txData.total_cost = (txData.items || []).reduce(
+                  (sum: number, item: TransactionItem) => sum + (item.quantity * item.unit_cost), 
+                  0
+                );
+              }
+              setInventoryTx(txData);
+            } else {
+              setError('Transaction not found in inventory');
             }
-            setInventoryTx(txData);
           } else {
-            setError('Transaction not found');
+            // No reference_id - try to get basic info from ledger entry
+            const ledgerResponse = await apiClient.get(`/vendors/ledger-entry/${transactionId}`);
+            if (ledgerResponse.data.success && ledgerResponse.data.data) {
+              const ledger = ledgerResponse.data.data;
+              // Create a minimal inventory transaction from ledger data
+              setInventoryTx({
+                id: ledger.id,
+                invoice_no: ledger.reference_no || 'N/A',
+                transaction_type: entryType,
+                status: 'approved',
+                total_cost: ledger.debit || ledger.credit || 0,
+                transaction_date: ledger.transaction_date,
+                notes: ledger.description,
+                items: [], // No items available
+              });
+            } else {
+              setError('Transaction details not found');
+            }
           }
         } else if (entryType === 'payment') {
           // For payments, use the ledger entry ID directly

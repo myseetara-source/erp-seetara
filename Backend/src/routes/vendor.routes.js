@@ -60,6 +60,23 @@ router.get(
 );
 
 // =============================================================================
+// STATIC ROUTES - MUST BE BEFORE /:id TO AVOID CONFLICTS
+// =============================================================================
+
+/**
+ * Get single ledger entry by ID
+ * GET /vendors/ledger-entry/:id
+ * 
+ * SECURITY: Admin only - Ledger entries are financial data
+ * NOTE: MUST be before /:id routes!
+ */
+router.get(
+  '/ledger-entry/:id',
+  authorize('admin'),
+  vendorController.getLedgerEntry
+);
+
+// =============================================================================
 // VENDOR CRUD - Admin Only
 // =============================================================================
 
@@ -247,19 +264,6 @@ router.post(
 // =============================================================================
 // PAYMENTS - Admin Only (Financial Transactions)
 // =============================================================================
-
-/**
- * Get single ledger entry by ID
- * GET /vendors/ledger-entry/:id
- * 
- * SECURITY: Admin only - Ledger entries are financial data
- * NOTE: Must be BEFORE any /:id routes to prevent 'ledger-entry' being treated as vendor ID
- */
-router.get(
-  '/ledger-entry/:id',
-  authorize('admin'),
-  vendorController.getLedgerEntry
-);
 
 /**
  * Record vendor payment (General endpoint)
