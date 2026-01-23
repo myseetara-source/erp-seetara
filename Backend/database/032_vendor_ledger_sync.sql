@@ -78,10 +78,10 @@ BEGIN
             v_credit := 0;
             v_description := 'Purchase: ' || NEW.invoice_no;
         WHEN 'purchase_return' THEN
-            v_entry_type := 'return';
+            v_entry_type := 'purchase_return';
             v_debit := 0;
             v_credit := COALESCE(NEW.total_cost, 0);  -- Vendor owes us back
-            v_description := 'Return: ' || NEW.invoice_no;
+            v_description := 'Purchase Return: ' || NEW.invoice_no;
         ELSE
             RETURN NEW;  -- Unknown type, skip
     END CASE;
@@ -198,7 +198,7 @@ SELECT
     it.vendor_id,
     CASE it.transaction_type 
         WHEN 'purchase' THEN 'purchase'::vendor_ledger_type
-        WHEN 'purchase_return' THEN 'return'::vendor_ledger_type
+        WHEN 'purchase_return' THEN 'purchase_return'::vendor_ledger_type
     END,
     it.id,
     it.invoice_no,
