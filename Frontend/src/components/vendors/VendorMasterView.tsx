@@ -581,10 +581,10 @@ function VendorDetailView({ vendorId, onTransactionSuccess }: VendorDetailViewPr
                           'text-sm font-semibold',
                           isPayment ? 'text-green-600' : 'text-gray-900'
                         )}>
-                          {isPayment ? '-' : '+'}₹{(tx.debit || tx.credit || 0).toLocaleString()}
+                          {isPayment ? '-' : '+'}{formatCurrency(tx.debit || tx.credit || 0)}
                         </p>
                         <p className="text-[10px] text-gray-400">
-                          ₹{(tx.running_balance || 0).toLocaleString()}
+                          Bal: {formatCurrency(tx.running_balance || 0)}
                         </p>
                       </div>
                     </div>
