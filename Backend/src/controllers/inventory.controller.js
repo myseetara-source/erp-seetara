@@ -438,44 +438,49 @@ export const getLowStockAlerts = catchAsync(async (req, res) => {
 import { supabaseAdmin } from '../config/supabase.js';
 
 /**
- * Get inventory dashboard summary
+ * Get inventory dashboard summary (ADVANCED)
  * GET /inventory/dashboard
  * 
- * Returns ALL stats in a single call:
- * - Products & variants count
- * - Stock alerts (low stock, out of stock)
- * - This month stock movement (in/out values)
- * - Pending approvals count
- * - Recent transactions
- * - Low stock items
- * - Inventory valuation
+ * Returns comprehensive metrics in a single call:
+ * - Total Stock Value (inventory valuation)
+ * - Inventory Turnover (monthly in/out)
+ * - Critical Stock (below threshold)
+ * - Damage Loss (this month's loss)
+ * - Stock Trend (7-day sparkline data)
+ * - Pending Actions
+ * - Recent Transactions
  */
 export const getDashboardSummary = catchAsync(async (req, res) => {
   const isAdmin = ['admin', 'manager'].includes(req.user?.role);
 
-  // Call the RPC function
-  const { data, error } = await supabaseAdmin.rpc('get_inventory_dashboard_summary');
+  // Call the advanced RPC function
+  const { data, error } = await supabaseAdmin.rpc('get_inventory_dashboard_stats');
 
   if (error) {
     logger.error('Dashboard RPC failed', { error });
     
-    // Fallback: Return basic stats on RPC failure
-    const fallbackStats = {
-      products: { total: 0, active: 0 },
-      variants: { total: 0, active: 0 },
-      alerts: { low_stock: 0, out_of_stock: 0 },
-      this_month: { stock_in_value: 0, stock_out_value: 0 },
-      pending_approvals: 0,
-      recent_transactions: [],
-      low_stock_items: [],
-      valuation: { total_value: 0, total_units: 0 },
-      generated_at: new Date().toISOString(),
-      fallback: true,
-    };
-
+    // Try fallback to simpler RPC
+    const { data: fallbackData, error: fallbackError } = await supabaseAdmin
+      .rpc('get_inventory_dashboard_summary');
+    
+    if (!fallbackError && fallbackData) {
+      return res.json({ success: true, data: fallbackData });
+    }
+    
+    // Ultimate fallback
     return res.json({
       success: true,
-      data: fallbackStats,
+      data: {
+        total_stock_value: { value: 0, units: 0 },
+        inventory_turnover: { this_month: { stock_in: 0, stock_out: 0 } },
+        critical_stock: { count: 0, items: [] },
+        damage_loss: { this_month: { total_value: 0 } },
+        stock_trend: [],
+        pending_actions: { pending_approvals: 0, out_of_stock: 0 },
+        recent_transactions: [],
+        generated_at: new Date().toISOString(),
+        fallback: true,
+      },
     });
   }
 
@@ -483,21 +488,35 @@ export const getDashboardSummary = catchAsync(async (req, res) => {
   const result = { ...data };
   
   if (!isAdmin) {
-    // Hide valuation from non-admins
-    result.valuation = { 
-      total_value: '***', 
-      total_units: result.valuation?.total_units || 0 
-    };
+    // Hide stock value
+    if (result.total_stock_value) {
+      result.total_stock_value.value = '***';
+    }
     
-    // Hide stock values
-    if (result.this_month) {
-      result.this_month.stock_in_value = '***';
-      result.this_month.stock_out_value = '***';
+    // Hide turnover values
+    if (result.inventory_turnover?.this_month) {
+      result.inventory_turnover.this_month.stock_in = '***';
+      result.inventory_turnover.this_month.stock_out = '***';
+      result.inventory_turnover.this_month.orders_value = '***';
+    }
+    
+    // Hide damage loss values
+    if (result.damage_loss?.this_month) {
+      result.damage_loss.this_month.total_value = '***';
+    }
+    
+    // Mask critical stock cost
+    if (result.critical_stock?.items) {
+      result.critical_stock.items = result.critical_stock.items.map((item) => ({
+        ...item,
+        cost_price: '***',
+        potential_loss: '***',
+      }));
     }
     
     // Mask recent transaction costs
     if (result.recent_transactions) {
-      result.recent_transactions = result.recent_transactions.map((tx: Record<string, unknown>) => ({
+      result.recent_transactions = result.recent_transactions.map((tx) => ({
         ...tx,
         total_cost: '***',
       }));
@@ -507,6 +526,38 @@ export const getDashboardSummary = catchAsync(async (req, res) => {
   res.json({
     success: true,
     data: result,
+  });
+});
+
+/**
+ * Get product movement report
+ * GET /inventory/movement-report
+ * 
+ * Returns opening -> in -> out -> closing for each product
+ */
+export const getProductMovementReport = catchAsync(async (req, res) => {
+  const { 
+    start_date, 
+    end_date, 
+    product_id, 
+    limit = 50 
+  } = req.query;
+
+  const { data, error } = await supabaseAdmin.rpc('get_product_movement_report', {
+    p_start_date: start_date || null,
+    p_end_date: end_date || null,
+    p_product_id: product_id || null,
+    p_limit: parseInt(limit) || 50,
+  });
+
+  if (error) {
+    logger.error('Movement report RPC failed', { error });
+    throw new AppError('Failed to generate movement report', 500);
+  }
+
+  res.json({
+    success: true,
+    data,
   });
 });
 
@@ -528,4 +579,5 @@ export default {
   getInventoryValuation,
   getLowStockAlerts,
   getDashboardSummary,
+  getProductMovementReport,
 };

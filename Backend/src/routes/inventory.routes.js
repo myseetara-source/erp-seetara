@@ -27,6 +27,7 @@ import inventoryController, {
   getInventoryValuation,
   getLowStockAlerts,
   getDashboardSummary,
+  getProductMovementReport,
 } from '../controllers/inventory.controller.js';
 import { authenticate, authorize } from '../middleware/auth.middleware.js';
 import { validateBody, validateQuery } from '../middleware/validate.middleware.js';
@@ -44,16 +45,35 @@ router.use(authenticate);
 // This endpoint returns ALL dashboard data in ONE call to prevent 429 errors
 
 /**
- * Get inventory dashboard summary
+ * Get inventory dashboard summary (ADVANCED)
  * GET /inventory/dashboard
  * 
- * Returns: products, variants, alerts, stock movement, pending approvals, 
- *          recent transactions, low stock items, valuation
+ * Returns comprehensive metrics:
+ * - Total Stock Value (inventory valuation)
+ * - Inventory Turnover (monthly in/out)
+ * - Critical Stock (below threshold)
+ * - Damage Loss (this month's loss)
+ * - Stock Trend (7-day sparkline data)
+ * - Pending Actions
+ * - Recent Transactions
  * 
  * PERFORMANCE: Single RPC call instead of 5-6 separate API calls
  * SECURITY: All authenticated, financial data masked for non-admins
  */
 router.get('/dashboard', getDashboardSummary);
+
+/**
+ * Get product movement report
+ * GET /inventory/movement-report
+ * 
+ * Returns opening -> in -> out -> closing for each product
+ * 
+ * @query start_date - Period start (default: month start)
+ * @query end_date - Period end (default: today)
+ * @query product_id - Filter by product (optional)
+ * @query limit - Max results (default: 50)
+ */
+router.get('/movement-report', getProductMovementReport);
 
 // =============================================================================
 // VALIDATION SCHEMAS
