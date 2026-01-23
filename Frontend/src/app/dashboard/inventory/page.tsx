@@ -76,6 +76,8 @@ interface DashboardData {
     recent: unknown[];
   };
   stock_trend: TrendDay[];
+  time_series: TimeSeriesPoint[];
+  time_bucket: 'hour' | 'day' | 'week';
   pending_actions: {
     pending_approvals: number;
     out_of_stock: number;
@@ -112,6 +114,13 @@ interface CriticalItem {
 interface TrendDay {
   day: string;
   net_change: number;
+}
+
+interface TimeSeriesPoint {
+  label: string;
+  bucket: string;
+  stock_in: number;
+  stock_out: number;
 }
 
 interface Transaction {
@@ -246,55 +255,109 @@ function MiniSparkline({ data }: { data: TrendDay[] }) {
 }
 
 // =============================================================================
-// STOCK MOVEMENT CHART
+// STOCK MOVEMENT CHART (Dynamic Time Series)
 // =============================================================================
 
 function StockMovementChart({ data, canSeeFinancials }: { data: DashboardData | null; canSeeFinancials: boolean }) {
   const chartData = useMemo(() => {
+    // Use time_series data if available (dynamic based on date range)
+    if (data?.time_series && data.time_series.length > 0) {
+      return data.time_series.map((point) => ({
+        name: point.label,
+        stockIn: point.stock_in || 0,
+        stockOut: point.stock_out || 0,
+      }));
+    }
+    
+    // Fallback to summary data
     if (!data) return [];
     
     return [
       {
         name: 'Stock In',
-        value: data.purchase_summary?.total_units || 0,
-        amount: canSeeFinancials && typeof data.purchase_summary?.total_value === 'number' 
-          ? data.purchase_summary.total_value : 0,
-        fill: '#22c55e',
+        stockIn: data.purchase_summary?.total_units || 0,
+        stockOut: 0,
       },
       {
         name: 'Stock Out',
-        value: (data.return_summary?.total_units || 0) + (data.damage_loss?.this_month?.units_damaged || 0),
-        amount: canSeeFinancials && typeof data.inventory_turnover?.this_month?.stock_out === 'number'
-          ? data.inventory_turnover.this_month.stock_out : 0,
-        fill: '#ef4444',
-      },
-      {
-        name: 'Damaged',
-        value: data.damage_loss?.this_month?.units_damaged || 0,
-        amount: canSeeFinancials && typeof data.damage_loss?.this_month?.total_value === 'number'
-          ? data.damage_loss.this_month.total_value : 0,
-        fill: '#f59e0b',
+        stockIn: 0,
+        stockOut: (data.return_summary?.total_units || 0) + (data.damage_loss?.this_month?.units_damaged || 0),
       },
     ];
-  }, [data, canSeeFinancials]);
+  }, [data]);
+
+  const hasData = chartData.some(d => d.stockIn > 0 || d.stockOut > 0);
 
   if (!data) return null;
 
+  // Show empty state if no data
+  if (!hasData) {
+    return (
+      <div className="h-[200px] flex items-center justify-center text-gray-400">
+        <div className="text-center">
+          <BarChart3 className="w-12 h-12 mx-auto mb-2 opacity-50" />
+          <p className="text-sm">No stock movement in this period</p>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <ResponsiveContainer width="100%" height={200}>
-      <BarChart data={chartData} layout="vertical" margin={{ top: 5, right: 30, left: 20, bottom: 5 }}>
+      <AreaChart data={chartData} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
+        <defs>
+          <linearGradient id="colorStockIn" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="5%" stopColor="#22c55e" stopOpacity={0.3}/>
+            <stop offset="95%" stopColor="#22c55e" stopOpacity={0}/>
+          </linearGradient>
+          <linearGradient id="colorStockOut" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="5%" stopColor="#ef4444" stopOpacity={0.3}/>
+            <stop offset="95%" stopColor="#ef4444" stopOpacity={0}/>
+          </linearGradient>
+        </defs>
         <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
-        <XAxis type="number" tick={{ fontSize: 12 }} />
-        <YAxis dataKey="name" type="category" tick={{ fontSize: 12 }} width={80} />
+        <XAxis 
+          dataKey="name" 
+          tick={{ fontSize: 11 }} 
+          tickLine={false}
+          axisLine={{ stroke: '#e5e7eb' }}
+        />
+        <YAxis 
+          tick={{ fontSize: 11 }} 
+          tickLine={false}
+          axisLine={{ stroke: '#e5e7eb' }}
+          width={40}
+        />
         <Tooltip 
           formatter={(value: number, name: string) => [
             `${value.toLocaleString()} units`,
-            name
+            name === 'stockIn' ? 'Stock In' : 'Stock Out'
           ]}
-          contentStyle={{ borderRadius: '8px', border: '1px solid #e5e7eb' }}
+          contentStyle={{ 
+            borderRadius: '8px', 
+            border: '1px solid #e5e7eb',
+            fontSize: '12px',
+          }}
         />
-        <Bar dataKey="value" radius={[0, 4, 4, 0]} />
-      </BarChart>
+        <Legend 
+          formatter={(value) => value === 'stockIn' ? 'Stock In' : 'Stock Out'}
+          wrapperStyle={{ fontSize: '12px' }}
+        />
+        <Area
+          type="monotone"
+          dataKey="stockIn"
+          stroke="#22c55e"
+          strokeWidth={2}
+          fill="url(#colorStockIn)"
+        />
+        <Area
+          type="monotone"
+          dataKey="stockOut"
+          stroke="#ef4444"
+          strokeWidth={2}
+          fill="url(#colorStockOut)"
+        />
+      </AreaChart>
     </ResponsiveContainer>
   );
 }
