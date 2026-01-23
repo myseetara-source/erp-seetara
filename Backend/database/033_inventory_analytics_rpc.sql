@@ -25,11 +25,11 @@ CREATE INDEX IF NOT EXISTS idx_inv_tx_status_date
 ON inventory_transactions(status, created_at DESC);
 
 -- Index for product_variants stock queries
-CREATE INDEX IF NOT EXISTS idx_pv_stock_quantity 
-ON product_variants(stock_quantity);
+CREATE INDEX IF NOT EXISTS idx_pv_current_stock 
+ON product_variants(current_stock) WHERE is_active = true;
 
 CREATE INDEX IF NOT EXISTS idx_pv_low_stock 
-ON product_variants(stock_quantity, low_stock_threshold);
+ON product_variants(current_stock, reorder_level) WHERE is_active = true;
 
 -- =============================================================================
 -- STEP 2: Create the main analytics function
@@ -101,13 +101,13 @@ BEGIN
     -- AGGREGATE: Total Stock Value & Units (Current Inventory)
     -- ==========================================================================
     SELECT 
-        COALESCE(SUM(pv.stock_quantity * COALESCE(pv.cost_price, 0)), 0),
-        COALESCE(SUM(pv.stock_quantity), 0),
+        COALESCE(SUM(pv.current_stock * COALESCE(pv.cost_price, 0)), 0),
+        COALESCE(SUM(pv.current_stock), 0),
         COUNT(DISTINCT pv.id)
     INTO v_total_stock_value, v_total_stock_units, v_active_variants
     FROM product_variants pv
     JOIN products p ON p.id = pv.product_id
-    WHERE pv.stock_quantity > 0
+    WHERE pv.current_stock > 0
       AND p.status = 'active';
     
     -- ==========================================================================
@@ -174,15 +174,15 @@ BEGIN
     INTO v_low_stock_count
     FROM product_variants pv
     JOIN products p ON p.id = pv.product_id
-    WHERE pv.stock_quantity > 0
-      AND pv.stock_quantity <= COALESCE(pv.low_stock_threshold, 5)
+    WHERE pv.current_stock > 0
+      AND pv.current_stock <= COALESCE(pv.reorder_level, 5)
       AND p.status = 'active';
     
     SELECT COUNT(*)
     INTO v_out_of_stock_count
     FROM product_variants pv
     JOIN products p ON p.id = pv.product_id
-    WHERE pv.stock_quantity <= 0
+    WHERE pv.current_stock <= 0
       AND p.status = 'active';
     
     -- ==========================================================================
@@ -244,16 +244,16 @@ BEGIN
             pv.id,
             pv.sku,
             p.name as product_name,
-            pv.stock_quantity as current_stock,
-            COALESCE(pv.low_stock_threshold, 5) as threshold,
+            pv.current_stock as current_stock,
+            COALESCE(pv.reorder_level, 5) as threshold,
             CASE WHEN v_can_see_financials THEN pv.cost_price ELSE NULL END as cost_price,
             pv.selling_price
         FROM product_variants pv
         JOIN products p ON p.id = pv.product_id
-        WHERE pv.stock_quantity > 0
-          AND pv.stock_quantity <= COALESCE(pv.low_stock_threshold, 5)
+        WHERE pv.current_stock > 0
+          AND pv.current_stock <= COALESCE(pv.reorder_level, 5)
           AND p.status = 'active'
-        ORDER BY pv.stock_quantity ASC
+        ORDER BY pv.current_stock ASC
         LIMIT 10
     ) t;
     
