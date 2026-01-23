@@ -64,8 +64,7 @@ BEGIN
         SET 
             debit = CASE WHEN NEW.transaction_type = 'purchase' THEN COALESCE(NEW.total_cost, 0) ELSE 0 END,
             credit = CASE WHEN NEW.transaction_type = 'purchase_return' THEN COALESCE(NEW.total_cost, 0) ELSE 0 END,
-            transaction_date = NEW.transaction_date,
-            updated_at = NOW()
+            transaction_date = NEW.transaction_date
         WHERE id = v_existing_entry;
         
         RETURN NEW;
@@ -169,8 +168,7 @@ SET
     credit = CASE 
         WHEN it.transaction_type = 'purchase_return' THEN COALESCE(it.total_cost, 0)
         ELSE vl.credit
-    END,
-    updated_at = NOW()
+    END
 FROM inventory_transactions it
 WHERE vl.reference_id = it.id
   AND (vl.debit = 0 OR vl.debit IS NULL)
