@@ -70,7 +70,7 @@ const NAV_ITEMS: NavGroup[] = [
     items: [
       { href: '/dashboard/orders', label: 'Orders', icon: ClipboardList, shortcut: 'O' },
       { href: '/dashboard/customers', label: 'Customers', icon: Users, shortcut: 'C' },
-      { href: '/dashboard/inventory', label: 'Inventory', icon: Boxes, shortcut: 'I', roles: ['admin', 'manager'] },
+      { href: '/dashboard/inventory', label: 'Inventory', icon: Boxes, shortcut: 'I' }, // Staff can access with masked financials
       { href: '/dashboard/vendors', label: 'Vendors', icon: Building2, shortcut: 'V' },
     ],
   },
