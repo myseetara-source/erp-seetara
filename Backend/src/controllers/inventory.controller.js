@@ -431,6 +431,86 @@ export const getLowStockAlerts = catchAsync(async (req, res) => {
 });
 
 // =============================================================================
+// DASHBOARD SUMMARY - SINGLE RPC FOR ALL STATS
+// =============================================================================
+// Prevents 429 errors by returning all dashboard data in one call
+
+import { supabaseAdmin } from '../config/supabase.js';
+
+/**
+ * Get inventory dashboard summary
+ * GET /inventory/dashboard
+ * 
+ * Returns ALL stats in a single call:
+ * - Products & variants count
+ * - Stock alerts (low stock, out of stock)
+ * - This month stock movement (in/out values)
+ * - Pending approvals count
+ * - Recent transactions
+ * - Low stock items
+ * - Inventory valuation
+ */
+export const getDashboardSummary = catchAsync(async (req, res) => {
+  const isAdmin = ['admin', 'manager'].includes(req.user?.role);
+
+  // Call the RPC function
+  const { data, error } = await supabaseAdmin.rpc('get_inventory_dashboard_summary');
+
+  if (error) {
+    logger.error('Dashboard RPC failed', { error });
+    
+    // Fallback: Return basic stats on RPC failure
+    const fallbackStats = {
+      products: { total: 0, active: 0 },
+      variants: { total: 0, active: 0 },
+      alerts: { low_stock: 0, out_of_stock: 0 },
+      this_month: { stock_in_value: 0, stock_out_value: 0 },
+      pending_approvals: 0,
+      recent_transactions: [],
+      low_stock_items: [],
+      valuation: { total_value: 0, total_units: 0 },
+      generated_at: new Date().toISOString(),
+      fallback: true,
+    };
+
+    return res.json({
+      success: true,
+      data: fallbackStats,
+    });
+  }
+
+  // Mask financial data for non-admins
+  const result = { ...data };
+  
+  if (!isAdmin) {
+    // Hide valuation from non-admins
+    result.valuation = { 
+      total_value: '***', 
+      total_units: result.valuation?.total_units || 0 
+    };
+    
+    // Hide stock values
+    if (result.this_month) {
+      result.this_month.stock_in_value = '***';
+      result.this_month.stock_out_value = '***';
+    }
+    
+    // Mask recent transaction costs
+    if (result.recent_transactions) {
+      result.recent_transactions = result.recent_transactions.map((tx: Record<string, unknown>) => ({
+        ...tx,
+        total_cost: '***',
+      }));
+    }
+  }
+
+  res.json({
+    success: true,
+    data: result,
+  });
+});
+
+// =============================================================================
 // EXPORTS
 // =============================================================================
 
@@ -447,4 +527,5 @@ export default {
   searchPurchaseInvoices,
   getInventoryValuation,
   getLowStockAlerts,
+  getDashboardSummary,
 };

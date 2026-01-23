@@ -3,11 +3,13 @@
 /**
  * Inventory Overview Page
  * 
- * Shows stock levels, recent transactions, and pending approvals.
- * Clean layout with stats at top and transaction history below.
+ * OPTIMIZED: Uses single API call (get_inventory_dashboard_summary RPC)
+ * to prevent 429 Too Many Requests errors.
+ * 
+ * Shows stock levels, recent transactions, pending approvals, and low stock alerts.
  */
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import Link from 'next/link';
 import { 
   Package, 
@@ -19,29 +21,38 @@ import {
   Loader2,
   FileText,
   Calendar,
-  User,
   PackagePlus,
   PackageMinus,
   Settings,
-  Eye,
+  CheckCircle,
+  RefreshCw,
+  Clock,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { PendingApprovalsWidget } from '@/components/inventory/PendingApprovalsWidget';
 import { cn } from '@/lib/utils';
 import apiClient from '@/lib/api/apiClient';
+import { formatCurrency } from '@/lib/utils/currency';
 
 // =============================================================================
 // TYPES
 // =============================================================================
 
-interface InventoryStats {
-  totalProducts: number;
-  totalVariants: number;
-  lowStock: number;
-  outOfStock: number;
-  thisMonthIn: number;
-  thisMonthOut: number;
+interface DashboardData {
+  products: { total: number; active: number };
+  variants: { total: number; active: number };
+  alerts: { low_stock: number; out_of_stock: number };
+  this_month: { 
+    stock_in_value: number; 
+    stock_in_count: number;
+    stock_out_value: number; 
+    stock_out_count: number;
+  };
+  pending_approvals: number;
+  recent_transactions: Transaction[];
+  low_stock_items: LowStockItem[];
+  valuation: { total_value: number; total_units: number };
+  generated_at: string;
 }
 
 interface Transaction {
@@ -49,12 +60,16 @@ interface Transaction {
   invoice_no: string;
   transaction_type: 'purchase' | 'purchase_return' | 'damage' | 'adjustment';
   status: string;
-  total_quantity: number;
-  total_cost: number;
+  total_cost: number | string;
   transaction_date: string;
   created_at: string;
-  vendor?: { name: string };
-  performer?: { name: string };
+}
+
+interface LowStockItem {
+  id: string;
+  sku: string;
+  current_stock: number;
+  product_name: string;
 }
 
 const TYPE_CONFIG = {
@@ -97,72 +112,53 @@ const STATUS_CONFIG: Record<string, { label: string; color: string }> = {
 // =============================================================================
 
 export default function InventoryPage() {
-  const [stats, setStats] = useState<InventoryStats>({
-    totalProducts: 0,
-    totalVariants: 0,
-    lowStock: 0,
-    outOfStock: 0,
-    thisMonthIn: 0,
-    thisMonthOut: 0,
-  });
-  const [transactions, setTransactions] = useState<Transaction[]>([]);
+  const [data, setData] = useState<DashboardData | null>(null);
   const [isLoading, setIsLoading] = useState(true);
-  const [isTxLoading, setIsTxLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [lastRefresh, setLastRefresh] = useState<Date | null>(null);
 
-  // Fetch stats
-  useEffect(() => {
-    const fetchStats = async () => {
-      try {
-        const productsRes = await apiClient.get('/products', { params: { limit: 1 } });
-        const totalProducts = productsRes.data?.pagination?.total || 0;
-
-        setStats({
-          totalProducts,
-          totalVariants: totalProducts * 3,
-          lowStock: 23,
-          outOfStock: 0,
-          thisMonthIn: 150000,
-          thisMonthOut: 89000,
-        });
-      } catch (error) {
-        console.error('Failed to fetch stats:', error);
-        setStats({
-          totalProducts: 156,
-          totalVariants: 487,
-          lowStock: 23,
-          outOfStock: 8,
-          thisMonthIn: 150000,
-          thisMonthOut: 89000,
-        });
-      } finally {
-        setIsLoading(false);
+  // Single API call to get ALL dashboard data
+  const fetchDashboard = useCallback(async () => {
+    setIsLoading(true);
+    setError(null);
+    
+    try {
+      const response = await apiClient.get('/inventory/dashboard');
+      
+      if (response.data.success) {
+        setData(response.data.data);
+        setLastRefresh(new Date());
       }
-    };
-
-    fetchStats();
+    } catch (err) {
+      console.error('Failed to fetch inventory dashboard:', err);
+      setError('Failed to load dashboard. Please refresh.');
+      
+      // Set fallback data
+      setData({
+        products: { total: 0, active: 0 },
+        variants: { total: 0, active: 0 },
+        alerts: { low_stock: 0, out_of_stock: 0 },
+        this_month: { stock_in_value: 0, stock_in_count: 0, stock_out_value: 0, stock_out_count: 0 },
+        pending_approvals: 0,
+        recent_transactions: [],
+        low_stock_items: [],
+        valuation: { total_value: 0, total_units: 0 },
+        generated_at: new Date().toISOString(),
+      });
+    } finally {
+      setIsLoading(false);
+    }
   }, []);
 
-  // Fetch recent transactions
   useEffect(() => {
-    const fetchTransactions = async () => {
-      setIsTxLoading(true);
-      try {
-        const response = await apiClient.get('/inventory/transactions', {
-          params: { limit: 10 },
-        });
-        if (response.data.success) {
-          setTransactions(response.data.data || []);
-        }
-      } catch (error) {
-        console.error('Failed to fetch transactions:', error);
-        setTransactions([]);
-      } finally {
-        setIsTxLoading(false);
-      }
-    };
+    fetchDashboard();
+  }, [fetchDashboard]);
 
-    fetchTransactions();
-  }, []);
+  // Auto-refresh every 2 minutes
+  useEffect(() => {
+    const interval = setInterval(fetchDashboard, 120000);
+    return () => clearInterval(interval);
+  }, [fetchDashboard]);
 
   return (
     <div className="p-6">
@@ -170,9 +166,27 @@ export default function InventoryPage() {
       <div className="flex items-center justify-between mb-8">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Inventory Management</h1>
-          <p className="text-gray-500">Track stock levels and manage inventory</p>
+          <p className="text-gray-500 flex items-center gap-2">
+            Track stock levels and manage inventory
+            {lastRefresh && (
+              <span className="text-xs text-gray-400 flex items-center gap-1">
+                <Clock className="w-3 h-3" />
+                Updated {lastRefresh.toLocaleTimeString()}
+              </span>
+            )}
+          </p>
         </div>
         <div className="flex gap-3">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={fetchDashboard}
+            disabled={isLoading}
+            className="text-gray-600"
+          >
+            <RefreshCw className={cn("w-4 h-4 mr-2", isLoading && "animate-spin")} />
+            Refresh
+          </Button>
           <Link href="/dashboard/inventory/transaction">
             <Button className="bg-orange-500 hover:bg-orange-600 text-white">
               <Plus className="w-4 h-4 mr-2" />
@@ -181,6 +195,16 @@ export default function InventoryPage() {
           </Link>
         </div>
       </div>
+
+      {/* Error Banner */}
+      {error && (
+        <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-lg flex items-center justify-between">
+          <span className="text-red-700">{error}</span>
+          <Button size="sm" variant="ghost" onClick={fetchDashboard}>
+            Retry
+          </Button>
+        </div>
+      )}
 
       {/* Stats Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
@@ -193,24 +217,26 @@ export default function InventoryPage() {
             <span className="text-sm text-gray-500">Products</span>
           </div>
           <div className="text-2xl font-bold text-gray-900">
-            {isLoading ? <Loader2 className="w-6 h-6 animate-spin" /> : stats.totalProducts}
+            {isLoading ? <Loader2 className="w-6 h-6 animate-spin" /> : data?.products.total || 0}
           </div>
-          <div className="text-sm text-gray-500">{stats.totalVariants} variants</div>
+          <div className="text-sm text-gray-500">{data?.variants.total || 0} variants</div>
         </div>
 
         {/* Low Stock */}
-        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
-          <div className="flex items-center justify-between mb-4">
-            <div className="w-12 h-12 bg-amber-100 rounded-xl flex items-center justify-center">
-              <AlertTriangle className="w-6 h-6 text-amber-600" />
+        <Link href="/dashboard/products?filter=low_stock" className="block">
+          <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 hover:border-amber-300 transition-colors cursor-pointer">
+            <div className="flex items-center justify-between mb-4">
+              <div className="w-12 h-12 bg-amber-100 rounded-xl flex items-center justify-center">
+                <AlertTriangle className="w-6 h-6 text-amber-600" />
+              </div>
+              <span className="text-sm text-gray-500">Alerts</span>
             </div>
-            <span className="text-sm text-gray-500">Alerts</span>
+            <div className="text-2xl font-bold text-amber-600">
+              {isLoading ? <Loader2 className="w-6 h-6 animate-spin" /> : data?.alerts.low_stock || 0}
+            </div>
+            <div className="text-sm text-gray-500">Low stock items</div>
           </div>
-          <div className="text-2xl font-bold text-amber-600">
-            {isLoading ? <Loader2 className="w-6 h-6 animate-spin" /> : stats.lowStock}
-          </div>
-          <div className="text-sm text-gray-500">Low stock items</div>
-        </div>
+        </Link>
 
         {/* Stock In */}
         <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
@@ -223,8 +249,10 @@ export default function InventoryPage() {
           <div className="text-2xl font-bold text-green-600">
             {isLoading ? (
               <Loader2 className="w-6 h-6 animate-spin" />
+            ) : typeof data?.this_month.stock_in_value === 'number' ? (
+              formatCurrency(data.this_month.stock_in_value)
             ) : (
-              `Rs. ${stats.thisMonthIn.toLocaleString()}`
+              '***'
             )}
           </div>
           <div className="text-sm text-gray-500">Stock In (Purchases)</div>
@@ -241,140 +269,168 @@ export default function InventoryPage() {
           <div className="text-2xl font-bold text-red-600">
             {isLoading ? (
               <Loader2 className="w-6 h-6 animate-spin" />
+            ) : typeof data?.this_month.stock_out_value === 'number' ? (
+              formatCurrency(data.this_month.stock_out_value)
             ) : (
-              `Rs. ${stats.thisMonthOut.toLocaleString()}`
+              '***'
             )}
           </div>
           <div className="text-sm text-gray-500">Stock Out (Orders)</div>
         </div>
       </div>
 
-      {/* Main Content Grid */}
+      {/* Bottom Grid: Transactions + Alerts */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Left: Recent Transactions Table */}
-        <div className="lg:col-span-2">
-          <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
-            <div className="px-6 py-4 border-b border-gray-200 flex items-center justify-between">
-              <h2 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
-                <FileText className="w-5 h-5 text-orange-500" />
-                Recent Transactions
-              </h2>
-              <Link href="/dashboard/inventory/purchase">
-                <Button variant="ghost" size="sm" className="text-orange-600 hover:text-orange-700">
-                  View All
-                  <ArrowRight className="w-4 h-4 ml-1" />
+        {/* Recent Transactions */}
+        <div className="lg:col-span-2 bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+          <div className="p-6 border-b border-gray-100 flex items-center justify-between">
+            <h2 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
+              <FileText className="w-5 h-5 text-gray-400" />
+              Recent Transactions
+            </h2>
+            <Link href="/dashboard/inventory/transaction" className="text-sm text-orange-500 hover:text-orange-600 flex items-center gap-1">
+              View All <ArrowRight className="w-4 h-4" />
+            </Link>
+          </div>
+
+          {isLoading ? (
+            <div className="p-12 text-center">
+              <Loader2 className="w-8 h-8 animate-spin mx-auto text-gray-400" />
+            </div>
+          ) : data?.recent_transactions && data.recent_transactions.length > 0 ? (
+            <div className="divide-y divide-gray-100">
+              {data.recent_transactions.map((tx) => {
+                const config = TYPE_CONFIG[tx.transaction_type] || TYPE_CONFIG.adjustment;
+                const status = STATUS_CONFIG[tx.status] || STATUS_CONFIG.pending;
+                const Icon = config.icon;
+
+                return (
+                  <Link 
+                    key={tx.id} 
+                    href={`/dashboard/inventory/transaction/${tx.id}`}
+                    className="flex items-center gap-4 p-4 hover:bg-gray-50 transition-colors"
+                  >
+                    <div className={cn("w-10 h-10 rounded-lg flex items-center justify-center", config.bgColor)}>
+                      <Icon className={cn("w-5 h-5", config.color)} />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2">
+                        <span className="font-medium text-gray-900">{tx.invoice_no}</span>
+                        <Badge className={cn("text-xs", status.color)}>{status.label}</Badge>
+                      </div>
+                      <div className="text-sm text-gray-500 flex items-center gap-2">
+                        <Calendar className="w-3 h-3" />
+                        {new Date(tx.transaction_date).toLocaleDateString()}
+                      </div>
+                    </div>
+                    <div className="text-right">
+                      <div className="font-medium text-gray-900">
+                        {typeof tx.total_cost === 'number' ? formatCurrency(tx.total_cost) : '***'}
+                      </div>
+                      <div className="text-xs text-gray-400">{config.label}</div>
+                    </div>
+                  </Link>
+                );
+              })}
+            </div>
+          ) : (
+            <div className="p-12 text-center text-gray-400">
+              <Package className="w-12 h-12 mx-auto mb-3 text-gray-300" />
+              <p className="font-medium">No transactions yet</p>
+              <p className="text-sm">Create your first transaction to get started</p>
+              <Link href="/dashboard/inventory/purchase/new" className="mt-4 inline-block">
+                <Button className="bg-orange-500 hover:bg-orange-600">
+                  <Plus className="w-4 h-4 mr-2" />
+                  New Transaction
                 </Button>
               </Link>
             </div>
+          )}
+        </div>
 
-            {isTxLoading ? (
-              <div className="p-12 text-center text-gray-400">
-                <Loader2 className="w-8 h-8 mx-auto animate-spin" />
-                <p className="mt-2">Loading transactions...</p>
+        {/* Right Sidebar */}
+        <div className="space-y-6">
+          {/* Pending Approvals */}
+          <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="font-semibold text-gray-900 flex items-center gap-2">
+                <Clock className="w-5 h-5 text-amber-500" />
+                Pending Approvals
+              </h3>
+            </div>
+            
+            {isLoading ? (
+              <div className="text-center py-4">
+                <Loader2 className="w-6 h-6 animate-spin mx-auto text-gray-400" />
               </div>
-            ) : transactions.length === 0 ? (
-              <div className="p-12 text-center text-gray-400">
-                <Package className="w-12 h-12 mx-auto mb-3 text-gray-300" />
-                <p className="font-medium">No transactions yet</p>
-                <p className="text-sm">Create your first transaction to get started</p>
-                <Link href="/dashboard/inventory/transaction">
-                  <Button className="mt-4 bg-orange-500 hover:bg-orange-600">
-                    <Plus className="w-4 h-4 mr-2" />
-                    New Transaction
+            ) : (data?.pending_approvals || 0) > 0 ? (
+              <div className="text-center">
+                <div className="text-3xl font-bold text-amber-600 mb-2">
+                  {data?.pending_approvals}
+                </div>
+                <p className="text-sm text-gray-500 mb-4">Transactions awaiting approval</p>
+                <Link href="/dashboard/inventory/transaction?status=pending">
+                  <Button variant="outline" size="sm" className="w-full">
+                    Review Pending
                   </Button>
                 </Link>
               </div>
             ) : (
-              <div className="overflow-x-auto">
-                <table className="w-full text-sm">
-                  <thead className="bg-gray-50">
-                    <tr>
-                      <th className="px-4 py-3 text-left font-medium text-gray-600">Invoice</th>
-                      <th className="px-4 py-3 text-left font-medium text-gray-600">Type</th>
-                      <th className="px-4 py-3 text-left font-medium text-gray-600">Vendor</th>
-                      <th className="px-4 py-3 text-center font-medium text-gray-600">Qty</th>
-                      <th className="px-4 py-3 text-center font-medium text-gray-600">Status</th>
-                      <th className="px-4 py-3 text-left font-medium text-gray-600">Date</th>
-                      <th className="px-4 py-3 w-12"></th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-gray-100">
-                    {transactions.map((tx) => {
-                      const typeConfig = TYPE_CONFIG[tx.transaction_type] || TYPE_CONFIG.purchase;
-                      const Icon = typeConfig.icon;
-                      const statusConfig = STATUS_CONFIG[tx.status] || STATUS_CONFIG.approved;
-
-                      return (
-                        <tr key={tx.id} className="hover:bg-gray-50">
-                          <td className="px-4 py-3">
-                            <span className="font-mono font-medium text-gray-900">
-                              {tx.invoice_no}
-                            </span>
-                          </td>
-                          <td className="px-4 py-3">
-                            <div className="flex items-center gap-2">
-                              <div className={cn('p-1.5 rounded', typeConfig.bgColor)}>
-                                <Icon className={cn('w-3.5 h-3.5', typeConfig.color)} />
-                              </div>
-                              <span className={cn('text-sm font-medium', typeConfig.color)}>
-                                {typeConfig.label}
-                              </span>
-                            </div>
-                          </td>
-                          <td className="px-4 py-3 text-gray-600">
-                            {tx.vendor?.name || '-'}
-                          </td>
-                          <td className="px-4 py-3 text-center font-medium">
-                            {tx.total_quantity || 0}
-                          </td>
-                          <td className="px-4 py-3 text-center">
-                            <Badge className={cn('text-xs', statusConfig.color)}>
-                              {statusConfig.label}
-                            </Badge>
-                          </td>
-                          <td className="px-4 py-3 text-gray-500 text-sm">
-                            {new Date(tx.transaction_date || tx.created_at).toLocaleDateString()}
-                          </td>
-                          <td className="px-4 py-3">
-                            <Link href={`/dashboard/inventory/transaction/${tx.id}`}>
-                              <Button variant="ghost" size="icon" className="h-8 w-8">
-                                <Eye className="w-4 h-4 text-gray-400" />
-                              </Button>
-                            </Link>
-                          </td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
+              <div className="text-center py-4">
+                <CheckCircle className="w-12 h-12 text-green-500 mx-auto mb-2" />
+                <p className="font-medium text-green-700">All caught up!</p>
+                <p className="text-sm text-gray-500">No pending approvals</p>
               </div>
             )}
           </div>
-        </div>
 
-        {/* Right: Pending Approvals + Low Stock */}
-        <div className="space-y-6">
-          <PendingApprovalsWidget />
-          
           {/* Low Stock Alert */}
-          <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-5">
-            <div className="flex items-center gap-2 mb-4">
-              <AlertTriangle className="w-5 h-5 text-amber-500" />
-              <h3 className="font-semibold text-gray-900">Low Stock Alert</h3>
+          <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="font-semibold text-gray-900 flex items-center gap-2">
+                <AlertTriangle className="w-5 h-5 text-red-500" />
+                Low Stock Alert
+              </h3>
             </div>
-            {stats.lowStock > 0 ? (
-              <div className="space-y-2">
-                <p className="text-sm text-gray-600">
-                  <span className="font-bold text-amber-600">{stats.lowStock}</span> items are running low on stock
-                </p>
-                <Link href="/dashboard/products?filter=low_stock">
-                  <Button variant="outline" size="sm" className="w-full">
-                    View Low Stock Items
-                  </Button>
-                </Link>
+
+            {isLoading ? (
+              <div className="text-center py-4">
+                <Loader2 className="w-6 h-6 animate-spin mx-auto text-gray-400" />
               </div>
+            ) : data?.low_stock_items && data.low_stock_items.length > 0 ? (
+              <>
+                <div className="space-y-3 mb-4 max-h-48 overflow-y-auto">
+                  {data.low_stock_items.slice(0, 5).map((item) => (
+                    <div key={item.id} className="flex items-center justify-between py-2 border-b border-gray-100 last:border-0">
+                      <div>
+                        <p className="font-medium text-gray-900 text-sm truncate max-w-[150px]">
+                          {item.product_name}
+                        </p>
+                        <p className="text-xs text-gray-500">{item.sku}</p>
+                      </div>
+                      <Badge variant="destructive" className="text-xs">
+                        {item.current_stock} left
+                      </Badge>
+                    </div>
+                  ))}
+                </div>
+                <div className="text-center">
+                  <p className="text-amber-600 font-medium mb-2">
+                    {data.alerts.low_stock} items are running low on stock
+                  </p>
+                  <Link href="/dashboard/products?filter=low_stock">
+                    <Button variant="outline" size="sm" className="w-full">
+                      View Low Stock Items
+                    </Button>
+                  </Link>
+                </div>
+              </>
             ) : (
-              <p className="text-sm text-green-600">✓ All items are well stocked!</p>
+              <div className="text-center py-4">
+                <CheckCircle className="w-12 h-12 text-green-500 mx-auto mb-2" />
+                <p className="font-medium text-green-700">Stock Healthy</p>
+                <p className="text-sm text-gray-500">All items have adequate stock</p>
+              </div>
             )}
           </div>
         </div>

@@ -3,47 +3,59 @@
  * Centralized axios instance for all API calls
  * Uses Supabase Auth tokens for authentication
  * 
- * PORT FIX: Uses smart baseURL detection to avoid ERR_CONNECTION_REFUSED
- * - Server Side: Uses absolute URL from env or localhost:3000
- * - Client Side: Uses relative '/api/v1' (auto-detects current port)
+ * FEATURES:
+ * - Smart baseURL detection (auto-detects port)
+ * - Exponential backoff retry for 429/5xx errors
+ * - Request deduplication to prevent duplicate calls
+ * - Auth token injection
  */
 
-import axios, { AxiosInstance, AxiosError, InternalAxiosRequestConfig } from 'axios';
+import axios, { AxiosInstance, AxiosError, InternalAxiosRequestConfig, AxiosResponse } from 'axios';
 import { createClient } from '@/lib/supabase/client';
+
+// =============================================================================
+// CONFIGURATION
+// =============================================================================
+
+const API_TIMEOUT = 30000; // 30 seconds
+const MAX_RETRIES = 3;
+const INITIAL_RETRY_DELAY = 1000; // 1 second
 
 // =============================================================================
 // SMART BASE URL DETECTION
 // =============================================================================
-// 
-// Problem: Hardcoded http://localhost:3000 fails when app runs on port 3001
-// 
-// Solution:
-// - Server Side (SSR): Use absolute URL (env var or fallback)
-// - Client Side (Browser): Use relative path '/api/v1'
-//   The browser will automatically prepend the current origin (http://localhost:3001)
-//
 
-/**
- * Get the appropriate base URL based on execution environment
- */
 function getBaseURL(): string {
-  // Server-side rendering (Node.js environment)
   if (typeof window === 'undefined') {
-    // Use environment variable if set, otherwise fallback to localhost
     return process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000/api/v1';
   }
-  
-  // Client-side (Browser)
-  // Use relative path so browser automatically uses current origin/port
-  // This works whether the app runs on 3000, 3001, 8080, or any port
   return '/api/v1';
 }
 
-// API Configuration
 const API_BASE_URL = getBaseURL();
-const API_TIMEOUT = 30000; // 30 seconds
 
-// Create axios instance
+// =============================================================================
+// REQUEST DEDUPLICATION
+// =============================================================================
+// Prevents duplicate requests from firing simultaneously
+
+interface PendingRequest {
+  promise: Promise<AxiosResponse>;
+  timestamp: number;
+}
+
+const pendingRequests = new Map<string, PendingRequest>();
+const DEDUP_WINDOW_MS = 100; // Deduplicate requests within 100ms
+
+function getRequestKey(config: InternalAxiosRequestConfig): string {
+  const params = config.params ? JSON.stringify(config.params) : '';
+  return `${config.method}:${config.url}:${params}`;
+}
+
+// =============================================================================
+// AXIOS INSTANCE
+// =============================================================================
+
 const apiClient: AxiosInstance = axios.create({
   baseURL: API_BASE_URL,
   timeout: API_TIMEOUT,
@@ -53,12 +65,55 @@ const apiClient: AxiosInstance = axios.create({
 });
 
 // =============================================================================
+// EXPONENTIAL BACKOFF RETRY
+// =============================================================================
+
+interface RetryConfig {
+  retryCount?: number;
+  skipRetry?: boolean;
+}
+
+async function sleep(ms: number): Promise<void> {
+  return new Promise(resolve => setTimeout(resolve, ms));
+}
+
+async function retryWithBackoff<T>(
+  fn: () => Promise<T>,
+  retryCount = 0
+): Promise<T> {
+  try {
+    return await fn();
+  } catch (error) {
+    const axiosError = error as AxiosError;
+    const status = axiosError.response?.status;
+    
+    // Retry on 429 (Rate Limit) or 5xx (Server Error)
+    const shouldRetry = status === 429 || (status && status >= 500);
+    
+    if (shouldRetry && retryCount < MAX_RETRIES) {
+      // Exponential backoff: 1s, 2s, 4s
+      const delay = INITIAL_RETRY_DELAY * Math.pow(2, retryCount);
+      
+      // Add jitter to prevent thundering herd
+      const jitter = Math.random() * 500;
+      
+      console.warn(`[API] Retry ${retryCount + 1}/${MAX_RETRIES} after ${delay + jitter}ms (status: ${status})`);
+      
+      await sleep(delay + jitter);
+      return retryWithBackoff(fn, retryCount + 1);
+    }
+    
+    throw error;
+  }
+}
+
+// =============================================================================
 // REQUEST INTERCEPTOR
 // =============================================================================
-// Add Supabase auth token to all requests
 
 apiClient.interceptors.request.use(
   async (config: InternalAxiosRequestConfig) => {
+    // Add auth token
     if (typeof window !== 'undefined') {
       try {
         const supabase = createClient();
@@ -68,47 +123,75 @@ apiClient.interceptors.request.use(
           config.headers.Authorization = `Bearer ${session.access_token}`;
         }
       } catch {
-        // Auth session error - request will proceed without token
-        // Server will return 401 if auth is required
+        // Auth error - continue without token
       }
     }
     
     return config;
   },
-  (error: AxiosError) => {
-    return Promise.reject(error);
-  }
+  (error: AxiosError) => Promise.reject(error)
 );
 
 // =============================================================================
-// RESPONSE INTERCEPTOR
+// RESPONSE INTERCEPTOR WITH RETRY
 // =============================================================================
-// Handle errors globally
 
 apiClient.interceptors.response.use(
   (response) => response,
   async (error: AxiosError) => {
-    if (error.response) {
-      const { status } = error.response;
+    const config = error.config as InternalAxiosRequestConfig & RetryConfig;
+    
+    if (!config || config.skipRetry) {
+      return Promise.reject(error);
+    }
+    
+    const status = error.response?.status;
+    
+    // Handle 429 Too Many Requests with retry
+    if (status === 429) {
+      const retryCount = config.retryCount || 0;
       
-      switch (status) {
-        case 401:
-          // Unauthorized - sign out and redirect to login
-          if (typeof window !== 'undefined') {
-            try {
-              const supabase = createClient();
-              await supabase.auth.signOut();
-            } catch {
-              // Sign out failed - continue to redirect
-            }
-            // Redirect to login (skip if already on login page)
-            if (!window.location.pathname.includes('/login')) {
-              window.location.href = '/login';
-            }
-          }
-          break;
-        // Other error statuses are passed through to the caller
-        // No console.log to avoid security leaks in production
+      if (retryCount < MAX_RETRIES) {
+        config.retryCount = retryCount + 1;
+        
+        // Exponential backoff with jitter
+        const delay = INITIAL_RETRY_DELAY * Math.pow(2, retryCount);
+        const jitter = Math.random() * 500;
+        
+        console.warn(`[API] Rate limited. Retry ${retryCount + 1}/${MAX_RETRIES} in ${Math.round(delay + jitter)}ms`);
+        
+        await sleep(delay + jitter);
+        return apiClient.request(config);
+      }
+    }
+    
+    // Handle 5xx server errors with retry
+    if (status && status >= 500 && status < 600) {
+      const retryCount = config.retryCount || 0;
+      
+      if (retryCount < MAX_RETRIES) {
+        config.retryCount = retryCount + 1;
+        const delay = INITIAL_RETRY_DELAY * Math.pow(2, retryCount);
+        
+        console.warn(`[API] Server error ${status}. Retry ${retryCount + 1}/${MAX_RETRIES}`);
+        
+        await sleep(delay);
+        return apiClient.request(config);
+      }
+    }
+    
+    // Handle 401 Unauthorized
+    if (status === 401) {
+      if (typeof window !== 'undefined') {
+        try {
+          const supabase = createClient();
+          await supabase.auth.signOut();
+        } catch {
+          // Sign out failed
+        }
+        if (!window.location.pathname.includes('/login')) {
+          window.location.href = '/login';
+        }
       }
     }
     
@@ -116,9 +199,83 @@ apiClient.interceptors.response.use(
   }
 );
 
+// =============================================================================
+// WRAPPED API METHODS WITH DEDUPLICATION
+// =============================================================================
+
+/**
+ * GET request with deduplication
+ * Prevents duplicate simultaneous requests to the same endpoint
+ */
+export async function apiGet<T = unknown>(
+  url: string, 
+  config?: { params?: Record<string, unknown>; skipDedup?: boolean }
+): Promise<AxiosResponse<T>> {
+  const requestKey = `GET:${url}:${JSON.stringify(config?.params || {})}`;
+  
+  // Check for pending duplicate request
+  if (!config?.skipDedup) {
+    const pending = pendingRequests.get(requestKey);
+    if (pending && Date.now() - pending.timestamp < DEDUP_WINDOW_MS) {
+      return pending.promise as Promise<AxiosResponse<T>>;
+    }
+  }
+  
+  // Create new request
+  const promise = apiClient.get<T>(url, config);
+  
+  // Store for deduplication
+  pendingRequests.set(requestKey, {
+    promise: promise as Promise<AxiosResponse>,
+    timestamp: Date.now(),
+  });
+  
+  // Clean up after request completes
+  promise.finally(() => {
+    setTimeout(() => pendingRequests.delete(requestKey), DEDUP_WINDOW_MS);
+  });
+  
+  return promise;
+}
+
+/**
+ * POST request (no deduplication - mutations should always execute)
+ */
+export async function apiPost<T = unknown>(
+  url: string,
+  data?: unknown,
+  config?: Record<string, unknown>
+): Promise<AxiosResponse<T>> {
+  return apiClient.post<T>(url, data, config);
+}
+
+/**
+ * PUT request
+ */
+export async function apiPut<T = unknown>(
+  url: string,
+  data?: unknown,
+  config?: Record<string, unknown>
+): Promise<AxiosResponse<T>> {
+  return apiClient.put<T>(url, data, config);
+}
+
+/**
+ * DELETE request
+ */
+export async function apiDelete<T = unknown>(
+  url: string,
+  config?: Record<string, unknown>
+): Promise<AxiosResponse<T>> {
+  return apiClient.delete<T>(url, config);
+}
+
+// =============================================================================
+// EXPORTS
+// =============================================================================
+
 export default apiClient;
 
-// Type definitions for API responses
 export interface ApiResponse<T> {
   success: boolean;
   data: T;

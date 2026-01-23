@@ -26,6 +26,7 @@ import { Router } from 'express';
 import inventoryController, {
   getInventoryValuation,
   getLowStockAlerts,
+  getDashboardSummary,
 } from '../controllers/inventory.controller.js';
 import { authenticate, authorize } from '../middleware/auth.middleware.js';
 import { validateBody, validateQuery } from '../middleware/validate.middleware.js';
@@ -36,6 +37,23 @@ const router = Router();
 
 // All routes require authentication
 router.use(authenticate);
+
+// =============================================================================
+// DASHBOARD SUMMARY - SINGLE CALL FOR ALL STATS
+// =============================================================================
+// This endpoint returns ALL dashboard data in ONE call to prevent 429 errors
+
+/**
+ * Get inventory dashboard summary
+ * GET /inventory/dashboard
+ * 
+ * Returns: products, variants, alerts, stock movement, pending approvals, 
+ *          recent transactions, low stock items, valuation
+ * 
+ * PERFORMANCE: Single RPC call instead of 5-6 separate API calls
+ * SECURITY: All authenticated, financial data masked for non-admins
+ */
+router.get('/dashboard', getDashboardSummary);
 
 // =============================================================================
 // VALIDATION SCHEMAS
