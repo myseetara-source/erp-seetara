@@ -322,6 +322,34 @@ export const getVendorLedger = asyncHandler(async (req, res) => {
 });
 
 /**
+ * Get single ledger entry by ID
+ * GET /vendors/ledger-entry/:id
+ * 
+ * SECURITY: Admin only
+ */
+export const getLedgerEntry = asyncHandler(async (req, res) => {
+  const userRole = req.user?.role;
+
+  // Ledger entry is admin-only
+  if (!canSeeFinancials(userRole)) {
+    return res.status(403).json({
+      success: false,
+      error: {
+        code: 'FORBIDDEN',
+        message: 'You do not have permission to view ledger entry',
+      },
+    });
+  }
+
+  const entry = await vendorService.getLedgerEntryById(req.params.id);
+
+  res.json({
+    success: true,
+    data: entry,
+  });
+});
+
+/**
  * Get vendor summary/stats
  * GET /vendors/:id/summary
  * 
@@ -570,6 +598,7 @@ export default {
   // Payments & Ledger
   recordPayment,
   getVendorLedger,
+  getLedgerEntry,
   getVendorSummary,
   getVendorStats,
   getVendorTransactions,

@@ -800,6 +800,63 @@ class VendorService {
       },
     };
   }
+
+  /**
+   * Get a single ledger entry by ID
+   * Used for transaction detail panel
+   * @param {string} entryId - Ledger entry ID
+   * @returns {Object} Ledger entry
+   */
+  async getLedgerEntryById(entryId) {
+    const { data, error } = await supabaseAdmin
+      .from('vendor_ledger')
+      .select(`
+        id,
+        vendor_id,
+        entry_type,
+        reference_id,
+        reference_no,
+        debit,
+        credit,
+        running_balance,
+        description,
+        transaction_date,
+        performed_by,
+        payment_method,
+        receipt_url,
+        notes,
+        created_at,
+        vendor:vendors(id, name, company_name)
+      `)
+      .eq('id', entryId)
+      .single();
+
+    if (error) {
+      if (error.code === 'PGRST116') {
+        throw new NotFoundError('Ledger entry not found');
+      }
+      throw new DatabaseError(`Failed to fetch ledger entry: ${error.message}`);
+    }
+
+    return {
+      id: data.id,
+      vendor_id: data.vendor_id,
+      entry_type: data.entry_type,
+      reference_id: data.reference_id,
+      reference_no: data.reference_no,
+      debit: parseFloat(data.debit) || 0,
+      credit: parseFloat(data.credit) || 0,
+      running_balance: parseFloat(data.running_balance) || 0,
+      description: data.description,
+      transaction_date: data.transaction_date,
+      performed_by: data.performed_by,
+      payment_method: data.payment_method || 'cash',
+      receipt_url: data.receipt_url,
+      notes: data.notes,
+      created_at: data.created_at,
+      vendor: data.vendor,
+    };
+  }
 }
 
 export const vendorService = new VendorService();

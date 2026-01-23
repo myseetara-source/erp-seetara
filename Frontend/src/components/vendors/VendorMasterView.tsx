@@ -47,6 +47,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { cn } from '@/lib/utils';
+import { AnimatePresence } from 'framer-motion';
 import apiClient from '@/lib/api/apiClient';
 import { toast } from 'sonner';
 import RecordPaymentModal from './RecordPaymentModal';
@@ -246,9 +247,11 @@ function VendorListSidebar({
 interface VendorDetailViewProps {
   vendorId: string | null;
   onTransactionSuccess?: () => void; // Callback to refresh parent data
+  onSelectTransaction?: (tx: SelectedTransaction | null) => void;
+  selectedTransactionId?: string | null;
 }
 
-function VendorDetailView({ vendorId, onTransactionSuccess }: VendorDetailViewProps) {
+function VendorDetailView({ vendorId, onTransactionSuccess, onSelectTransaction, selectedTransactionId }: VendorDetailViewProps) {
   const router = useRouter();
   const [vendor, setVendor] = useState<Vendor | null>(null);
   const [stats, setStats] = useState<VendorStats | null>(null);
@@ -260,7 +263,6 @@ function VendorDetailView({ vendorId, onTransactionSuccess }: VendorDetailViewPr
   
   // Modal states
   const [showPaymentModal, setShowPaymentModal] = useState(false);
-  const [selectedTransaction, setSelectedTransaction] = useState<SelectedTransaction | null>(null);
 
   // Fetch vendor data function (extracted for reuse after modal actions)
   const fetchVendorData = useCallback(async () => {
@@ -548,8 +550,11 @@ function VendorDetailView({ vendorId, onTransactionSuccess }: VendorDetailViewPr
                   return (
                     <button 
                       key={tx.id} 
-                      className="w-full flex items-center gap-2.5 py-2 px-1 hover:bg-orange-50 transition-colors cursor-pointer text-left"
-                      onClick={() => setSelectedTransaction({
+                      className={cn(
+                        "w-full flex items-center gap-2.5 py-2 px-1 hover:bg-orange-50 transition-colors cursor-pointer text-left rounded",
+                        selectedTransactionId === tx.id && "bg-orange-100 ring-1 ring-orange-300"
+                      )}
+                      onClick={() => onSelectTransaction?.({
                         id: tx.id,
                         entryType: tx.entry_type as 'purchase' | 'purchase_return' | 'payment',
                         referenceId: tx.reference_id,
@@ -644,15 +649,6 @@ function VendorDetailView({ vendorId, onTransactionSuccess }: VendorDetailViewPr
         currentBalance={vendor.balance}
       />
 
-      {/* Transaction Detail Panel (Slide-over) */}
-      <TransactionDetailPanel
-        transactionId={selectedTransaction?.id || null}
-        entryType={selectedTransaction?.entryType || null}
-        referenceId={selectedTransaction?.referenceId || null}
-        onClose={() => setSelectedTransaction(null)}
-        vendorName={vendor.company_name || vendor.name}
-      />
-
     </div>
   );
 }
@@ -670,6 +666,10 @@ export default function VendorMasterView() {
   const [isLoading, setIsLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [activeFilter, setActiveFilter] = useState<FilterTab>('all');
+  const [selectedTransaction, setSelectedTransaction] = useState<SelectedTransaction | null>(null);
+  
+  // Get selected vendor's name for the detail panel
+  const selectedVendor = vendors.find(v => v.id === selectedVendorId);
 
   const fetchVendors = useCallback(async () => {
     try {
@@ -697,9 +697,15 @@ export default function VendorMasterView() {
     fetchVendors();
   }, [fetchVendors]);
 
+  // Clear selected transaction when vendor changes
+  useEffect(() => {
+    setSelectedTransaction(null);
+  }, [selectedVendorId]);
+
   return (
-    <div className="h-[calc(100vh-48px)] flex">
-      <div className="w-[280px] flex-shrink-0">
+    <div className="h-[calc(100vh-48px)] flex overflow-hidden">
+      {/* Left Panel: Vendor List (Fixed Width) */}
+      <div className="w-[280px] flex-shrink-0 border-r border-gray-200">
         <VendorListSidebar
           vendors={vendors}
           selectedVendorId={selectedVendorId}
@@ -711,11 +717,34 @@ export default function VendorMasterView() {
           onFilterChange={setActiveFilter}
         />
       </div>
-      <div className="flex-1">
-        <VendorDetailView 
-          vendorId={selectedVendorId} 
-          onTransactionSuccess={handleGlobalRefresh}
-        />
+      
+      {/* Middle + Right Panels: Flex container that shares remaining space */}
+      <div className="flex-1 flex overflow-hidden">
+        {/* Middle Panel: Vendor Detail (Shrinks when right panel opens) */}
+        <div className={cn(
+          "flex-1 min-w-0 overflow-auto transition-all duration-300 ease-in-out",
+          selectedTransaction && "flex-[2]"
+        )}>
+          <VendorDetailView 
+            vendorId={selectedVendorId} 
+            onTransactionSuccess={handleGlobalRefresh}
+            onSelectTransaction={setSelectedTransaction}
+            selectedTransactionId={selectedTransaction?.id}
+          />
+        </div>
+        
+        {/* Right Panel: Transaction Detail (Inline, not overlay) */}
+        <AnimatePresence mode="wait">
+          {selectedTransaction && (
+            <TransactionDetailPanel
+              transactionId={selectedTransaction.id}
+              entryType={selectedTransaction.entryType}
+              referenceId={selectedTransaction.referenceId}
+              onClose={() => setSelectedTransaction(null)}
+              vendorName={selectedVendor?.company_name || selectedVendor?.name || ''}
+            />
+          )}
+        </AnimatePresence>
       </div>
     </div>
   );
