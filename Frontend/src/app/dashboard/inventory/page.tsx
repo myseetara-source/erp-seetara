@@ -47,6 +47,7 @@ import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
 import apiClient from '@/lib/api/apiClient';
 import { formatCurrency } from '@/lib/utils/currency';
+import { useAuth } from '@/hooks/useAuth';
 
 // =============================================================================
 // TYPES
@@ -258,6 +259,7 @@ export default function InventoryPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [lastRefresh, setLastRefresh] = useState<Date | null>(null);
+  const { canSeeFinancials } = useAuth();
 
   const fetchDashboard = useCallback(async () => {
     setIsLoading(true);
@@ -345,44 +347,62 @@ export default function InventoryPage() {
         </div>
       )}
 
-      {/* 4 Key Metrics */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-        {/* Metric 1: Total Stock Value */}
-        <MetricCard
-          title="Total Stock Value"
-          value={typeof data?.total_stock_value?.value === 'number' 
-            ? formatCurrency(data.total_stock_value.value) 
-            : data?.total_stock_value?.value || '***'}
-          subtitle={`${data?.total_stock_value?.units?.toLocaleString() || 0} units in ${data?.total_stock_value?.active_variants || 0} variants`}
-          icon={DollarSign}
-          iconBg="bg-emerald-100"
-          iconColor="text-emerald-600"
-          sparklineData={data?.stock_trend}
-          isLoading={isLoading}
-        />
+      {/* Key Metrics - Financial cards visible only to admin/manager */}
+      <div className={cn(
+        "grid gap-6 mb-8",
+        canSeeFinancials 
+          ? "grid-cols-1 md:grid-cols-2 lg:grid-cols-4" 
+          : "grid-cols-1 md:grid-cols-2 lg:grid-cols-3"
+      )}>
+        {/* Metric 1: Total Stock Value - ADMIN ONLY */}
+        {canSeeFinancials && (
+          <MetricCard
+            title="Total Stock Value"
+            value={typeof data?.total_stock_value?.value === 'number' 
+              ? formatCurrency(data.total_stock_value.value) 
+              : data?.total_stock_value?.value || '***'}
+            subtitle={`${data?.total_stock_value?.units?.toLocaleString() || 0} units in ${data?.total_stock_value?.active_variants || 0} variants`}
+            icon={DollarSign}
+            iconBg="bg-emerald-100"
+            iconColor="text-emerald-600"
+            sparklineData={data?.stock_trend}
+            isLoading={isLoading}
+          />
+        )}
 
-        {/* Metric 2: Inventory Turnover */}
+        {/* Metric: Total Units (Staff sees this instead of Stock Value) */}
+        {!canSeeFinancials && (
+          <MetricCard
+            title="Total Stock Units"
+            value={data?.total_stock_value?.units?.toLocaleString() || 0}
+            subtitle={`Across ${data?.total_stock_value?.active_variants || 0} active variants`}
+            icon={Package}
+            iconBg="bg-emerald-100"
+            iconColor="text-emerald-600"
+            isLoading={isLoading}
+          />
+        )}
+
+        {/* Metric 2: Stock Movement - Quantity only for staff, with value for admin */}
         <MetricCard
-          title="Monthly Turnover"
-          value={`${turnoverRatio}%`}
-          subtitle={`In: ${typeof data?.inventory_turnover?.this_month?.stock_in === 'number' 
-            ? formatCurrency(data.inventory_turnover.this_month.stock_in) 
-            : '***'}`}
-          icon={Activity}
+          title="Stock In This Month"
+          value={canSeeFinancials
+            ? (typeof data?.inventory_turnover?.this_month?.stock_in === 'number' 
+                ? formatCurrency(data.inventory_turnover.this_month.stock_in) 
+                : '***')
+            : `${data?.inventory_turnover?.this_month?.stock_in_qty?.toLocaleString() || 0} units`
+          }
+          subtitle={canSeeFinancials 
+            ? `${data?.inventory_turnover?.this_month?.stock_in_qty?.toLocaleString() || 0} units purchased`
+            : "From purchases"
+          }
+          icon={TrendingUp}
           iconBg="bg-blue-100"
           iconColor="text-blue-600"
-          trend={{ 
-            value: typeof data?.inventory_turnover?.this_month?.stock_in === 'number' && 
-                   typeof data?.inventory_turnover?.last_month?.stock_in === 'number' &&
-                   data.inventory_turnover.last_month.stock_in > 0
-              ? Math.round(((data.inventory_turnover.this_month.stock_in - data.inventory_turnover.last_month.stock_in) / data.inventory_turnover.last_month.stock_in) * 100)
-              : 0,
-            label: 'vs last month'
-          }}
           isLoading={isLoading}
         />
 
-        {/* Metric 3: Critical Stock */}
+        {/* Metric 3: Critical Stock - Visible to ALL */}
         <Link href="/dashboard/products?filter=low_stock" className="block">
           <MetricCard
             title="Critical Stock"
@@ -396,26 +416,41 @@ export default function InventoryPage() {
           />
         </Link>
 
-        {/* Metric 4: Damage Loss */}
-        <MetricCard
-          title="Damage Loss"
-          value={typeof data?.damage_loss?.this_month?.total_value === 'number' 
-            ? formatCurrency(data.damage_loss.this_month.total_value) 
-            : data?.damage_loss?.this_month?.total_value || '***'}
-          subtitle={`${data?.damage_loss?.this_month?.units_damaged || 0} units damaged this month`}
-          icon={Trash2}
-          iconBg="bg-red-100"
-          iconColor="text-red-600"
-          trend={{
-            value: typeof data?.damage_loss?.this_month?.total_value === 'number' &&
-                   typeof data?.damage_loss?.last_month?.total_value === 'number' &&
-                   data.damage_loss.last_month.total_value > 0
-              ? Math.round(((data.damage_loss.this_month.total_value - data.damage_loss.last_month.total_value) / data.damage_loss.last_month.total_value) * 100)
-              : 0,
-            label: 'vs last month'
-          }}
-          isLoading={isLoading}
-        />
+        {/* Metric 4: Damage Loss - ADMIN ONLY */}
+        {canSeeFinancials && (
+          <MetricCard
+            title="Damage Loss"
+            value={typeof data?.damage_loss?.this_month?.total_value === 'number' 
+              ? formatCurrency(data.damage_loss.this_month.total_value) 
+              : data?.damage_loss?.this_month?.total_value || '***'}
+            subtitle={`${data?.damage_loss?.this_month?.units_damaged || 0} units damaged this month`}
+            icon={Trash2}
+            iconBg="bg-red-100"
+            iconColor="text-red-600"
+            trend={{
+              value: typeof data?.damage_loss?.this_month?.total_value === 'number' &&
+                     typeof data?.damage_loss?.last_month?.total_value === 'number' &&
+                     data.damage_loss.last_month.total_value > 0
+                ? Math.round(((data.damage_loss.this_month.total_value - data.damage_loss.last_month.total_value) / data.damage_loss.last_month.total_value) * 100)
+                : 0,
+              label: 'vs last month'
+            }}
+            isLoading={isLoading}
+          />
+        )}
+
+        {/* Metric: Damage Count (Staff sees units, not value) */}
+        {!canSeeFinancials && (
+          <MetricCard
+            title="Damaged This Month"
+            value={`${data?.damage_loss?.this_month?.units_damaged || 0} units`}
+            subtitle={`${data?.damage_loss?.this_month?.transaction_count || 0} damage entries`}
+            icon={Trash2}
+            iconBg="bg-red-100"
+            iconColor="text-red-600"
+            isLoading={isLoading}
+          />
+        )}
       </div>
 
       {/* Stock Movement Summary */}
@@ -436,12 +471,18 @@ export default function InventoryPage() {
             <div className="text-center p-4 bg-green-50 rounded-lg border border-green-100">
               <TrendingUp className="w-8 h-8 text-green-600 mx-auto mb-2" />
               <div className="text-2xl font-bold text-green-700">
-                {typeof data?.inventory_turnover?.this_month?.stock_in === 'number' 
-                  ? formatCurrency(data.inventory_turnover.this_month.stock_in)
-                  : '***'}
+                {canSeeFinancials
+                  ? (typeof data?.inventory_turnover?.this_month?.stock_in === 'number' 
+                      ? formatCurrency(data.inventory_turnover.this_month.stock_in)
+                      : '***')
+                  : `${data?.inventory_turnover?.this_month?.stock_in_qty?.toLocaleString() || 0}`
+                }
               </div>
               <div className="text-sm text-green-600">
-                {data?.inventory_turnover?.this_month?.stock_in_qty?.toLocaleString() || 0} units
+                {canSeeFinancials 
+                  ? `${data?.inventory_turnover?.this_month?.stock_in_qty?.toLocaleString() || 0} units`
+                  : 'units'
+                }
               </div>
               <div className="text-xs text-gray-500 mt-1">Stock In (Purchases)</div>
             </div>
@@ -450,26 +491,42 @@ export default function InventoryPage() {
             <div className="text-center p-4 bg-red-50 rounded-lg border border-red-100">
               <TrendingDown className="w-8 h-8 text-red-600 mx-auto mb-2" />
               <div className="text-2xl font-bold text-red-700">
-                {typeof data?.inventory_turnover?.this_month?.stock_out === 'number' 
-                  ? formatCurrency(data.inventory_turnover.this_month.stock_out)
-                  : '***'}
+                {canSeeFinancials
+                  ? (typeof data?.inventory_turnover?.this_month?.stock_out === 'number' 
+                      ? formatCurrency(data.inventory_turnover.this_month.stock_out)
+                      : '***')
+                  : `${data?.inventory_turnover?.this_month?.stock_out_qty?.toLocaleString() || 0}`
+                }
               </div>
               <div className="text-sm text-red-600">
-                {data?.inventory_turnover?.this_month?.stock_out_qty?.toLocaleString() || 0} units
+                {canSeeFinancials 
+                  ? `${data?.inventory_turnover?.this_month?.stock_out_qty?.toLocaleString() || 0} units`
+                  : 'units'
+                }
               </div>
               <div className="text-xs text-gray-500 mt-1">Stock Out (Returns/Damage)</div>
             </div>
 
-            {/* Orders */}
-            <div className="text-center p-4 bg-blue-50 rounded-lg border border-blue-100">
-              <Package className="w-8 h-8 text-blue-600 mx-auto mb-2" />
-              <div className="text-2xl font-bold text-blue-700">
-                {typeof data?.inventory_turnover?.this_month?.orders_value === 'number' 
-                  ? formatCurrency(data.inventory_turnover.this_month.orders_value)
-                  : '***'}
+            {/* Orders - Only visible to admin */}
+            {canSeeFinancials ? (
+              <div className="text-center p-4 bg-blue-50 rounded-lg border border-blue-100">
+                <Package className="w-8 h-8 text-blue-600 mx-auto mb-2" />
+                <div className="text-2xl font-bold text-blue-700">
+                  {typeof data?.inventory_turnover?.this_month?.orders_value === 'number' 
+                    ? formatCurrency(data.inventory_turnover.this_month.orders_value)
+                    : '***'}
+                </div>
+                <div className="text-xs text-gray-500 mt-1">Delivered Orders Value</div>
               </div>
-              <div className="text-xs text-gray-500 mt-1">Delivered Orders Value</div>
-            </div>
+            ) : (
+              <div className="text-center p-4 bg-amber-50 rounded-lg border border-amber-100">
+                <AlertOctagon className="w-8 h-8 text-amber-600 mx-auto mb-2" />
+                <div className="text-2xl font-bold text-amber-700">
+                  {data?.pending_actions?.out_of_stock || 0}
+                </div>
+                <div className="text-xs text-gray-500 mt-1">Out of Stock Items</div>
+              </div>
+            )}
           </div>
         </div>
 
@@ -544,9 +601,11 @@ export default function InventoryPage() {
                       </div>
                     </div>
                     <div className="text-right">
-                      <div className="font-medium text-gray-900">
-                        {typeof tx.total_cost === 'number' ? formatCurrency(tx.total_cost) : '***'}
-                      </div>
+                      {canSeeFinancials ? (
+                        <div className="font-medium text-gray-900">
+                          {typeof tx.total_cost === 'number' ? formatCurrency(tx.total_cost) : '***'}
+                        </div>
+                      ) : null}
                       <div className="text-xs text-gray-400">{config.label}</div>
                     </div>
                   </Link>
