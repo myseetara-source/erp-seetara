@@ -11,7 +11,7 @@ import {
   DatabaseError,
   InsufficientStockError,
 } from '../utils/errors.js';
-import { getAvailableStock, formatVariantName } from '../utils/helpers.js';
+import { getAvailableStock, formatVariantName, buildSafeOrQuery } from '../utils/helpers.js';
 
 const logger = createLogger('ProductService');
 
@@ -199,7 +199,7 @@ class ProductService {
       // Fetch existing variants if none provided
       const { data: existingVariants } = await supabaseAdmin
         .from('product_variants')
-        .select('id, name, description, brand, category, image_url, is_active, shipping_inside, shipping_outside, created_at, updated_at')
+        .select('id, sku, barcode, attributes, color, size, material, cost_price, selling_price, mrp, current_stock, damaged_stock, reserved_stock, reorder_level, is_active, created_at, updated_at')
         .eq('product_id', id)
         .order('created_at', { ascending: true });
       
@@ -267,7 +267,8 @@ class ProductService {
     if (category) query = query.eq('category', category);
     if (is_active !== undefined) query = query.eq('is_active', is_active);
     if (search) {
-      query = query.or(`name.ilike.%${search}%,brand.ilike.%${search}%`);
+      const safeQuery = buildSafeOrQuery(search, ['name', 'brand']);
+      if (safeQuery) query = query.or(safeQuery);
     }
 
     // Apply sorting and pagination
@@ -432,6 +433,37 @@ class ProductService {
   }
 
   /**
+   * Get multiple variants by SKUs (BATCH QUERY - N+1 FIX)
+   * Performance: Single query for all SKUs instead of N queries
+   * 
+   * @param {string[]} skus - Array of SKU codes
+   * @returns {Object[]} Array of variants with product info
+   */
+  async getVariantsBySkus(skus) {
+    if (!skus || skus.length === 0) {
+      return [];
+    }
+
+    // Normalize SKUs to uppercase
+    const normalizedSkus = skus.map(sku => sku.toUpperCase());
+
+    const { data: variants, error } = await supabaseAdmin
+      .from('product_variants')
+      .select(`
+        *,
+        product:products(id, name, brand, category, image_url)
+      `)
+      .in('sku', normalizedSkus);
+
+    if (error) {
+      logger.error('Failed to fetch variants by SKUs', { error, skus: normalizedSkus });
+      throw new DatabaseError('Failed to fetch variants', error);
+    }
+
+    return variants || [];
+  }
+
+  /**
    * Update variant
    * @param {string} id - Variant UUID
    * @param {Object} data - Update data
@@ -504,7 +536,8 @@ class ProductService {
       query = query.lte('current_stock', supabaseAdmin.raw('reorder_level'));
     }
     if (search) {
-      query = query.or(`sku.ilike.%${search}%,color.ilike.%${search}%,size.ilike.%${search}%`);
+      const safeQuery = buildSafeOrQuery(search, ['sku', 'color', 'size']);
+      if (safeQuery) query = query.or(safeQuery);
     }
 
     const { data, error, count } = await query
@@ -536,6 +569,8 @@ class ProductService {
    * Check stock availability for multiple items
    * @param {Array} items - Array of { variant_id, quantity }
    * @returns {Object} Stock check result
+   * 
+   * DEBUG: Added detailed logging to diagnose "False Positive Insufficient Stock" errors
    */
   async checkStock(items) {
     const variantIds = items.map(item => item.variant_id);
@@ -562,13 +597,31 @@ class ProductService {
         continue;
       }
 
-      const available = getAvailableStock(variant);
-      if (available < item.quantity) {
+      // CRITICAL: Ensure quantity is a number (fix string comparison bug)
+      const requestedQty = parseInt(item.quantity, 10) || 0;
+      const currentStock = parseInt(variant.current_stock, 10) || 0;
+      const reservedStock = parseInt(variant.reserved_stock, 10) || 0;
+      const available = currentStock - reservedStock;
+      
+      // DEBUG LOGGING: Help diagnose false positive "Insufficient Stock" errors
+      logger.info('[StockCheck] Variant:', {
+        variant_id: item.variant_id,
+        sku: variant.sku,
+        requested: requestedQty,
+        current_stock: currentStock,
+        reserved_stock: reservedStock,
+        available: available,
+        willFail: available < requestedQty
+      });
+
+      if (available < requestedQty) {
         unavailable.push({
           variant_id: item.variant_id,
           sku: variant.sku,
-          requested: item.quantity,
+          requested: requestedQty,
           available,
+          current_stock: currentStock,
+          reserved_stock: reservedStock,
         });
       }
     }
@@ -673,6 +726,9 @@ class ProductService {
    * All-or-nothing deduction using database transaction.
    * If ANY item fails, the ENTIRE operation is rolled back.
    * 
+   * FALLBACK: If the batch RPC function is not available in the database,
+   * falls back to sequential single-item deductions using deductStockAtomic.
+   * 
    * @param {Array} items - Array of { variant_id, quantity }
    * @param {string} orderId - Order ID for tracking
    * @returns {Object} Batch result
@@ -685,11 +741,23 @@ class ProductService {
       quantity: item.quantity,
     }));
 
+    // Try the batch RPC first
     const { data, error } = await supabaseAdmin.rpc('deduct_stock_batch_atomic', {
       p_items: formattedItems,
       p_order_id: orderId,
       p_reason: `Batch order reservation${orderId ? ` - ${orderId}` : ''}`,
     });
+
+    // If RPC function doesn't exist (PGRST202), fallback to sequential deduction
+    if (error && error.code === 'PGRST202') {
+      logger.warn('Batch RPC not available, falling back to sequential deduction', {
+        orderId,
+        itemCount: items.length,
+      });
+      
+      // Use the sequential atomic deduction as fallback
+      return await this.deductStockAtomic(items, orderId, null);
+    }
 
     if (error) {
       logger.error('Batch atomic stock deduction RPC failed', { error });
@@ -848,83 +916,124 @@ class ProductService {
   }
 
   /**
-   * Adjust stock manually
+   * ATOMIC Stock Adjustment
+   * 
+   * Uses database-level row locking (FOR UPDATE) to prevent race conditions.
+   * This guarantees data integrity even under high concurrency.
+   * 
+   * SECURITY FIX: Replaced unsafe read-modify-write pattern with atomic RPC.
+   * 
    * @param {Object} data - Adjustment data
+   * @param {string} data.variant_id - UUID of the variant
+   * @param {string} data.movement_type - 'inward', 'outward', or 'damage'
+   * @param {number} data.quantity - Quantity to adjust (always positive)
+   * @param {string} data.reason - Reason for adjustment
+   * @param {string} data.vendor_id - Optional vendor ID
    * @param {string} userId - User making the adjustment
-   * @returns {Object} Stock movement record
+   * @returns {Object} Stock movement record with before/after details
    */
   async adjustStock(data, userId = null) {
     const { variant_id, movement_type, quantity, reason, vendor_id } = data;
 
-    // Get current stock
-    const { data: variant, error: fetchError } = await supabaseAdmin
-      .from('product_variants')
-      .select('id, sku, current_stock')
-      .eq('id', variant_id)
-      .single();
-
-    if (fetchError || !variant) {
-      throw new NotFoundError('Variant');
-    }
-
-    // Calculate new stock
-    let adjustedQuantity = quantity;
+    // Convert movement_type to quantity delta
+    // inward = positive, outward/damage = negative
+    let adjustedQuantity = Math.abs(quantity);
     if (movement_type === 'outward' || movement_type === 'damage') {
-      adjustedQuantity = -Math.abs(quantity);
-    } else if (movement_type === 'inward') {
-      adjustedQuantity = Math.abs(quantity);
+      adjustedQuantity = -adjustedQuantity;
     }
 
-    const newStock = variant.current_stock + adjustedQuantity;
+    // Build reason string with movement type context
+    const fullReason = `${movement_type}: ${reason || 'Manual adjustment'}`;
 
-    if (newStock < 0) {
-      throw new InsufficientStockError(
-        variant.sku,
-        Math.abs(adjustedQuantity),
-        variant.current_stock
-      );
-    }
-
-    // Update stock
-    const { error: updateError } = await supabaseAdmin
-      .from('product_variants')
-      .update({ current_stock: newStock })
-      .eq('id', variant_id);
-
-    if (updateError) {
-      throw new DatabaseError('Failed to adjust stock', updateError);
-    }
-
-    // Record movement
-    const { data: movement, error: movementError } = await supabaseAdmin
-      .from('stock_movements')
-      .insert({
-        variant_id,
-        movement_type,
-        quantity: adjustedQuantity,
-        vendor_id,
-        stock_before: variant.current_stock,
-        stock_after: newStock,
-        reason,
-        created_by: userId,
-      })
-      .select()
-      .single();
-
-    if (movementError) {
-      throw new DatabaseError('Failed to record stock movement', movementError);
-    }
-
-    logger.info('Stock adjusted', {
+    logger.debug('Attempting atomic stock adjustment', {
       variantId: variant_id,
-      sku: variant.sku,
-      type: movement_type,
+      movementType: movement_type,
       quantity: adjustedQuantity,
-      newStock,
-      reason,
+      reason: fullReason,
     });
 
-    return movement;
+    // =========================================================================
+    // ATOMIC RPC CALL - Uses FOR UPDATE row locking in PostgreSQL
+    // This prevents race conditions where two concurrent adjustments could
+    // corrupt stock data by both reading the same "current" value.
+    // =========================================================================
+    const { data: result, error: rpcError } = await supabaseAdmin.rpc('adjust_stock_atomic', {
+      p_variant_id: variant_id,
+      p_quantity: adjustedQuantity,
+      p_reason: fullReason,
+      p_user_id: userId,
+    });
+
+    // Handle RPC errors (network, function not found, etc.)
+    if (rpcError) {
+      logger.error('Atomic stock adjustment RPC failed', {
+        error: rpcError.message,
+        code: rpcError.code,
+        variantId: variant_id,
+      });
+      throw new DatabaseError(`Failed to adjust stock: ${rpcError.message}`, rpcError);
+    }
+
+    // Handle business logic errors from the RPC function
+    if (!result || !result.success) {
+      const errorCode = result?.error_code || 'UNKNOWN';
+      const errorMessage = result?.error || 'Stock adjustment failed';
+
+      logger.warn('Stock adjustment rejected', {
+        variantId: variant_id,
+        errorCode,
+        errorMessage,
+        currentStock: result?.current_stock,
+        requested: result?.requested,
+      });
+
+      // Map specific error codes to appropriate exceptions
+      if (errorCode === 'INSUFFICIENT_STOCK') {
+        throw new InsufficientStockError(
+          result?.sku || variant_id,
+          Math.abs(adjustedQuantity),
+          result?.current_stock || 0
+        );
+      }
+
+      if (errorCode === 'VARIANT_NOT_FOUND') {
+        throw new NotFoundError('Variant');
+      }
+
+      throw new DatabaseError(errorMessage);
+    }
+
+    // =========================================================================
+    // SUCCESS: Stock was adjusted atomically
+    // =========================================================================
+    logger.info('Stock adjusted atomically', {
+      variantId: result.variant_id,
+      sku: result.sku,
+      productName: result.product_name,
+      type: movement_type,
+      quantity: adjustedQuantity,
+      stockBefore: result.stock_before,
+      stockAfter: result.stock_after,
+      movementId: result.movement_id,
+      reason: fullReason,
+    });
+
+    // Return in the same format as before for backward compatibility
+    return {
+      id: result.movement_id,
+      variant_id: result.variant_id,
+      movement_type,
+      quantity: adjustedQuantity,
+      vendor_id: vendor_id || null,
+      stock_before: result.stock_before,
+      stock_after: result.stock_after,
+      reason: fullReason,
+      created_by: userId,
+      created_at: result.adjusted_at,
+      // Additional fields from atomic RPC
+      sku: result.sku,
+      product_name: result.product_name,
+    };
   }
 
   /**
@@ -932,15 +1041,36 @@ class ProductService {
    * @returns {Array} Variants with low stock
    */
   async getLowStockAlerts() {
+    // Query product_variants with low stock instead of non-existent inventory_alerts table
     const { data, error } = await supabaseAdmin
-      .from('inventory_alerts')
-      .select('id, name, description, brand, category, image_url, is_active, shipping_inside, shipping_outside, created_at, updated_at');
+      .from('product_variants')
+      .select(`
+        id, sku, color, size, current_stock, reserved_stock, cost_price, selling_price,
+        product:products(id, name, brand, category, image_url)
+      `)
+      .lt('current_stock', 10)
+      .gt('current_stock', 0)
+      .order('current_stock', { ascending: true })
+      .limit(50);
 
     if (error) {
-      throw new DatabaseError('Failed to fetch inventory alerts', error);
+      throw new DatabaseError('Failed to fetch low stock alerts', error);
     }
 
-    return data;
+    // Transform to expected format
+    return (data || []).map(v => ({
+      variant_id: v.id,
+      sku: v.sku,
+      color: v.color,
+      size: v.size,
+      current_stock: v.current_stock,
+      reserved_stock: v.reserved_stock || 0,
+      product_id: v.product?.id,
+      product_name: v.product?.name,
+      brand: v.product?.brand,
+      category: v.product?.category,
+      image_url: v.product?.image_url,
+    }));
   }
 
   /**

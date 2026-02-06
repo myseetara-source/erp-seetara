@@ -113,15 +113,32 @@ export const receiveSupplySchema = z.object({
 
 /**
  * Payment Mode Enum
+ * 
+ * Supports multiple payment providers:
+ * - Standard: cash, cheque, bank_transfer
+ * - UPI/Bank: upi, neft, rtgs, imps
+ * - Nepal Digital Wallets: esewa, khalti, ime_pay, fonepay
+ * - Generic: bank, online, other
  */
 export const paymentModeSchema = z.enum([
+  // Standard methods
   'cash',
-  'upi',
-  'bank_transfer',
   'cheque',
+  'bank_transfer',
+  // Bank/UPI methods
+  'upi',
   'neft',
   'rtgs',
   'imps',
+  'bank',        // Generic bank transfer (frontend sends this)
+  // Nepal digital wallets
+  'esewa',
+  'khalti',
+  'ime_pay',
+  'fonepay',
+  // Generic fallbacks
+  'online',
+  'other',
 ]);
 
 /**

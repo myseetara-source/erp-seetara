@@ -19,6 +19,7 @@ import {
   stockCheckSchema,
   productListQuerySchema,
   variantListQuerySchema,
+  productSearchQuerySchema,
 } from '../validations/product.validation.js';
 
 const router = Router();
@@ -31,7 +32,12 @@ router.use(authenticate);
 // =============================================================================
 
 // Search products (must be before /:id to avoid conflict)
-router.get('/search', productController.searchProducts);
+// Validated with: q (optional), limit (default 15), mode (default 'SALES')
+router.get(
+  '/search',
+  validateQuery(productSearchQuerySchema),
+  productController.searchProducts
+);
 
 // List products
 router.get(
@@ -93,6 +99,34 @@ router.get(
   '/:id/variants',
   validateParams(productIdSchema),
   productController.getProductVariants
+);
+
+/**
+ * Get product stock configuration (for Low Stock Alert settings)
+ * GET /products/:id/stock-config
+ * 
+ * Returns product with all variants and their reorder_level settings.
+ * SECURITY: Admin only
+ */
+router.get(
+  '/:id/stock-config',
+  authorize('admin'),
+  validateParams(productIdSchema),
+  productController.getProductStockConfig
+);
+
+/**
+ * Update reorder levels for product variants (Low Stock Alert)
+ * PATCH /products/:id/reorder-levels
+ * 
+ * Sets the minimum stock threshold for low stock alerts.
+ * SECURITY: Admin only
+ */
+router.patch(
+  '/:id/reorder-levels',
+  authorize('admin'),
+  validateParams(productIdSchema),
+  productController.updateReorderLevels
 );
 
 export default router;

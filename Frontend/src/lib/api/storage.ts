@@ -246,6 +246,8 @@ export const UPLOAD_FOLDERS = {
   INVOICES: 'invoices',
   PROFILES: 'profiles',
   MISC: 'uploads',
+  CUSTOMER_ADVANCES: 'customer-advances',
+  VENDOR_RECEIPTS: 'vendor-receipts',
 } as const;
 
 export default {

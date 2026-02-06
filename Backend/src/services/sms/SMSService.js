@@ -26,6 +26,7 @@ import { supabaseAdmin } from '../../config/supabase.js';
 import { createLogger } from '../../utils/logger.js';
 import { AakashSMSProvider } from './AakashSMSProvider.js';
 import { validateNepalPhone } from '../../utils/phone.js';
+import { sanitizeSearchInput } from '../../utils/helpers.js';
 
 const logger = createLogger('SMSService');
 
@@ -510,7 +511,11 @@ class SMSService {
         query = query.eq('template_slug', templateSlug);
       }
       if (phone) {
-        query = query.ilike('recipient_phone', `%${phone}%`);
+        // SECURITY: Sanitize phone to prevent SQL injection
+        const sanitizedPhone = sanitizeSearchInput(phone);
+        if (sanitizedPhone) {
+          query = query.ilike('recipient_phone', `%${sanitizedPhone}%`);
+        }
       }
 
       const from = (page - 1) * limit;

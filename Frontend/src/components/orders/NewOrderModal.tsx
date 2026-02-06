@@ -13,10 +13,7 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import {
-  X,
   User,
-  Phone,
-  MapPin,
   Plus,
   Minus,
   Trash2,
@@ -28,7 +25,6 @@ import {
   Check,
   Loader2,
   Send,
-  Sparkles,
 } from 'lucide-react';
 import {
   Dialog,
@@ -43,8 +39,10 @@ import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
 import { useQuickOrderForm, ProductOption } from '@/hooks/useOrderForm';
 import { ProductVariantSelect, VariantOption } from '@/components/form/ProductVariantSelect';
+import { NCMBranchSelect } from '@/components/orders/NCMBranchSelect';
 import { calculateShipping } from '@/lib/utils/shippingCalculator';
 import type { FulfillmentType } from '@/types/order';
+import type { DeliveryType } from '@/hooks/useNcmMasterData';
 
 // =============================================================================
 // TYPES
@@ -55,7 +53,7 @@ interface NewOrderModalProps {
   onSuccess?: (order: any) => void;
 }
 
-type FulfillmentType = 'inside_valley' | 'outside_valley' | 'store';
+// Using FulfillmentType from @/types/order
 type OrderStatus = 'intake' | 'converted';
 
 // =============================================================================
@@ -117,6 +115,36 @@ export function NewOrderModal({ trigger, onSuccess }: NewOrderModalProps) {
   const discountAmount = watch('discount_amount') || 0;
   const prepaidAmount = watch('prepaid_amount') || 0;
 
+  // NCM Branch selection state (only for Outside Valley)
+  const selectedBranch = watch('destination_branch') || '';
+  const isOutsideValley = fulfillmentType === 'outside_valley';
+  const [ncmDeliveryType, setNcmDeliveryType] = useState<DeliveryType>('home');
+  const [ncmManualCharge, setNcmManualCharge] = useState<number>(0);
+  const [isNcmManualEntry, setIsNcmManualEntry] = useState(false);
+
+  // Reset branch and NCM state when switching away from outside_valley
+  useEffect(() => {
+    if (!isOutsideValley) {
+      setValue('destination_branch', null);
+      setNcmDeliveryType('home');
+      setNcmManualCharge(0);
+      setIsNcmManualEntry(false);
+    }
+  }, [isOutsideValley, setValue]);
+
+  // Handler for NCM branch selection
+  const handleNcmBranchChange = (branchCode: string | null) => {
+    setValue('destination_branch', branchCode);
+  };
+
+  // Handler for NCM delivery charge calculation
+  const handleNcmDeliveryChargeChange = (charge: number | null, isManual: boolean) => {
+    setIsNcmManualEntry(isManual);
+    if (charge !== null && isOutsideValley) {
+      setValue('delivery_charge', charge);
+    }
+  };
+
   // Handle product selection
   const handleProductSelect = (product: ProductOption) => {
     const existingIndex = watchedItems.findIndex(
@@ -147,6 +175,7 @@ export function NewOrderModal({ trigger, onSuccess }: NewOrderModalProps) {
   // - Shipping is FLAT RATE per ORDER (not per quantity/item)
   // - When multiple products: Use the HIGHEST shipping cost (Heavy Item Rule)
   // - Store pickup = 0
+  // - For Outside Valley: NCM pricing takes priority
   // - User can manually override the suggested value
   // ==========================================================================
   
@@ -156,7 +185,13 @@ export function NewOrderModal({ trigger, onSuccess }: NewOrderModalProps) {
       return;
     }
 
-    // Use centralized shipping calculator
+    // For Outside Valley, NCMBranchSelect handles the delivery charge
+    // Only auto-calculate for Inside Valley and Store
+    if (isOutsideValley) {
+      return;
+    }
+
+    // Use centralized shipping calculator for non-NCM fulfillment types
     const suggestedShipping = calculateShipping(
       watchedItems as { shipping_inside?: number; shipping_outside?: number }[],
       fulfillmentType as FulfillmentType
@@ -165,7 +200,7 @@ export function NewOrderModal({ trigger, onSuccess }: NewOrderModalProps) {
     // Auto-update the delivery charge field
     // Note: User can still manually override this value
     setValue('delivery_charge', suggestedShipping);
-  }, [watchedItems, fulfillmentType, setValue]);
+  }, [watchedItems, fulfillmentType, isOutsideValley, setValue]);
 
   // Reset when modal closes
   const handleOpenChange = (open: boolean) => {
@@ -182,7 +217,7 @@ export function NewOrderModal({ trigger, onSuccess }: NewOrderModalProps) {
   ];
 
   const statusOptions = [
-    { value: 'intake', label: 'Intake', icon: Clock },
+    { value: 'intake', label: 'New', icon: Clock },
     { value: 'converted', label: 'Converted', icon: Check },
   ];
 
@@ -261,6 +296,20 @@ export function NewOrderModal({ trigger, onSuccess }: NewOrderModalProps) {
                   placeholder="Street, Area, City"
                 />
               </div>
+
+              {/* NCM Branch Selector with Rich UI (Outside Valley Only) */}
+              {isOutsideValley && (
+                <NCMBranchSelect
+                  value={selectedBranch}
+                  onChange={handleNcmBranchChange}
+                  deliveryType={ncmDeliveryType}
+                  onDeliveryTypeChange={setNcmDeliveryType}
+                  onDeliveryChargeChange={handleNcmDeliveryChargeChange}
+                  manualCharge={ncmManualCharge}
+                  onManualChargeChange={setNcmManualCharge}
+                  compact={false}
+                />
+              )}
             </div>
 
             {/* Order Type */}
@@ -322,12 +371,21 @@ export function NewOrderModal({ trigger, onSuccess }: NewOrderModalProps) {
                 <div>
                   <label className="text-xs text-gray-500 mb-1 flex items-center gap-1">
                     Delivery
-                    <span 
-                      title="Auto-calculated based on highest shipping among selected products. You can override this value."
-                      className="text-orange-400 cursor-help"
-                    >
-                      ✨
-                    </span>
+                    {isOutsideValley ? (
+                      <span 
+                        title="NCM pricing based on selected branch and delivery type"
+                        className="text-blue-400 cursor-help"
+                      >
+                        🚚
+                      </span>
+                    ) : (
+                      <span 
+                        title="Auto-calculated based on highest shipping among selected products. You can override this value."
+                        className="text-orange-400 cursor-help"
+                      >
+                        ✨
+                      </span>
+                    )}
                   </label>
                   <Input
                     type="number"
@@ -335,9 +393,14 @@ export function NewOrderModal({ trigger, onSuccess }: NewOrderModalProps) {
                     placeholder="0"
                     className={cn(
                       'text-center',
-                      deliveryCharge > 0 && 'border-orange-300 bg-orange-50/50'
+                      deliveryCharge > 0 && isOutsideValley && 'border-blue-300 bg-blue-50/50',
+                      deliveryCharge > 0 && !isOutsideValley && 'border-orange-300 bg-orange-50/50'
                     )}
+                    disabled={isOutsideValley && !isNcmManualEntry}
                   />
+                  {isOutsideValley && selectedBranch && !isNcmManualEntry && (
+                    <p className="text-[10px] text-blue-600 mt-0.5">NCM Rate</p>
+                  )}
                 </div>
                 <div>
                   <label className="text-xs text-gray-500 mb-1 block">Discount</label>
@@ -463,7 +526,7 @@ export function NewOrderModal({ trigger, onSuccess }: NewOrderModalProps) {
             </Badge>
             <span className="text-sm">•</span>
             <span className="text-sm font-semibold text-orange-600">
-              COD: ₹{codAmount.toLocaleString()}
+              COD: रु.{codAmount.toLocaleString()}
             </span>
           </div>
 

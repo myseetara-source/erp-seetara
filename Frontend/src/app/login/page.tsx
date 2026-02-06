@@ -43,6 +43,13 @@ export default function LoginPage() {
         throw new Error('Login failed - no user returned');
       }
 
+      // CRITICAL: Force session refresh to get latest app_metadata (role)
+      // This ensures the JWT has the most up-to-date role after admin updates
+      const { error: refreshError } = await supabase.auth.refreshSession();
+      if (refreshError) {
+        console.warn('Session refresh failed:', refreshError.message);
+      }
+
       // Get user role from public.users table
       const { data: userData, error: userError } = await supabase
         .from('users')

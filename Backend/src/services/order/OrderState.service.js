@@ -5,6 +5,8 @@
  * - Status updates (single and bulk)
  * - State validation
  * - Status change integrations
+ * 
+ * P0 FIX: Now uses centralized WorkflowRules.validateTransition() (Audit Finding 4.5)
  */
 
 import { supabaseAdmin } from '../../config/supabase.js';
@@ -16,44 +18,100 @@ import {
   DatabaseError,
 } from '../../utils/errors.js';
 import { orderCoreService } from './OrderCore.service.js';
+import { logStatusChange, logActivity, ACTIVITY_TYPES } from '../ActivityLogger.service.js';
+import { 
+  validateTransition as validateWorkflowTransition,
+  executeInventoryTrigger,
+  getAllowedTransitions as getWorkflowAllowedTransitions,
+} from './WorkflowRules.service.js';
 
 const logger = createLogger('OrderState');
 
-// Valid status transitions
+// Valid status transitions - Aligned with WorkflowRules.service.js
+// =========================================================================
+// STATUS FLOW:
+// intake → follow_up → converted → packed → assigned → out_for_delivery → delivered
+//                                         → handover_to_courier → in_transit → delivered
+// =========================================================================
 const VALID_TRANSITIONS = {
-  intake: ['confirmed', 'cancelled'],
-  confirmed: ['packed', 'cancelled'],
-  packed: ['shipped', 'out_for_delivery', 'cancelled'],
+  // Intake Phase
+  intake: ['follow_up', 'converted', 'cancelled', 'store_sale'],
+  follow_up: ['follow_up', 'converted', 'hold', 'cancelled'],
+  
+  // Processing Phase
+  converted: ['packed', 'hold', 'cancelled', 'store_sale'],
+  hold: ['converted', 'packed', 'cancelled'],
+  packed: ['assigned', 'handover_to_courier', 'shipped', 'out_for_delivery', 'store_sale', 'cancelled'],
+  
+  // Delivery Phase - Inside Valley (Rider)
+  assigned: ['out_for_delivery', 'packed', 'cancelled'],
+  out_for_delivery: ['delivered', 'rejected', 'return_initiated', 'assigned', 'cancelled'],
+  
+  // Delivery Phase - Outside Valley (Courier)
+  handover_to_courier: ['in_transit', 'delivered', 'return_initiated'],
   shipped: ['delivered', 'returned', 'in_transit'],
-  in_transit: ['delivered', 'returned'],
-  out_for_delivery: ['delivered', 'returned', 'cancelled'],
-  delivered: ['returned'],
-  cancelled: [],
+  in_transit: ['delivered', 'returned', 'return_initiated'],
+  
+  // Terminal States
+  delivered: ['return_initiated'],
+  store_sale: ['delivered', 'return_initiated'],
+  
+  // Return Flow
+  return_initiated: ['returned'],
+  rejected: ['return_initiated', 'returned'],
   returned: [],
+  
+  // Cancelled (terminal)
+  cancelled: [],
 };
 
-// Status metadata
+// Status metadata - Complete status configuration
 const STATUS_CONFIG = {
-  intake: { label: 'Intake', color: 'gray', canEdit: true, canCancel: true },
-  confirmed: { label: 'Confirmed', color: 'blue', canEdit: true, canCancel: true },
+  // Intake Phase
+  intake: { label: 'New', color: 'gray', canEdit: true, canCancel: true },
+  follow_up: { label: 'Follow Up', color: 'yellow', canEdit: true, canCancel: true },
+  
+  // Processing Phase
+  converted: { label: 'Converted', color: 'blue', canEdit: true, canCancel: true },
+  hold: { label: 'On Hold', color: 'orange', canEdit: true, canCancel: true },
   packed: { label: 'Packed', color: 'purple', canEdit: false, canCancel: true },
+  
+  // Delivery Phase - Inside Valley
+  assigned: { label: 'Assigned', color: 'indigo', canEdit: false, canCancel: true },
+  out_for_delivery: { label: 'Out for Delivery', color: 'cyan', canEdit: false, canCancel: false },
+  
+  // Delivery Phase - Outside Valley
+  handover_to_courier: { label: 'Handover to Courier', color: 'blue', canEdit: false, canCancel: false },
   shipped: { label: 'Shipped', color: 'orange', canEdit: false, canCancel: false },
   in_transit: { label: 'In Transit', color: 'orange', canEdit: false, canCancel: false },
-  out_for_delivery: { label: 'Out for Delivery', color: 'yellow', canEdit: false, canCancel: false },
+  
+  // Terminal States
   delivered: { label: 'Delivered', color: 'green', canEdit: false, canCancel: false },
-  cancelled: { label: 'Cancelled', color: 'red', canEdit: false, canCancel: false },
+  store_sale: { label: 'Store Sale', color: 'green', canEdit: false, canCancel: false },
+  
+  // Return Flow
+  return_initiated: { label: 'Return Initiated', color: 'amber', canEdit: false, canCancel: false },
+  rejected: { label: 'Rejected', color: 'red', canEdit: false, canCancel: false },
   returned: { label: 'Returned', color: 'red', canEdit: false, canCancel: false },
+  
+  // Cancelled
+  cancelled: { label: 'Cancelled', color: 'red', canEdit: false, canCancel: false },
+  
+  // Legacy (for backward compatibility)
+  confirmed: { label: 'Confirmed', color: 'blue', canEdit: true, canCancel: true },
 };
 
 class OrderStateService {
   /**
    * Update order status with validation
+   * 
+   * P0 FIX: Now uses centralized WorkflowRules.validateTransition() (Audit Finding 4.5)
    */
   async updateStatus(orderId, statusData, context = {}) {
-    const { status: newStatus, reason, awb_number, courier_partner, tracking_url } = statusData;
-    const { userId } = context;
+    const { status: newStatus, reason, awb_number, courier_partner, tracking_url, ...additionalData } = statusData;
+    const { userId, user, userRole } = context;
 
-    // Get current order
+    // Get current order with all fields needed for validation
     const { data: order, error } = await supabaseAdmin
       .from('orders')
       .select('id, order_number, status, fulfillment_type, rider_id, customer_id')
@@ -67,9 +125,51 @@ class OrderStateService {
 
     const currentStatus = order.status;
 
-    // Validate state transition
-    if (!this.isValidTransition(currentStatus, newStatus)) {
-      throw new InvalidStateTransitionError(currentStatus, newStatus);
+    // =========================================================================
+    // P0 FIX: Use centralized WorkflowRules.validateTransition() (Audit Finding 4.5)
+    // This enforces:
+    // 1. Proper state machine transitions
+    // 2. Role-based locks (e.g., rider lock)
+    // 3. Dispatch requirements
+    // 4. Inventory checks for 'packed'
+    // =========================================================================
+    const validationResult = await validateWorkflowTransition(order, newStatus, {
+      userId,
+      userRole: userRole || user?.role || 'operator',
+      additionalData: { ...additionalData, reason },
+    });
+
+    if (!validationResult.valid) {
+      logger.warn('Status transition rejected by WorkflowRules', {
+        orderId,
+        from: currentStatus,
+        to: newStatus,
+        error: validationResult.error,
+        code: validationResult.code,
+      });
+
+      // Throw appropriate error based on code
+      if (validationResult.code === 'INVALID_TRANSITION') {
+        throw new InvalidStateTransitionError(currentStatus, newStatus);
+      }
+      if (validationResult.code === 'ACCESS_DENIED') {
+        throw new ValidationError(validationResult.error);
+      }
+      if (validationResult.code === 'MISSING_REQUIRED_FIELDS') {
+        throw new ValidationError(validationResult.error);
+      }
+      if (validationResult.code === 'INSUFFICIENT_STOCK') {
+        throw new ValidationError(validationResult.error);
+      }
+      throw new ValidationError(validationResult.error || 'Invalid status transition');
+    }
+
+    // Log any warnings from validation
+    if (validationResult.warnings?.length > 0) {
+      logger.warn('Status transition warnings', {
+        orderId,
+        warnings: validationResult.warnings,
+      });
     }
 
     // Build update data
@@ -96,6 +196,11 @@ class OrderStateService {
       updateData.cancellation_reason = reason;
     }
 
+    if (newStatus === 'return_initiated') {
+      updateData.return_initiated_at = new Date().toISOString();
+      updateData.return_reason = additionalData.return_reason || reason;
+    }
+
     // Perform update
     const { error: updateError } = await supabaseAdmin
       .from('orders')
@@ -107,7 +212,20 @@ class OrderStateService {
       throw new DatabaseError('Failed to update order status', updateError);
     }
 
-    // Create status change log
+    // =========================================================================
+    // P0 FIX: Execute inventory trigger via WorkflowRules (Audit Finding 4.5)
+    // This handles stock deduction/restoration based on the transition
+    // =========================================================================
+    const inventoryResult = await executeInventoryTrigger(order, currentStatus, newStatus, { userId });
+    if (!inventoryResult.success && inventoryResult.error) {
+      logger.warn('Inventory trigger warning', {
+        orderId,
+        action: inventoryResult.action,
+        error: inventoryResult.error,
+      });
+    }
+
+    // Create status change log (legacy order_logs table)
     await orderCoreService.createOrderLog({
       order_id: orderId,
       action: 'status_changed',
@@ -115,6 +233,18 @@ class OrderStateService {
       new_status: newStatus,
       description: reason || `Status changed from ${currentStatus} to ${newStatus}`,
       created_by: userId,
+    });
+
+    // =========================================================================
+    // P0: Log to order_activities for Timeline feature
+    // Note: The database trigger also logs this, but we log with user info here
+    // =========================================================================
+    await logStatusChange(supabaseAdmin, {
+      orderId,
+      user: context.user || null,  // Pass full user object for name/role extraction
+      oldStatus: currentStatus,
+      newStatus: newStatus,
+      reason: reason,
     });
 
     // Trigger integrations
@@ -125,6 +255,7 @@ class OrderStateService {
       orderNumber: order.order_number,
       from: currentStatus,
       to: newStatus,
+      inventoryAction: inventoryResult.action,
     });
 
     return orderCoreService.getOrderById(orderId);
@@ -156,17 +287,20 @@ class OrderStateService {
 
   /**
    * Check if status transition is valid
+   * P0 FIX: Now delegates to WorkflowRules for consistency (Audit Finding 4.5)
    */
-  isValidTransition(fromStatus, toStatus) {
-    const validNextStatuses = VALID_TRANSITIONS[fromStatus] || [];
-    return validNextStatuses.includes(toStatus);
+  isValidTransition(fromStatus, toStatus, fulfillmentType = 'inside_valley') {
+    // Use WorkflowRules as primary validation
+    const allowedTransitions = getWorkflowAllowedTransitions(fromStatus, fulfillmentType);
+    return allowedTransitions.includes(toStatus);
   }
 
   /**
    * Get valid next statuses for an order
+   * P0 FIX: Now delegates to WorkflowRules for consistency (Audit Finding 4.5)
    */
-  getValidNextStatuses(currentStatus) {
-    return VALID_TRANSITIONS[currentStatus] || [];
+  getValidNextStatuses(currentStatus, fulfillmentType = 'inside_valley') {
+    return getWorkflowAllowedTransitions(currentStatus, fulfillmentType);
   }
 
   /**

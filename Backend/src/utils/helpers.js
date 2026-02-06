@@ -164,6 +164,44 @@ export const formatVariantName = (variant) => {
   return parts.join(' - ') || 'Default';
 };
 
+/**
+ * Sanitize search input for PostgREST .or() queries
+ * Prevents SQL injection by escaping special characters
+ * 
+ * @param {string} input - User input to sanitize
+ * @returns {string} Sanitized string safe for PostgREST queries
+ */
+export const sanitizeSearchInput = (input) => {
+  if (!input || typeof input !== 'string') return '';
+  
+  // Remove or escape special PostgREST/SQL characters
+  return input
+    .replace(/[\\%_'"`;()[\]{}|&^$#@!]/g, '') // Remove dangerous chars
+    .replace(/\s+/g, ' ')                      // Normalize whitespace
+    .trim()
+    .substring(0, 100);                        // Limit length
+};
+
+/**
+ * Build a safe .or() query string for PostgREST ILIKE searches
+ * 
+ * @param {string} search - Sanitized search term
+ * @param {string[]} columns - Array of column names to search
+ * @returns {string} Safe .or() query string
+ * 
+ * @example
+ * buildSafeOrQuery('john', ['name', 'email']) 
+ * // Returns: "name.ilike.%john%,email.ilike.%john%"
+ */
+export const buildSafeOrQuery = (search, columns) => {
+  const sanitized = sanitizeSearchInput(search);
+  if (!sanitized || !columns?.length) return null;
+  
+  return columns
+    .map(col => `${col}.ilike.%${sanitized}%`)
+    .join(',');
+};
+
 export default {
   generateRandomString,
   sanitizePhone,
@@ -175,4 +213,6 @@ export default {
   hashForFacebook,
   getAvailableStock,
   formatVariantName,
+  sanitizeSearchInput,
+  buildSafeOrQuery,
 };

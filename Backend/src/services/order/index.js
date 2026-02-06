@@ -49,6 +49,22 @@ class OrderService {
     return orderCoreService.updateOrder(id, data, context);
   }
 
+  async updateRemarks(id, remarks, context) {
+    return orderCoreService.updateRemarks(id, remarks, context);
+  }
+
+  async updateZoneBranch(id, data, context) {
+    return orderCoreService.updateZoneBranch(id, data, context);
+  }
+
+  async updateRouting(id, data, context) {
+    return orderCoreService.updateRouting(id, data, context);
+  }
+
+  async updateCustomerInfo(id, data, context) {
+    return orderCoreService.updateCustomerInfo(id, data, context);
+  }
+
   async deleteOrder(id, context) {
     return orderCoreService.deleteOrder(id, context);
   }

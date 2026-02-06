@@ -75,15 +75,28 @@ function extractRoleFromSession(session: Session | null): UserRole {
   
   const user = session.user;
   
+  // DEBUG: Log what metadata we're seeing
+  console.log('[useAuth] Session metadata:', {
+    app_metadata: user.app_metadata,
+    user_metadata: user.user_metadata,
+  });
+  
   // Priority 1: app_metadata.role (synced by trigger)
   const appMetaRole = user.app_metadata?.role as UserRole | undefined;
-  if (appMetaRole) return appMetaRole;
+  if (appMetaRole) {
+    console.log('[useAuth] Using app_metadata.role:', appMetaRole);
+    return appMetaRole;
+  }
   
   // Priority 2: user_metadata.role (set during signup)
   const userMetaRole = user.user_metadata?.role as UserRole | undefined;
-  if (userMetaRole) return userMetaRole;
+  if (userMetaRole) {
+    console.log('[useAuth] Using user_metadata.role:', userMetaRole);
+    return userMetaRole;
+  }
   
   // Default fallback
+  console.log('[useAuth] No role found, defaulting to staff');
   return 'staff';
 }
 
@@ -145,13 +158,38 @@ export function useAuth(): UseAuthReturn {
 
         if (mounted) {
           if (session) {
-            // Extract user info from JWT metadata (no DB call!)
+            // Extract user info from JWT metadata
+            let role = extractRoleFromSession(session);
+            let vendorId = extractVendorIdFromSession(session);
+            let name = extractNameFromSession(session);
+            
+            // FALLBACK: If role is 'staff' (default), try to refresh session first
+            // This handles cases where app_metadata wasn't synced properly
+            if (role === 'staff') {
+              console.log('[useAuth] Role is staff, attempting session refresh...');
+              try {
+                // Force session refresh to get latest app_metadata
+                const { data: refreshData } = await supabase.auth.refreshSession();
+                if (refreshData?.session) {
+                  const refreshedRole = extractRoleFromSession(refreshData.session);
+                  if (refreshedRole !== 'staff') {
+                    role = refreshedRole;
+                    vendorId = extractVendorIdFromSession(refreshData.session);
+                    name = extractNameFromSession(refreshData.session);
+                    console.log('[useAuth] Role after refresh:', role);
+                  }
+                }
+              } catch (refreshError) {
+                console.warn('[useAuth] Session refresh failed:', refreshError);
+              }
+            }
+
             const authUser: AuthUser = {
               id: session.user.id,
               email: session.user.email || '',
-              name: extractNameFromSession(session),
-              role: extractRoleFromSession(session),
-              vendorId: extractVendorIdFromSession(session),
+              name,
+              role,
+              vendorId,
               isActive: true,
             };
 
@@ -198,12 +236,35 @@ export function useAuth(): UseAuthReturn {
           });
         } else if (session) {
           // Extract user info from JWT metadata
+          let role = extractRoleFromSession(session);
+          let vendorId = extractVendorIdFromSession(session);
+          let name = extractNameFromSession(session);
+          
+          // FALLBACK: If role is 'staff' (default), try to refresh session
+          if (role === 'staff') {
+            console.log('[useAuth] onAuthStateChange: Role is staff, checking refresh...');
+            try {
+              const { data: refreshData } = await supabase.auth.refreshSession();
+              if (refreshData?.session) {
+                const refreshedRole = extractRoleFromSession(refreshData.session);
+                if (refreshedRole !== 'staff') {
+                  role = refreshedRole;
+                  vendorId = extractVendorIdFromSession(refreshData.session);
+                  name = extractNameFromSession(refreshData.session);
+                  console.log('[useAuth] Role after refresh:', role);
+                }
+              }
+            } catch (refreshError) {
+              console.warn('[useAuth] Session refresh in auth change failed:', refreshError);
+            }
+          }
+
           const authUser: AuthUser = {
             id: session.user.id,
             email: session.user.email || '',
-            name: extractNameFromSession(session),
-            role: extractRoleFromSession(session),
-            vendorId: extractVendorIdFromSession(session),
+            name,
+            role,
+            vendorId,
             isActive: true,
           };
 

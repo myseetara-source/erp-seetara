@@ -25,7 +25,15 @@ export type OrderStatus =
   | 'cancelled'
   | 'rejected'
   | 'return_initiated'
-  | 'returned';
+  | 'returned'
+  | 'rescheduled'
+  | 'refunded'
+  | 'exchange'
+  | 'trash'
+  | 'partially_exchanged'
+  | 'store_refund'
+  | 'store_exchange'
+  | 'store_return';
 
 export type PaymentStatus = 'pending' | 'paid' | 'partial' | 'refunded' | 'cod';
 
@@ -61,7 +69,7 @@ export interface StatusConfig {
 
 export const STATUS_CONFIG: Record<OrderStatus, StatusConfig> = {
   intake: {
-    label: 'Intake',
+    label: 'New',
     color: 'blue',
     bgColor: 'bg-blue-100',
     textColor: 'text-blue-700',
@@ -465,9 +473,11 @@ export interface Order {
   subtotal: number;
   discount_amount: number;
   delivery_charge: number;
+  shipping_charges?: number;  // P0 FIX: Backend uses this name
   total_amount: number;
   payment_status: PaymentStatus;
   payment_method?: string;
+  paid_amount?: number;
   
   // Tracking
   assigned_rider_id?: string;
@@ -477,6 +487,17 @@ export interface Order {
   courier_partner?: string;
   courier_tracking_id?: string;
   courier_manifest_id?: string;
+  
+  // P0 FIX: NCM delivery type (D2D = Home Delivery, D2B = Branch Pickup)
+  delivery_type?: 'D2D' | 'D2B' | null;
+  
+  // P0 FIX: Logistics sync fields
+  destination_branch?: string;
+  zone_code?: string;
+  is_logistics_synced?: boolean;
+  external_order_id?: string;
+  logistics_provider?: string;
+  logistics_synced_at?: string;
   
   // Follow-up
   followup_date?: string;
@@ -492,6 +513,9 @@ export interface Order {
   return_reason?: string;
   return_initiated_at?: string;
   returned_at?: string;
+  
+  // Staff Notes
+  staff_remarks?: string;
   
   // Items
   items?: OrderItem[];

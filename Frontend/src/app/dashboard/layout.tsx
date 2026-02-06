@@ -1,13 +1,16 @@
 /**
- * Dashboard Layout
- * Wraps all dashboard pages with sidebar, header, and error boundary
+ * Dashboard Root Layout
+ * 
+ * Provides shared providers and error boundary for all dashboard pages.
+ * The actual layout (sidebar + optional header) is handled by route groups:
+ * - (header)   → DashboardLayout with header visible
+ * - (headerless) → DashboardLayout without header (focus mode)
  */
 
-import DashboardLayout from '@/components/layouts/DashboardLayout';
 import ErrorBoundary from '@/components/common/ErrorBoundary';
 import { QueryProvider } from '@/lib/providers/QueryProvider';
 
-export default function Layout({
+export default function DashboardRootLayout({
   children,
 }: {
   children: React.ReactNode;
@@ -15,7 +18,7 @@ export default function Layout({
   return (
     <ErrorBoundary>
       <QueryProvider>
-        <DashboardLayout>{children}</DashboardLayout>
+        {children}
       </QueryProvider>
     </ErrorBoundary>
   );

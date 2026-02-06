@@ -5,7 +5,7 @@
  * 
  * SECURITY RULES:
  * 1. NEVER accept vendor_id from req.body or req.params
- * 2. ALWAYS extract vendor_id from req.user.vendor_id (JWT)
+ * 2. ALWAYS extract vendor_id from req.user.vendorId (JWT)
  * 3. All endpoints are VIEW ONLY (no mutations)
  * 4. Every access is logged
  * 
@@ -17,7 +17,7 @@
  * │  ❌ NEVER: req.params.vendor_id                                        │
  * │  ❌ NEVER: req.query.vendor_id                                         │
  * │                                                                        │
- * │  ✅ ALWAYS: req.user.vendor_id (from verified JWT)                     │
+ * │  ✅ ALWAYS: req.user.vendorId (from verified JWT)                     │
  * │                                                                        │
  * └────────────────────────────────────────────────────────────────────────┘
  */
@@ -57,12 +57,12 @@ function getVendorIdFromJWT(req) {
   }
 
   // Verify vendor_id exists
-  if (!req.user.vendor_id) {
+  if (!req.user.vendorId) {
     logger.error('Vendor user without vendor_id', { userId: req.user.id });
     throw new ForbiddenError('Vendor account not properly configured');
   }
 
-  return req.user.vendor_id;
+  return req.user.vendorId;
 }
 
 /**
@@ -71,7 +71,7 @@ function getVendorIdFromJWT(req) {
 async function logAccess(req, action) {
   try {
     await supabaseAdmin.from('vendor_access_logs').insert({
-      vendor_id: req.user.vendor_id,
+      vendor_id: req.user.vendorId,
       user_id: req.user.id,
       action,
       ip_address: req.ip || req.headers['x-forwarded-for']?.split(',')[0],
@@ -105,7 +105,13 @@ export const getDashboard = asyncHandler(async (req, res) => {
   // Log access
   await logAccess(req, 'view_dashboard');
 
-  // Fetch vendor info
+  // ===========================================================================
+  // PARALLEL QUERY EXECUTION (PERFORMANCE FIX)
+  // Reduced from 6 sequential queries to 1 initial + 5 parallel queries
+  // Expected improvement: ~1000ms -> ~300ms
+  // ===========================================================================
+
+  // First, verify vendor exists (required for security)
   const { data: vendor, error: vendorError } = await supabaseAdmin
     .from('vendors')
     .select('id, name, company_name, balance, payment_terms')
@@ -116,52 +122,80 @@ export const getDashboard = asyncHandler(async (req, res) => {
     throw new NotFoundError('Vendor account');
   }
 
-  // Fetch recent transactions
-  const { data: transactions } = await supabaseAdmin
-    .from('transactions')
-    .select('id, type, amount, description, created_at')
-    .eq('vendor_id', vendorId)
-    .order('created_at', { ascending: false })
-    .limit(5);
+  // Execute remaining 5 queries in parallel using Promise.all()
+  const [
+    transactionsResult,
+    suppliesResult,
+    paymentsResult,
+    statsResult,
+    paymentStatsResult,
+  ] = await Promise.all([
+    // 1. Recent transactions from vendor_ledger
+    supabaseAdmin
+      .from('vendor_ledger')
+      .select('id, entry_type, debit, credit, description, transaction_date, created_at')
+      .eq('vendor_id', vendorId)
+      .order('transaction_date', { ascending: false })
+      .limit(5),
+    
+    // 2. Recent supplies (purchases from inventory_transactions)
+    supabaseAdmin
+      .from('inventory_transactions')
+      .select(`
+        id,
+        invoice_no,
+        total_cost,
+        status,
+        created_at,
+        items:inventory_transaction_items(count)
+      `)
+      .eq('vendor_id', vendorId)
+      .eq('transaction_type', 'purchase')
+      .order('created_at', { ascending: false })
+      .limit(5),
+    
+    // 3. Recent payments from vendor_ledger
+    supabaseAdmin
+      .from('vendor_ledger')
+      .select('id, credit, transaction_date, reference_no, payment_method, description')
+      .eq('vendor_id', vendorId)
+      .eq('entry_type', 'payment')
+      .order('transaction_date', { ascending: false })
+      .limit(5),
+    
+    // 4. Stats from inventory_transactions
+    supabaseAdmin
+      .from('inventory_transactions')
+      .select('total_cost, status')
+      .eq('vendor_id', vendorId)
+      .eq('transaction_type', 'purchase'),
+    
+    // 5. Payment stats from vendor_ledger
+    supabaseAdmin
+      .from('vendor_ledger')
+      .select('credit')
+      .eq('vendor_id', vendorId)
+      .eq('entry_type', 'payment'),
+  ]);
 
-  // Fetch recent supplies
-  const { data: supplies } = await supabaseAdmin
-    .from('vendor_supplies')
-    .select(`
-      id,
-      invoice_number,
-      total_amount,
-      status,
-      created_at,
-      items:vendor_supply_items(count)
-    `)
-    .eq('vendor_id', vendorId)
-    .order('created_at', { ascending: false })
-    .limit(5);
+  const rawTransactions = transactionsResult.data;
+  const supplies = suppliesResult.data;
+  const payments = paymentsResult.data;
+  const stats = statsResult.data;
+  const paymentStats = paymentStatsResult.data;
 
-  // Fetch recent payments
-  const { data: payments } = await supabaseAdmin
-    .from('vendor_payments')
-    .select('id, amount, payment_method, payment_date, reference_number')
-    .eq('vendor_id', vendorId)
-    .order('payment_date', { ascending: false })
-    .limit(5);
+  // Transform transactions for portal compatibility
+  const transactions = (rawTransactions || []).map(t => ({
+    id: t.id,
+    type: t.entry_type,
+    amount: parseFloat(t.debit || 0) > 0 ? parseFloat(t.debit || 0) : parseFloat(t.credit || 0),
+    description: t.description,
+    created_at: t.transaction_date,
+  }));
 
-  // Calculate stats
-  const { data: stats } = await supabaseAdmin
-    .from('vendor_supplies')
-    .select('total_amount, status')
-    .eq('vendor_id', vendorId);
-
-  const totalSupplied = stats?.reduce((sum, s) => sum + parseFloat(s.total_amount || 0), 0) || 0;
+  const totalSupplied = stats?.reduce((sum, s) => sum + parseFloat(s.total_cost || 0), 0) || 0;
   const pendingSupplies = stats?.filter(s => s.status === 'pending').length || 0;
-
-  const { data: paymentStats } = await supabaseAdmin
-    .from('vendor_payments')
-    .select('amount')
-    .eq('vendor_id', vendorId);
-
-  const totalPaid = paymentStats?.reduce((sum, p) => sum + parseFloat(p.amount || 0), 0) || 0;
+  const totalPaid = paymentStats?.reduce((sum, p) => sum + parseFloat(p.credit || 0), 0) || 0;
 
   res.json({
     success: true,
@@ -179,10 +213,20 @@ export const getDashboard = asyncHandler(async (req, res) => {
       },
       recentTransactions: transactions || [],
       recentSupplies: (supplies || []).map(s => ({
-        ...s,
+        id: s.id,
+        invoice_number: s.invoice_no,
+        total_amount: parseFloat(s.total_cost || 0),
+        status: s.status,
+        created_at: s.created_at,
         itemCount: s.items?.[0]?.count || 0,
       })),
-      recentPayments: payments || [],
+      recentPayments: (payments || []).map(p => ({
+        id: p.id,
+        amount: parseFloat(p.credit || 0),
+        payment_method: p.payment_method || 'bank_transfer',
+        payment_date: p.transaction_date,
+        reference_number: p.reference_no,
+      })),
       stats: {
         totalSupplyCount: stats?.length || 0,
         pendingSupplyCount: pendingSupplies,
@@ -211,25 +255,35 @@ export const getTransactions = asyncHandler(async (req, res) => {
   const to = from + parseInt(limit) - 1;
 
   let query = supabaseAdmin
-    .from('transactions')
-    .select('*', { count: 'exact' })
+    .from('vendor_ledger')
+    .select('id, entry_type, reference_id, reference_no, debit, credit, running_balance, description, transaction_date, created_at', { count: 'exact' })
     .eq('vendor_id', vendorId);
 
   if (type) {
-    query = query.eq('type', type);
+    query = query.eq('entry_type', type);
   }
 
   const { data, error, count } = await query
-    .order('created_at', { ascending: false })
+    .order('transaction_date', { ascending: false })
     .range(from, to);
 
   if (error) {
     throw error;
   }
 
+  // Transform for portal compatibility
+  const transformedData = (data || []).map(entry => ({
+    id: entry.id,
+    type: entry.entry_type,
+    amount: parseFloat(entry.debit || 0) > 0 ? parseFloat(entry.debit || 0) : parseFloat(entry.credit || 0),
+    description: entry.description,
+    reference_no: entry.reference_no,
+    created_at: entry.transaction_date,
+  }));
+
   res.json({
     success: true,
-    data: data || [],
+    data: transformedData,
     pagination: {
       page: parseInt(page),
       limit: parseInt(limit),
@@ -259,22 +313,29 @@ export const getSupplies = asyncHandler(async (req, res) => {
   const to = from + parseInt(limit) - 1;
 
   let query = supabaseAdmin
-    .from('vendor_supplies')
+    .from('inventory_transactions')
     .select(`
-      *,
-      items:vendor_supply_items(
+      id,
+      invoice_no,
+      total_cost,
+      status,
+      transaction_date,
+      created_at,
+      notes,
+      items:inventory_transaction_items(
         id,
         quantity,
-        unit_price,
-        total_price,
+        unit_cost,
         variant:product_variants(
           sku,
           product:products(name)
         )
       )
     `, { count: 'exact' })
-    .eq('vendor_id', vendorId);
+    .eq('vendor_id', vendorId)
+    .eq('transaction_type', 'purchase');
 
+  // Map status for portal
   if (status) {
     query = query.eq('status', status);
   }
@@ -287,9 +348,27 @@ export const getSupplies = asyncHandler(async (req, res) => {
     throw error;
   }
 
+  // Transform data for portal compatibility
+  const transformedData = (data || []).map(tx => ({
+    id: tx.id,
+    invoice_number: tx.invoice_no,
+    total_amount: parseFloat(tx.total_cost || 0),
+    status: tx.status,
+    created_at: tx.created_at,
+    transaction_date: tx.transaction_date,
+    notes: tx.notes,
+    items: (tx.items || []).map(item => ({
+      id: item.id,
+      quantity: item.quantity,
+      unit_price: parseFloat(item.unit_cost || 0),
+      total_price: item.quantity * parseFloat(item.unit_cost || 0),
+      variant: item.variant,
+    })),
+  }));
+
   res.json({
     success: true,
-    data: data || [],
+    data: transformedData,
     pagination: {
       page: parseInt(page),
       limit: parseInt(limit),
@@ -316,14 +395,19 @@ export const getSupplyDetail = asyncHandler(async (req, res) => {
   await logAccess(req, 'view_supply_detail');
 
   const { data: supply, error } = await supabaseAdmin
-    .from('vendor_supplies')
+    .from('inventory_transactions')
     .select(`
-      *,
-      items:vendor_supply_items(
+      id,
+      invoice_no,
+      total_cost,
+      status,
+      transaction_date,
+      created_at,
+      notes,
+      items:inventory_transaction_items(
         id,
         quantity,
-        unit_price,
-        total_price,
+        unit_cost,
         variant:product_variants(
           sku,
           product:products(name, image_url)
@@ -332,15 +416,34 @@ export const getSupplyDetail = asyncHandler(async (req, res) => {
     `)
     .eq('id', id)
     .eq('vendor_id', vendorId) // SECURITY: Only own supplies
+    .eq('transaction_type', 'purchase')
     .single();
 
   if (error || !supply) {
     throw new NotFoundError('Supply');
   }
 
+  // Transform for portal compatibility
+  const transformedSupply = {
+    id: supply.id,
+    invoice_number: supply.invoice_no,
+    total_amount: parseFloat(supply.total_cost || 0),
+    status: supply.status,
+    created_at: supply.created_at,
+    transaction_date: supply.transaction_date,
+    notes: supply.notes,
+    items: (supply.items || []).map(item => ({
+      id: item.id,
+      quantity: item.quantity,
+      unit_price: parseFloat(item.unit_cost || 0),
+      total_price: item.quantity * parseFloat(item.unit_cost || 0),
+      variant: item.variant,
+    })),
+  };
+
   res.json({
     success: true,
-    data: supply,
+    data: transformedSupply,
   });
 });
 
@@ -364,19 +467,31 @@ export const getPayments = asyncHandler(async (req, res) => {
   const to = from + parseInt(limit) - 1;
 
   const { data, error, count } = await supabaseAdmin
-    .from('vendor_payments')
-    .select('*', { count: 'exact' })
+    .from('vendor_ledger')
+    .select('id, credit, transaction_date, reference_no, payment_method, description, created_at', { count: 'exact' })
     .eq('vendor_id', vendorId)
-    .order('payment_date', { ascending: false })
+    .eq('entry_type', 'payment')
+    .order('transaction_date', { ascending: false })
     .range(from, to);
 
   if (error) {
     throw error;
   }
 
+  // Transform for portal compatibility
+  const transformedData = (data || []).map(p => ({
+    id: p.id,
+    amount: parseFloat(p.credit || 0),
+    payment_method: p.payment_method || 'bank_transfer',
+    payment_date: p.transaction_date,
+    reference_number: p.reference_no,
+    description: p.description,
+    created_at: p.created_at,
+  }));
+
   res.json({
     success: true,
-    data: data || [],
+    data: transformedData,
     pagination: {
       page: parseInt(page),
       limit: parseInt(limit),
@@ -445,16 +560,16 @@ export const getLedger = asyncHandler(async (req, res) => {
   await logAccess(req, 'view_ledger');
 
   let query = supabaseAdmin
-    .from('transactions')
-    .select('id, name, company_name, phone, email, balance, is_active, created_at')
+    .from('vendor_ledger')
+    .select('id, entry_type, reference_id, reference_no, debit, credit, running_balance, description, transaction_date, created_at')
     .eq('vendor_id', vendorId)
-    .order('created_at', { ascending: true });
+    .order('transaction_date', { ascending: true });
 
   if (startDate) {
-    query = query.gte('created_at', startDate);
+    query = query.gte('transaction_date', startDate);
   }
   if (endDate) {
-    query = query.lte('created_at', endDate);
+    query = query.lte('transaction_date', endDate);
   }
 
   const { data, error } = await query;
@@ -463,19 +578,22 @@ export const getLedger = asyncHandler(async (req, res) => {
     throw error;
   }
 
-  // Calculate running balance
-  let runningBalance = 0;
-  const ledger = (data || []).map(txn => {
-    if (txn.type === 'vendor_payment') {
-      runningBalance -= parseFloat(txn.amount);
-    } else if (txn.type === 'income') {
-      runningBalance += parseFloat(txn.amount);
-    }
-    return {
-      ...txn,
-      running_balance: runningBalance,
-    };
-  });
+  // Transform ledger entries
+  const ledger = (data || []).map(entry => ({
+    id: entry.id,
+    type: entry.entry_type,
+    reference_id: entry.reference_id,
+    reference_no: entry.reference_no,
+    debit: parseFloat(entry.debit || 0),
+    credit: parseFloat(entry.credit || 0),
+    running_balance: parseFloat(entry.running_balance || 0),
+    description: entry.description,
+    transaction_date: entry.transaction_date,
+    created_at: entry.created_at,
+  }));
+
+  // Get closing balance
+  const closingBalance = ledger.length > 0 ? ledger[ledger.length - 1].running_balance : 0;
 
   res.json({
     success: true,
@@ -483,7 +601,7 @@ export const getLedger = asyncHandler(async (req, res) => {
       ledger,
       summary: {
         openingBalance: 0,
-        closingBalance: runningBalance,
+        closingBalance,
         totalTransactions: ledger.length,
       },
     },

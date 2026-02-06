@@ -15,6 +15,7 @@ import { supabase, supabaseAdmin } from '../config/supabase.js';
 import { NotFoundError, BadRequestError, ForbiddenError } from '../utils/errors.js';
 import logger from '../utils/logger.js';
 import { SMSService } from './sms/SMSService.js';
+import { buildSafeOrQuery } from '../utils/helpers.js';
 
 // =============================================================================
 // CONSTANTS
@@ -274,7 +275,8 @@ async function listTickets(filters = {}, options = {}) {
   }
 
   if (search) {
-    query = query.or(`ticket_number.ilike.%${search}%,subject.ilike.%${search}%`);
+    const safeQuery = buildSafeOrQuery(search, ['ticket_number', 'subject']);
+    if (safeQuery) query = query.or(safeQuery);
   }
 
   if (tags && tags.length > 0) {

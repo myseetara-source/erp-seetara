@@ -19,14 +19,22 @@ const logger = createLogger('AuthController');
 /**
  * User login
  * POST /auth/login
+ * 
+ * HYBRID AUTH: Supports both local password_hash and Supabase Auth
+ * - If password_hash exists in users table, use bcrypt
+ * - If password_hash is null (users created via admin panel), use Supabase Auth
  */
 export const login = asyncHandler(async (req, res) => {
   const { email, password } = req.body;
 
-  // Find user
+  if (!email || !password) {
+    throw new ValidationError('Email and password are required');
+  }
+
+  // Find user with password_hash
   const { data: user, error } = await supabaseAdmin
     .from('users')
-    .select('id, email, name, phone, role, vendor_id, is_active, avatar_url')
+    .select('id, email, name, phone, role, vendor_id, is_active, avatar_url, password_hash')
     .eq('email', email.toLowerCase())
     .single();
 
@@ -38,9 +46,50 @@ export const login = asyncHandler(async (req, res) => {
     throw new AuthenticationError('Account is deactivated');
   }
 
-  // Verify password
-  const validPassword = await bcrypt.compare(password, user.password_hash);
-  if (!validPassword) {
+  let isValidPassword = false;
+
+  // METHOD 1: Try local bcrypt verification if password_hash exists
+  if (user.password_hash) {
+    try {
+      isValidPassword = await bcrypt.compare(password, user.password_hash);
+    } catch (bcryptError) {
+      logger.warn('Bcrypt compare failed', { userId: user.id, error: bcryptError.message });
+      // Continue to try Supabase Auth
+    }
+  }
+
+  // METHOD 2: Fallback to Supabase Auth if local hash missing or failed
+  if (!isValidPassword) {
+    try {
+      const { data: authData, error: authError } = await supabaseAdmin.auth.signInWithPassword({
+        email: email.toLowerCase(),
+        password,
+      });
+
+      if (!authError && authData?.user) {
+        isValidPassword = true;
+        logger.info('User authenticated via Supabase Auth (no local hash)', { userId: user.id });
+        
+        // OPTIONAL: Sync password_hash for future logins (improves performance)
+        try {
+          const saltRounds = 10;
+          const password_hash = await bcrypt.hash(password, saltRounds);
+          await supabaseAdmin
+            .from('users')
+            .update({ password_hash })
+            .eq('id', user.id);
+          logger.info('Password hash synced to users table', { userId: user.id });
+        } catch (syncError) {
+          // Non-critical, continue login
+          logger.warn('Failed to sync password hash', { userId: user.id, error: syncError.message });
+        }
+      }
+    } catch (authError) {
+      logger.warn('Supabase Auth login failed', { email, error: authError.message });
+    }
+  }
+
+  if (!isValidPassword) {
     throw new AuthenticationError('Invalid email or password');
   }
 
@@ -53,7 +102,7 @@ export const login = asyncHandler(async (req, res) => {
     .update({ last_login: new Date().toISOString() })
     .eq('id', user.id);
 
-  logger.info('User logged in', { userId: user.id, email: user.email });
+  logger.info('User logged in', { userId: user.id, email: user.email, role: user.role });
 
   res.json({
     success: true,
@@ -64,6 +113,7 @@ export const login = asyncHandler(async (req, res) => {
         email: user.email,
         name: user.name,
         role: user.role,
+        vendor_id: user.vendor_id,
       },
       ...tokens,
     },

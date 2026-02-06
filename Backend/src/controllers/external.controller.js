@@ -176,30 +176,42 @@ export const createExternalOrder = asyncHandler(async (req, res) => {
   const customer = await customerService.findOrCreateByPhone(customerData);
 
   // ===========================================================================
-  // STEP 2: Resolve SKUs to Product Variants
+  // STEP 2: Resolve SKUs to Product Variants (BATCH QUERY - N+1 FIX)
   // ===========================================================================
+  // Performance: Single query for all SKUs instead of N queries
+  const skus = validatedData.items.map(item => item.sku);
+  
+  const { data: variants, error: variantsError } = await supabaseAdmin
+    .from('product_variants')
+    .select(`
+      id,
+      sku,
+      selling_price,
+      current_stock,
+      product:products (
+        id,
+        name,
+        channel_id
+      )
+    `)
+    .in('sku', skus);
+
+  if (variantsError) {
+    logger.error('Failed to fetch variants', { error: variantsError });
+    throw new ValidationError('Failed to resolve product variants');
+  }
+
+  // Create a map for O(1) lookup
+  const variantMap = new Map(variants.map(v => [v.sku, v]));
+
   const orderItems = [];
   let calculatedSubtotal = 0;
 
+  // Validate all items and build order items
   for (const item of validatedData.items) {
-    // Find variant by SKU
-    const { data: variant, error } = await supabaseAdmin
-      .from('product_variants')
-      .select(`
-        id,
-        sku,
-        selling_price,
-        current_stock,
-        product:products (
-          id,
-          name,
-          channel_id
-        )
-      `)
-      .eq('sku', item.sku)
-      .single();
+    const variant = variantMap.get(item.sku);
 
-    if (error || !variant) {
+    if (!variant) {
       throw new ValidationError(`Product with SKU "${item.sku}" not found`);
     }
 
@@ -210,17 +222,20 @@ export const createExternalOrder = asyncHandler(async (req, res) => {
       );
     }
 
+    const unitPrice = item.unit_price || variant.selling_price;
+    const totalPrice = item.quantity * unitPrice;
+
     orderItems.push({
       variant_id: variant.id,
       product_id: variant.product?.id,
       sku: variant.sku,
       product_name: item.product_name || variant.product?.name,
       quantity: item.quantity,
-      unit_price: item.unit_price || variant.selling_price,
-      total_price: item.quantity * (item.unit_price || variant.selling_price),
+      unit_price: unitPrice,
+      total_price: totalPrice,
     });
 
-    calculatedSubtotal += orderItems[orderItems.length - 1].total_price;
+    calculatedSubtotal += totalPrice;
   }
 
   // ===========================================================================

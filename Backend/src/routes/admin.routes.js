@@ -49,6 +49,14 @@ router.patch('/users/:id', authorize('admin'), adminUserController.updateUser);
  */
 router.delete('/users/:id', authorize('admin'), adminUserController.deleteUser);
 
+/**
+ * Sync all rider users to riders table
+ * POST /api/v1/admin/sync-riders
+ * 
+ * Ensures all users with role='rider' have a corresponding record in riders table
+ */
+router.post('/sync-riders', authorize('admin'), adminUserController.syncAllRiders);
+
 // =============================================================================
 // PRODUCT CHANGE REQUESTS (Admin/Manager)
 // =============================================================================
@@ -64,20 +72,24 @@ router.get(
 );
 
 /**
- * Create change request (Non-admin users)
+ * Create change request (Staff can propose changes for admin review)
  * POST /api/v1/admin/products/change-requests
+ * SECURITY: Any authenticated user can create a change request
  */
 router.post(
   '/products/change-requests',
+  authorize('admin', 'manager', 'staff'),
   adminProductController.createChangeRequest
 );
 
 /**
  * Get change request details
  * GET /api/v1/admin/products/change-requests/:id
+ * SECURITY: Only admin/manager can view change request details
  */
 router.get(
   '/products/change-requests/:id',
+  authorize('admin', 'manager'),
   adminProductController.getChangeRequest
 );
 

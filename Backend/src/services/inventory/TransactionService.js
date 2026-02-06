@@ -14,6 +14,7 @@ import { AppError } from '../../utils/errors.js';
 import { createLogger } from '../../utils/logger.js';
 import { TRANSACTION_TYPES, TRANSACTION_STATUSES } from './constants.js';
 import { stockCoreService } from './StockCore.service.js';
+import { buildSafeOrQuery } from '../../utils/helpers.js';
 
 const logger = createLogger('TransactionService');
 
@@ -38,10 +39,8 @@ class TransactionService {
     let query = supabaseAdmin
       .from('inventory_transactions')
       .select(`
-        id, invoice_no, transaction_type, transaction_date, total_cost, status, notes, created_at,
+        id, invoice_no, transaction_type, transaction_date, total_cost, status, notes, created_at, performed_by, approved_by,
         vendor:vendors(id, name, company_name),
-        performed_by_user:users!performed_by(id, name),
-        approved_by_user:users!approved_by(id, name),
         items:inventory_transaction_items(
           id, variant_id, quantity, unit_cost, notes,
           variant:product_variants(id, sku, product:products(id, name))
@@ -56,7 +55,8 @@ class TransactionService {
     if (from_date) query = query.gte('transaction_date', from_date);
     if (to_date) query = query.lte('transaction_date', to_date);
     if (search) {
-      query = query.or(`invoice_no.ilike.%${search}%,notes.ilike.%${search}%`);
+      const safeQuery = buildSafeOrQuery(search, ['invoice_no', 'notes']);
+      if (safeQuery) query = query.or(safeQuery);
     }
 
     const { data, error, count } = await query;
@@ -73,13 +73,12 @@ class TransactionService {
    * Get transaction by ID with full details
    */
   async getTransactionById(id) {
+    // First get the transaction without user joins (foreign key hints can fail)
     const { data, error } = await supabaseAdmin
       .from('inventory_transactions')
       .select(`
         *,
         vendor:vendors(id, name, company_name, phone),
-        performed_by_user:users!performed_by(id, name, email),
-        approved_by_user:users!approved_by(id, name, email),
         items:inventory_transaction_items(
           id, variant_id, quantity, unit_cost, source_type, stock_before, stock_after, notes,
           variant:product_variants(id, sku, current_stock, product:products(id, name, image_url))
@@ -94,6 +93,26 @@ class TransactionService {
       }
       logger.error('Failed to get transaction', { id, error });
       throw new AppError('Failed to get transaction', 500);
+    }
+
+    // Fetch user info separately if performed_by or approved_by exist
+    if (data) {
+      if (data.performed_by) {
+        const { data: user } = await supabaseAdmin
+          .from('users')
+          .select('id, name, email')
+          .eq('id', data.performed_by)
+          .single();
+        data.performed_by_user = user || null;
+      }
+      if (data.approved_by) {
+        const { data: user } = await supabaseAdmin
+          .from('users')
+          .select('id, name, email')
+          .eq('id', data.approved_by)
+          .single();
+        data.approved_by_user = user || null;
+      }
     }
 
     // If this is a return, get the reference transaction
@@ -137,9 +156,15 @@ class TransactionService {
     // Get next invoice number
     const invoiceNo = await stockCoreService.getNextInvoiceNumber(data.transaction_type);
 
-    // Calculate total cost
+    // Calculate total cost - using 'quantity' field (schema uses quantity + source_type)
     const totalCost = parsedItems.reduce(
-      (sum, item) => sum + (Math.abs(item.quantity_fresh + item.quantity_damaged) * item.unit_cost),
+      (sum, item) => sum + (Math.abs(item.quantity || item.quantity_fresh || 0) * (item.unit_cost || 0)),
+      0
+    );
+
+    // Calculate total quantity
+    const totalQuantity = parsedItems.reduce(
+      (sum, item) => sum + Math.abs(item.quantity || item.quantity_fresh || 0),
       0
     );
 
@@ -153,12 +178,14 @@ class TransactionService {
         transaction_date: data.transaction_date || new Date().toISOString().split('T')[0],
         reference_transaction_id: data.reference_transaction_id || null,
         total_cost: totalCost,
+        total_quantity: totalQuantity,
         status: transactionStatus,
         notes: data.notes || null,
         reason: data.reason || null,
         performed_by: userId,
         approved_by: isAdmin ? userId : null,
         approval_date: isAdmin ? new Date().toISOString() : null,
+        approved_at: isAdmin ? new Date().toISOString() : null,
       })
       .select()
       .single();
@@ -174,7 +201,8 @@ class TransactionService {
     // Insert items
     // quantity is positive for stock in (purchase), negative for stock out (damage, return)
     const itemRecords = parsedItems.map(item => {
-      let qty = item.quantity_fresh + item.quantity_damaged;
+      // Use 'quantity' field, fallback to quantity_fresh for backward compatibility
+      let qty = item.quantity || item.quantity_fresh || 0;
       // For damage and returns, quantity should be negative
       if (['damage', 'purchase_return', 'adjustment'].includes(data.transaction_type)) {
         qty = -Math.abs(qty);
@@ -183,7 +211,8 @@ class TransactionService {
         transaction_id: transaction.id,
         variant_id: item.variant_id,
         quantity: qty,
-        unit_cost: item.unit_cost,
+        unit_cost: item.unit_cost || 0,
+        source_type: item.source_type || 'fresh',
         notes: item.reason || null,
       };
     });
@@ -274,6 +303,7 @@ class TransactionService {
 
   /**
    * Parse and validate items array
+   * FIXED: Use 'quantity' field (not quantity_fresh/damaged which don't exist in schema)
    */
   _parseItems(items, config) {
     if (!Array.isArray(items)) return [];
@@ -281,13 +311,16 @@ class TransactionService {
     return items
       .map(item => {
         const qty = parseInt(item.quantity || item.quantity_fresh || 0, 10);
-        if (qty === 0 && !item.quantity_damaged) return null;
+        if (qty === 0) return null;
 
         return {
           variant_id: item.variant_id,
-          quantity_fresh: parseInt(item.quantity_fresh ?? item.quantity ?? 0, 10),
-          quantity_damaged: parseInt(item.quantity_damaged ?? 0, 10),
+          quantity: qty,
+          // Keep quantity_fresh for backward compat with other code
+          quantity_fresh: qty,
+          quantity_damaged: 0,
           unit_cost: parseFloat(item.unit_cost || item.cost_price || 0),
+          source_type: item.source_type || 'fresh',
           reason: item.reason || null,
         };
       })
@@ -296,17 +329,23 @@ class TransactionService {
 
   /**
    * Validate purchase return data
+   * Supports two modes:
+   * 1. Referenced Return: Links to original purchase invoice, validates quantities
+   * 2. Direct Vendor Return (Debit Note): No invoice linking, allows any quantity
    */
   async _validatePurchaseReturn(data, parsedItems) {
     if (!data.vendor_id) {
       throw new AppError('Vendor is required for purchase returns', 400);
     }
 
+    // DIRECT VENDOR RETURN: If no reference provided, skip quantity validation
+    // This allows creating debit notes without linking to specific purchases
     if (!data.reference_transaction_id) {
-      throw new AppError('Reference purchase invoice is required', 400);
+      logger.info('Creating direct vendor return (debit note) without reference invoice');
+      return; // No further validation needed for direct returns
     }
 
-    // Validate quantities don't exceed original purchase
+    // REFERENCED RETURN: Validate quantities don't exceed original purchase
     const { data: originalPurchase } = await supabaseAdmin
       .from('inventory_transactions')
       .select('items:inventory_transaction_items(variant_id, quantity)')
@@ -328,7 +367,8 @@ class TransactionService {
         throw new AppError(`Variant ${returnItem.variant_id} was not in the original purchase`, 400);
       }
 
-      const returnQty = returnItem.quantity_fresh + returnItem.quantity_damaged;
+      // Use quantity field (schema uses quantity, not quantity_fresh/damaged)
+      const returnQty = returnItem.quantity || returnItem.quantity_fresh || 0;
       if (returnQty > purchasedQty) {
         throw new AppError(`Cannot return more units than purchased`, 400);
       }
@@ -336,54 +376,78 @@ class TransactionService {
   }
 
   /**
-   * Update vendor balance for transactions
+   * Update vendor balance for transactions using atomic RPC
+   * 
+   * SECURITY: Uses database-level row locking (FOR UPDATE) to prevent race conditions.
+   * This guarantees 100% accurate financial records even under high concurrency.
+   * 
+   * @param {string} vendorId - UUID of the vendor
+   * @param {string} transactionType - PURCHASE or PURCHASE_RETURN
+   * @param {Array} items - Transaction items with quantity and unit_cost
    */
   async _updateVendorBalance(vendorId, transactionType, items) {
+    // Calculate total amount from items
+    // FIXED: Use quantity field (not quantity_fresh/damaged)
     const totalAmount = items.reduce(
-      (sum, item) => sum + (Math.abs(item.quantity_fresh + item.quantity_damaged) * item.unit_cost),
+      (sum, item) => sum + (Math.abs(item.quantity || item.quantity_fresh || 0) * (item.unit_cost || 0)),
       0
     );
 
-    if (totalAmount <= 0) return;
-
-    // Get current vendor balance
-    const { data: vendor, error: fetchError } = await supabaseAdmin
-      .from('vendors')
-      .select('balance, total_purchases, total_payments')
-      .eq('id', vendorId)
-      .single();
-
-    if (fetchError || !vendor) {
-      logger.warn('Vendor not found for balance update', { vendorId });
+    if (totalAmount <= 0) {
+      logger.debug('Skipping vendor balance update - zero amount', { vendorId, transactionType });
       return;
     }
 
-    let updates = {};
+    // Map internal transaction type to RPC type
+    let rpcType;
     switch (transactionType) {
       case TRANSACTION_TYPES.PURCHASE:
-        updates = {
-          balance: (vendor.balance || 0) + totalAmount,
-          total_purchases: (vendor.total_purchases || 0) + totalAmount,
-        };
+        rpcType = 'PURCHASE';
         break;
       case TRANSACTION_TYPES.PURCHASE_RETURN:
-        updates = {
-          balance: (vendor.balance || 0) - totalAmount,
-          total_purchases: (vendor.total_purchases || 0) - totalAmount,
-        };
+        rpcType = 'PURCHASE_RETURN';
         break;
       default:
+        logger.debug('Skipping vendor balance update - unsupported type', { vendorId, transactionType });
         return;
     }
 
-    const { error: updateError } = await supabaseAdmin
-      .from('vendors')
-      .update(updates)
-      .eq('id', vendorId);
+    // Call atomic RPC function with row-level locking
+    // This prevents race conditions where two concurrent transactions could corrupt the balance
+    const { data, error } = await supabaseAdmin.rpc('update_vendor_balance_atomic', {
+      p_vendor_id: vendorId,
+      p_amount: totalAmount,
+      p_type: rpcType,
+    });
 
-    if (updateError) {
-      logger.error('Failed to update vendor balance', { vendorId, error: updateError });
+    if (error) {
+      logger.error('Failed to update vendor balance (RPC error)', { 
+        vendorId, 
+        transactionType: rpcType,
+        amount: totalAmount,
+        error: error.message,
+      });
+      throw new AppError(`Failed to update vendor balance: ${error.message}`, 500);
     }
+
+    // Check RPC response for business logic errors
+    if (data && !data.success) {
+      logger.error('Vendor balance update failed', { 
+        vendorId, 
+        transactionType: rpcType,
+        amount: totalAmount,
+        rpcError: data.error,
+      });
+      throw new AppError(`Vendor balance update failed: ${data.error}`, 400);
+    }
+
+    logger.info('Vendor balance updated atomically', {
+      vendorId,
+      transactionType: rpcType,
+      amount: totalAmount,
+      previousBalance: data?.previous_balance,
+      newBalance: data?.new_balance,
+    });
   }
 }
 

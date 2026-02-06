@@ -127,7 +127,7 @@ export default function VendorLoginPage() {
             <div className="mb-6 p-4 bg-red-500/10 border border-red-500/20 rounded-lg flex items-start gap-3">
               <AlertCircle className="w-5 h-5 text-red-400 flex-shrink-0 mt-0.5" />
               <p className="text-red-300 text-sm">
-                {error || errorMessages[errorParam] || 'An error occurred'}
+                {error || (errorParam ? errorMessages[errorParam] : null) || 'An error occurred'}
               </p>
             </div>
           )}

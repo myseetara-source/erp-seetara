@@ -7,7 +7,7 @@
 import { Router } from 'express';
 import * as logisticsController from '../controllers/logistics.controller.js';
 import * as followupController from '../controllers/followup.controller.js';
-import * as dispatchController from '../controllers/dispatch.controller.js';
+// Dispatch controller moved to /dispatch/* routes - see dispatch.routes.js
 import { authenticate, authorize } from '../middleware/auth.middleware.js';
 import { validateBody, validateParams, validateQuery } from '../middleware/validate.middleware.js';
 import { z } from 'zod';
@@ -158,99 +158,10 @@ router.get(
 
 // =============================================================================
 // COURIER ROUTES (Outside Valley)
+// DEPRECATED: Use /dispatch/* routes instead (Migration 094)
 // =============================================================================
 
-/**
- * Get courier partners
- * GET /logistics/courier/partners
- */
-router.get(
-  '/courier/partners',
-  authorize(['admin', 'manager', 'operator']),
-  dispatchController.getCourierPartners
-);
-
-/**
- * Handover single order to courier
- * POST /logistics/courier/handover
- */
-router.post(
-  '/courier/handover',
-  authorize(['admin', 'manager', 'operator']),
-  validateBody(z.object({
-    order_id: uuidSchema,
-    courier_partner: z.string().min(1),
-    tracking_id: z.string().min(1),
-    awb_number: z.string().optional(),
-    courier_charge: z.number().optional(),
-  })),
-  dispatchController.handoverToCourier
-);
-
-/**
- * Bulk handover to courier (create manifest)
- * POST /logistics/courier/bulk-handover
- */
-router.post(
-  '/courier/bulk-handover',
-  authorize(['admin', 'manager', 'operator']),
-  validateBody(z.object({
-    order_ids: z.array(uuidSchema).min(1),
-    courier_partner: z.string().min(1),
-    tracking_codes: z.array(z.string()).optional(),
-    pickup_expected_at: z.string().datetime().optional(),
-  })),
-  dispatchController.bulkHandoverToCourier
-);
-
-/**
- * List manifests
- * GET /logistics/courier/manifests
- */
-router.get(
-  '/courier/manifests',
-  authorize(['admin', 'manager', 'operator']),
-  validateQuery(paginationSchema.extend({
-    status: z.enum(['draft', 'dispatched', 'in_transit', 'delivered', 'partial']).optional(),
-    courier: z.string().optional(),
-    date: z.string().optional(),
-  })),
-  dispatchController.listManifests
-);
-
-/**
- * Get manifest details
- * GET /logistics/courier/manifests/:id
- */
-router.get(
-  '/courier/manifests/:id',
-  authorize(['admin', 'manager', 'operator']),
-  validateParams(z.object({ id: uuidSchema })),
-  dispatchController.getManifest
-);
-
-/**
- * Dispatch manifest (mark as picked up)
- * POST /logistics/courier/manifests/:id/dispatch
- */
-router.post(
-  '/courier/manifests/:id/dispatch',
-  authorize(['admin', 'manager', 'operator']),
-  validateParams(z.object({ id: uuidSchema })),
-  validateBody(z.object({
-    tracking_codes: z.array(z.string()).optional(),
-  })),
-  dispatchController.dispatchManifest
-);
-
-/**
- * Get today's courier dispatch summary
- * GET /logistics/courier/summary
- */
-router.get(
-  '/courier/summary',
-  authorize(['admin', 'manager']),
-  dispatchController.getTodaysSummary
-);
+// Legacy routes commented out - use /dispatch/courier-handovers/* instead
+// See: Backend/src/routes/dispatch.routes.js
 
 export default router;

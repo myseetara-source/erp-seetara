@@ -5,10 +5,12 @@
  * 
  * Dynamically renders action buttons based on order state
  * Uses the state machine to determine valid transitions
+ * 
+ * P0 FIX: Uses React Query invalidation instead of router.refresh()
  */
 
 import { useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { useQueryClient } from '@tanstack/react-query';
 import {
   Phone,
   CheckCircle,
@@ -88,7 +90,7 @@ export function OrderActionButtons({
   showPrimaryOnly = false,
   size = 'default',
 }: OrderActionButtonsProps) {
-  const router = useRouter();
+  const queryClient = useQueryClient();
   const [isLoading, setIsLoading] = useState(false);
   const [activeModal, setActiveModal] = useState<ActionButton | null>(null);
   const [confirmDialog, setConfirmDialog] = useState<ActionButton | null>(null);
@@ -131,7 +133,10 @@ export function OrderActionButtons({
       
       toast.success(`Order ${order.order_number} updated to ${newStatus.replace('_', ' ')}`);
       onStatusChange?.(newStatus);
-      router.refresh();
+      
+      // P0 FIX: Invalidate queries instead of hard refresh
+      queryClient.invalidateQueries({ queryKey: ['orders'] });
+      queryClient.invalidateQueries({ queryKey: ['order', order.id] });
     } catch (error: any) {
       toast.error(error.response?.data?.message || 'Failed to update order status');
     } finally {

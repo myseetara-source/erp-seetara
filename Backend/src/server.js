@@ -77,6 +77,78 @@ const limiter = rateLimit({
 app.use('/api/', limiter);
 
 // =============================================================================
+// ENDPOINT-SPECIFIC RATE LIMITS (Stricter for sensitive endpoints)
+// =============================================================================
+
+// Auth endpoints - Prevent brute force attacks (5 attempts per 15 min)
+const authLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 5,
+  message: {
+    success: false,
+    error: {
+      code: 'AUTH_RATE_LIMIT',
+      message: 'Too many login attempts. Please try again in 15 minutes.',
+    },
+  },
+  standardHeaders: true,
+  legacyHeaders: false,
+  keyGenerator: (req) => req.body?.email?.toLowerCase() || req.ip, // Rate limit by email
+});
+app.use('/api/v1/auth/login', authLimiter);
+app.use('/api/v1/auth/verify-password', authLimiter);
+
+// External API - Rate limit by API key (100 per minute)
+const externalApiLimiter = rateLimit({
+  windowMs: 60 * 1000, // 1 minute
+  max: 100,
+  message: {
+    success: false,
+    error: {
+      code: 'EXTERNAL_API_RATE_LIMIT',
+      message: 'API rate limit exceeded. Please reduce request frequency.',
+    },
+  },
+  keyGenerator: (req) => req.headers['x-api-key'] || req.ip,
+});
+app.use('/api/v1/external/orders', externalApiLimiter);
+
+// Webhooks - Rate limit by source (50 per minute per source)
+const webhookLimiter = rateLimit({
+  windowMs: 60 * 1000, // 1 minute
+  max: 50,
+  message: { success: false, error: 'Webhook rate limit exceeded' },
+  keyGenerator: (req) => req.headers['x-shopify-shop-domain'] || req.headers['x-wc-webhook-source'] || req.ip,
+});
+app.use('/api/v1/webhooks', webhookLimiter);
+
+// =============================================================================
+// P0 SECURITY FIX: Financial Endpoints - Stricter Rate Limiting (Audit 2.3)
+// Prevents abuse of payment/financial operations (20 requests per minute)
+// =============================================================================
+const financialLimiter = rateLimit({
+  windowMs: 60 * 1000, // 1 minute
+  max: 20, // Strict limit for financial operations
+  message: {
+    success: false,
+    error: {
+      code: 'FINANCIAL_RATE_LIMIT',
+      message: 'Too many financial operations. Please wait before trying again.',
+    },
+  },
+  standardHeaders: true,
+  legacyHeaders: false,
+  keyGenerator: (req) => req.user?.id || req.ip, // Rate limit by user ID if authenticated
+});
+
+// Apply to payment and financial endpoints
+app.use('/api/v1/vendors/:id/payments', financialLimiter);
+app.use('/api/v1/purchases/:id/pay', financialLimiter);
+app.use('/api/v1/orders/:id/payments', financialLimiter);
+app.use('/api/v1/dispatch/settlements', financialLimiter);
+app.use('/api/v1/dispatch/complete-settlement', financialLimiter);
+
+// =============================================================================
 // BODY PARSING
 // =============================================================================
 
@@ -132,7 +204,7 @@ app.use(errorHandler);
 
 const PORT = config.port;
 
-const server = app.listen(PORT, () => {
+const server = app.listen(PORT, async () => {
   logger.info(`🚀 ERP Server started`, {
     port: PORT,
     env: config.env,
@@ -151,6 +223,28 @@ const server = app.listen(PORT, () => {
 ║                                                               ║
 ╚═══════════════════════════════════════════════════════════════╝
   `);
+  
+  // ==========================================================================
+  // INITIALIZE CRON JOBS (After server starts)
+  // ==========================================================================
+  
+  try {
+    // NCM Weekly Sync - Saturday 2:00 AM
+    const { initNCMSyncJob } = await import('./jobs/ncmSync.job.js');
+    initNCMSyncJob();
+    
+    // Gaau Besi Weekly Sync (Master Data) - Saturday 2:05 AM
+    const { initGaauBesiSyncJob } = await import('./jobs/gaauBesiSync.job.js');
+    initGaauBesiSyncJob();
+    
+    // Gaau Besi Order Status & Comments Sync - Every 3 hours (8 AM - 8 PM NPT)
+    const { initGaauBesiOrderSyncJob } = await import('./jobs/gaauBesiOrderSync.job.js');
+    initGaauBesiOrderSyncJob();
+    
+    logger.info('✅ Cron jobs initialized successfully');
+  } catch (cronError) {
+    logger.warn('⚠️ Cron job initialization failed (non-critical)', { error: cronError.message });
+  }
 });
 
 // =============================================================================

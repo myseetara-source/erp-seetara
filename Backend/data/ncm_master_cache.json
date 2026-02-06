@@ -1,0 +1,5062 @@
+{
+  "meta": {
+    "generated_at": "2026-02-04T09:21:32.165Z",
+    "source_branch": "TINKUNE",
+    "rate_type": "Pickup/Collect",
+    "total_branches": 561,
+    "pricing_fetched": 561,
+    "pricing_failed": 0,
+    "failed_branches": []
+  },
+  "branches": [
+    {
+      "name": "AARUGHAT",
+      "code": "AARU1",
+      "district": "GORKHA",
+      "phone": "9701003362",
+      "covered_areas": "ARUGHAT BIDHUT CHOWK, ARUGHAT BUSPARK, PAHADI CHOWK, BAGAICHAI, BISHAL BAZZAR, ARUTHAR, MANGALTAR",
+      "d2d_price": 220,
+      "d2b_price": 170
+    },
+    {
+      "name": "AMARAI ARGHAKHANCHI",
+      "code": "AMAR3",
+      "district": "ARGHAKHANCHI",
+      "phone": "9847358292",
+      "covered_areas": null,
+      "d2d_price": 245,
+      "d2b_price": 195
+    },
+    {
+      "name": "AMARDAHA",
+      "code": "AMAR2",
+      "district": "MORANG",
+      "phone": "9701010718",
+      "covered_areas": "SUNGHA,DEUJA CHOWK,SUNBARSI,BHELAI,KHIRKI DANGI,SURAT,DHOKARIYA,PIPAL CHOWK,BAJRAGHAT,GANDHIASRAM,KATATHAN,GIRDALIYA,JOGIDHAP,KUSHAL CHWOK,HASANDAHA,BHATEGAUDA,BHOTE GHUMTI,KHAYERBARI,KECHANA,KAMAL POKHARI",
+      "d2d_price": 220,
+      "d2b_price": 170
+    },
+    {
+      "name": "AMARGADHI",
+      "code": "AMAR1",
+      "district": "DADELDHURA",
+      "phone": "9801984440",
+      "covered_areas": "TUDIKHEL, KHALANGA, TUFANDADA, DAKALE, RATAGUN, UGRATARA, CAMPUS AREA, HOSPITA AREA, JILODA, DHAMTOLA, BAKANDDE, HATARKA, PEACE PARK AREA, SELAGAU SCHOOL AREA, BAGBAZAR, AMARGADHI PARK, SYAULE BAZAR, ARMY BYARIK AREA, SERA, WHITE PARK COLLEGE AREA, CHIMARIKOT",
+      "d2d_price": 270,
+      "d2b_price": 220
+    },
+    {
+      "name": "AMLEKHGUNJ",
+      "code": "AMLE1",
+      "district": "BARA",
+      "phone": "9801984173",
+      "covered_areas": "AMLEKHGUNJ, ARMY BARAYAK, HATTISAR, ADABAR, OIL DIPO, Q TWENTY HOTEL, 1 NO. PULL, 2 NO. PULL",
+      "d2d_price": 195,
+      "d2b_price": 145
+    },
+    {
+      "name": "AMUWA",
+      "code": "AMUW1",
+      "district": "RUPANDEHI",
+      "phone": "9701010609",
+      "covered_areas": "MILANCHOWK, BARDAWA, SARJUGUNJ, MADANGUNJ",
+      "d2d_price": 220,
+      "d2b_price": 170
+    },
+    {
+      "name": "ANBUKHAIRENI",
+      "code": "ANBU1",
+      "district": "TANAHU",
+      "phone": "9801472189",
+      "covered_areas": "MUGLIN, POWER HOUSE, AABU KHAIRENI, TAYER FACTORY, MILAN CHOK, GAUPALIKA, NARI GHAT, DHAPTAR, DHAKALTAR, KHANIKHOLA, BARADI, EKLEPHAT,SATRASAYA PHAT, MARKI CHOK, AMIL BOT, 3 KILO, GOPLING",
+      "d2d_price": 170,
+      "d2b_price": 120
+    },
+    {
+      "name": "ARJUNCHAUPARI SYNGJA",
+      "code": "ARJU1",
+      "district": "SYANGJA",
+      "phone": "9701010504",
+      "covered_areas": null,
+      "d2d_price": 245,
+      "d2b_price": 195
+    },
+    {
+      "name": "ARNAHA",
+      "code": "ARNA1",
+      "district": "SAPTARI",
+      "phone": "9701003407",
+      "covered_areas": "SAMBHUNATH MANDIR, TRAFFIC CHOWK, KATHAUNA",
+      "d2d_price": 220,
+      "d2b_price": 170
+    },
+    {
+      "name": "ARUNKHOLA",
+      "code": "ARUN1",
+      "district": "NAWALPARASI EAST",
+      "phone": "9801984168",
+      "covered_areas": "BHUPU CHOWK, VIURAN , BAYLAHANI , ARUNKHOLA BAZAR ALL AREA DUMKIBASH BRANCH : DUMKIBASH BAZAR ALL AREA",
+      "d2d_price": 220,
+      "d2b_price": 170
+    },
+    {
+      "name": "ARYA BHANJYANG",
+      "code": "ARYA1",
+      "district": "PALPA",
+      "phone": "9701010667",
+      "covered_areas": "GHORBANDA, GAPTUNG, POKHARATHOK, KHORBARI, MANGAL CHOWK, JARBADI",
+      "d2d_price": 245,
+      "d2b_price": 195
+    },
+    {
+      "name": "ATTARIYA",
+      "code": "ATTA1",
+      "district": "KAILALI",
+      "phone": "9701010560",
+      "covered_areas": "GULARIYA BAZAR, GETA BAZAR, SREEPUR, BANBEHADA BAZAR, GODAWARI, GETA, CHAURAHA, LALPUR, MALAKHETI, CHAUKI DADA",
+      "d2d_price": 220,
+      "d2b_price": 170
+    },
+    {
+      "name": "AURABANI",
+      "code": "AURA3",
+      "district": "SUNSARI",
+      "phone": "9701010485",
+      "covered_areas": "BARCHHAWA,AURABANI BAZZAR,CHANDBELA,CG FOOD",
+      "d2d_price": 220,
+      "d2b_price": 170
+    },
+    {
+      "name": "AURAHI",
+      "code": "AURA1",
+      "district": "MAHOTTARI",
+      "phone": "9701003765",
+      "covered_areas": "AURAHI, TIMKIYA, VOIL, KHAJURIYA, NABRAJPUR, BIJALPUR, INARABA",
+      "d2d_price": 220,
+      "d2b_price": 170
+    },
+    {
+      "name": "AURAHI DHANUSHA",
+      "code": "AURA4",
+      "district": "DHANUSHA",
+      "phone": "9701003590",
+      "covered_areas": "AURAHI DHANUSHA",
+      "d2d_price": 195,
+      "d2b_price": 145
+    },
+    {
+      "name": "AURAIYA",
+      "code": "AURA2",
+      "district": "RAUTAHAT",
+      "phone": "9701010681",
+      "covered_areas": "AURAIYA, PIPRA, DUMARIYA, LAWATNA, MOTIYA BAJAR, PALTUWA, MATHIYA, BANJAARA, GHIURA, JAYNAGAR",
+      "d2d_price": 220,
+      "d2b_price": 170
+    },
+    {
+      "name": "BADIGAD",
+      "code": "BADI1",
+      "district": "BAGLUNG",
+      "phone": "9857685000",
+      "covered_areas": "BADIGHAT GAUPALIKA, KHARBANG BAZAR, HADI KHOLA, NUWARA, MANEWA, KHAULARA, KHARA, BHIMGITHI, KHAALA",
+      "d2d_price": 245,
+      "d2b_price": 195
+    },
+    {
+      "name": "BADNIHAR",
+      "code": "BADN1",
+      "district": "PARSA",
+      "phone": "9801984689",
+      "covered_areas": "SOLAKPUR, MILANCHOCK, SABAIYA TANDI, BIRUWA CHOCK, PARAS PATEL CHOWK",
+      "d2d_price": 220,
+      "d2b_price": 170
+    },
+    {
+      "name": "BAGLUNG BAZAR",
+      "code": "BAGL1",
+      "district": "BAGLUNG",
+      "phone": "9801984312",
+      "covered_areas": "TRAFFIC CHOK, HALLANCHOK, DHAULAGIRI CHOK, PURANO FLIM HALL, DEURALI CHOK, GOLDEN GATE, GUTHI, JEEP PARK, BAGLUNG BUS PARK, RUDREPIPAL, UPALLACHAUR, ODAR CHAUR, LALIGURANS CHOK, TRIPATHI CHOK, KUDULE, RAMETAAR, SHIVADHARA CHOK, RATAMATA, PAKHATHAR",
+      "d2d_price": 220,
+      "d2b_price": 170
+    },
+    {
+      "name": "BAGMARA",
+      "code": "BAGM1",
+      "district": "KASKI",
+      "phone": "9801984290",
+      "covered_areas": "LAMGADHI, TIKLANG, MATHILLO KHAIRENI, TALLO KHAIRENI, BATYANI CHOK, SAHARE TARA.  PURANO BUSPARK, INDRA CHOWK, BARELI CHOWK, PANITANKI, SIPLENTAHARA, MAHAKALI CHOWK, KALIKA THAN, BHAGABATI CHAUTARA,  SANITO TOL, THULDHUNGA,  XUCHI GAUDA, BAGMARA MATHILLO PATNYERI, MATHILLO PATNYERI, BAGMARA PULCHOK",
+      "d2d_price": 170,
+      "d2b_price": 120
+    },
+    {
+      "name": "BAGTHALA",
+      "code": "BAGT1",
+      "district": "BAJHANG",
+      "phone": "9743938111",
+      "covered_areas": null,
+      "d2d_price": 245,
+      "d2b_price": 195
+    },
+    {
+      "name": "BAHAURI PIDARI",
+      "code": "BAHA1",
+      "district": "PARSA",
+      "phone": "9701003328",
+      "covered_areas": "DOKAILA CHAUK, BISHRAMPUR, SIRSIYA-BAIRIYA, PIPARA, NAGARDAHA, BALIRAMPUR, FULKAUL, RAMNAGARI",
+      "d2d_price": 220,
+      "d2b_price": 170
+    },
+    {
+      "name": "BAHRABISE",
+      "code": "BAHR1",
+      "district": "SINDHUPALCHOK",
+      "phone": "9801984694",
+      "covered_areas": "BAHRABISE",
+      "d2d_price": 245,
+      "d2b_price": 195
+    },
+    {
+      "name": "BAHUNDANGI",
+      "code": "BAHU1",
+      "district": "JHAPA",
+      "phone": "9801984350",
+      "covered_areas": "BAHUNDANGI BAZAR AREA,SANAM CHOWK,BOUDHAMODE, BHRIKUTI, DOKANDADA, MECHIDANGI CHOWK, ALDANGI, BHORLENI, BADAKHAL, RISING POOL,ELEPHANT RESTORE",
+      "d2d_price": 245,
+      "d2b_price": 195
+    },
+    {
+      "name": "BAHUNI",
+      "code": "BAHU2",
+      "district": "MORANG",
+      "phone": "9801984651",
+      "covered_areas": "BAHUNI",
+      "d2d_price": 195,
+      "d2b_price": 145
+    },
+    {
+      "name": "BAIDAULI",
+      "code": "BAID1",
+      "district": "KAPILBASTU",
+      "phone": "9801472137",
+      "covered_areas": "BAIDAULI",
+      "d2d_price": 195,
+      "d2b_price": 145
+    },
+    {
+      "name": "BAISJANGAR TANAHUN",
+      "code": "BAIS1",
+      "district": "TANAHU",
+      "phone": "9701010407",
+      "covered_areas": "BAISJANGAR, KALIMATI, CHITIKHOLA, DEURALITAR, PANCHSAYAPHAT, TURTURE, PATAL, JUNGEPHAT, BADAHARE, ARCHALDHARA, DUMRIKHARKA, KAURETAR, BAGALEPHAT, TARKUGHAT, NEPALDANDA, RAMPURTAR, THULOBAN, MALTEDANDA, HATIYA.",
+      "d2d_price": 245,
+      "d2b_price": 195
+    },
+    {
+      "name": "BALARA",
+      "code": "BALA2",
+      "district": "SARLAHI",
+      "phone": "9701003403",
+      "covered_areas": "BALARA",
+      "d2d_price": 195,
+      "d2b_price": 145
+    },
+    {
+      "name": "BALAWA",
+      "code": "BALA1",
+      "district": "MAHOTTARI",
+      "phone": "9801984160",
+      "covered_areas": "BALAWA",
+      "d2d_price": 220,
+      "d2b_price": 170
+    },
+    {
+      "name": "BALETAXAR",
+      "code": "BALE1",
+      "district": "GULMI",
+      "phone": "9801984214",
+      "covered_areas": "SIRINGA, LUMCHHA, RANIBAS, LAMAKHARKA ,PANI TANKI",
+      "d2d_price": 245,
+      "d2b_price": 195
+    },
+    {
+      "name": "BAMKA",
+      "code": "BAMK1",
+      "district": "BAJURA",
+      "phone": "9844565060",
+      "covered_areas": "FALASAIN, BALDE, TAPRISHERA, BETALMANDU, TOLI, KALAPANI, MALTAA, DELTA,",
+      "d2d_price": 270,
+      "d2b_price": 220
+    },
+    {
+      "name": "BANDIPUR",
+      "code": "BAND1",
+      "district": "TANAHU",
+      "phone": "9801472129",
+      "covered_areas": "Bandipur Bazar, Piple Gate, Shekhar Danda, Tindhara, Tudikhel",
+      "d2d_price": 245,
+      "d2b_price": 195
+    },
+    {
+      "name": "BANEPA",
+      "code": "BANE1",
+      "district": "KAVREPALANCHOK",
+      "phone": "9801984489",
+      "covered_areas": "NALA, SANGHA, 28 KILO, KHADPU,  HOSPITAL AREA, CHANDESWORI",
+      "d2d_price": 170,
+      "d2b_price": 120
+    },
+    {
+      "name": "BANGALACHULI",
+      "code": "BANG1",
+      "district": "DANG",
+      "phone": "9764643078",
+      "covered_areas": "BANGALACHULI",
+      "d2d_price": 195,
+      "d2b_price": 145
+    },
+    {
+      "name": "BANI",
+      "code": "BANI1",
+      "district": "KANCHANPUR",
+      "phone": "9801984343",
+      "covered_areas": "BANI BAJAR, PAHARIYA, DEKHATBHULI, DUBAHA, CHAUDHAR NADI POOL, BUNK BAJAR, ITAHA, NANDA MAVI SCHOOL, DANGA, NIGALI, BANDA, DOMILLA, BIJAYA SHAH CHOWK, BANHARA POOL",
+      "d2d_price": 245,
+      "d2b_price": 195
+    },
+    {
+      "name": "BANIYANI",
+      "code": "BANI2",
+      "district": "JHAPA",
+      "phone": "9801472167",
+      "covered_areas": "SINGIMARI,LAURECHOWK, HIMALI, SOMBARE, PRITHIVNAGAR SAGARMATHA, PRITIVINAGAR CHARAALI, AMACHOWK, GAURISHANKAR, DUMJAN CHOWK, NILA CHOWK, BANGADAGI, SUKUNADIGI, BALUBADI, PATHAMARI, DUGDUGI, SITAGADI, DAMARGACHH",
+      "d2d_price": 245,
+      "d2b_price": 195
+    },
+    {
+      "name": "BANKUL",
+      "code": "BANK1",
+      "district": "RAUTAHAT",
+      "phone": "9701003610",
+      "covered_areas": "BANKUL",
+      "d2d_price": 195,
+      "d2b_price": 145
+    },
+    {
+      "name": "BANSBARI MORANG",
+      "code": "BANS2",
+      "district": "MORANG",
+      "phone": "9701010234",
+      "covered_areas": "GANGA CHOWK, BMC HOSPITAL, BANSBARI CHOWK, SHANTI CHOWK, GOKUWA CHOWK, NEMUWA CHOWK, MUDERI CHOWK, MANMOHAN COLLEGE, HATTIMUDA CHOWK, PATHIYA CHOWK, SUKCHAR CHOWK, LICHI BAGAAN, BAURAHA CHOWK, SIRA GOKUWA TOLE",
+      "d2d_price": 170,
+      "d2b_price": 120
+    },
+    {
+      "name": "BANSGADHI",
+      "code": "BANS1",
+      "district": "BARDIYA",
+      "phone": "9701010443",
+      "covered_areas": "KISHAN CHOWK,MATARIYA , LAKHNA,CG,UTTAR BHAKARI,KEDHARE DHAM, KAKAURA, LACHMANA, MACHAGADH, MOTIPUR, MAINAPOKHARI.",
+      "d2d_price": 245,
+      "d2b_price": 195
+    },
+    {
+      "name": "BARAGADHI",
+      "code": "BARA2",
+      "district": "BARA",
+      "phone": "9701010377",
+      "covered_areas": "BARAGADHI",
+      "d2d_price": 195,
+      "d2b_price": 145
+    },
+    {
+      "name": "BARAHATHAWA",
+      "code": "BARA1",
+      "district": "SARLAHI",
+      "phone": "9701010634",
+      "covered_areas": "BALARA, GAIR, HAJARBIGHA, HARIPUR BARRACK, BASBARIYA CAMP, KAUDENA",
+      "d2d_price": 220,
+      "d2b_price": 170
+    },
+    {
+      "name": "BARDAGHAT",
+      "code": "BARD2",
+      "district": "NAWALPARASI WEST",
+      "phone": "9801869464",
+      "covered_areas": "PUNARBAS, MAKAR, SAKHUWANI, BHUTAHA BAZAR, HARKATTA,CHISAPANI, BHUMAHI, PALDADA",
+      "d2d_price": 220,
+      "d2b_price": 170
+    },
+    {
+      "name": "BARDIBAS",
+      "code": "BARD1",
+      "district": "MAHOTTARI",
+      "phone": "9801984213",
+      "covered_areas": "BADAHARI BAZAR, LALGADH, GAURIDANDA, AURAHI BAZAR, HATTILET, MAISTHAN, KISANNAGAR, BARDIBAS",
+      "d2d_price": 220,
+      "d2b_price": 170
+    },
+    {
+      "name": "BARIYARPATTI",
+      "code": "BARI1",
+      "district": "SIRAHA",
+      "phone": "9701010337",
+      "covered_areas": "AURAHI, SANHAITHA, BARIYARPATTI",
+      "d2d_price": 220,
+      "d2b_price": 170
+    },
+    {
+      "name": "BARIYARPUR",
+      "code": "BARI2",
+      "district": "BARA",
+      "phone": "9801984188",
+      "covered_areas": "BARIYARPUR BAZAR, DAHIYAR, SHREE-SANSARI-MAI-TEMPLE, MAYENPUR, INARWA CHAUK, GADHIMAI MANDIR",
+      "d2d_price": 220,
+      "d2b_price": 170
+    },
+    {
+      "name": "BARJU",
+      "code": "BARJ1",
+      "district": "MORANG",
+      "phone": "9701010502",
+      "covered_areas": "KESHALIYA CHOWK, GOPI CHOWK, SUKRABARE, BUGDARI, GELABARI CHOWK, TAMMU CHOWK, TENGRA KHOLA, SISAUBARI CHOWK, CHIMDI BAZAR, BARJU TAAL, CHHITAHA PODDAR THAAN, JANAKI CHOWK, AITABARE CHOWK, BELAHA CHOWK, CHINI MILL CHOWK, BELAHA MILAN CHOWK, SITAGUNJ, RAMGUNJ BELGACHHIYA CHOWK, BHIMPUR",
+      "d2d_price": 220,
+      "d2b_price": 170
+    },
+    {
+      "name": "BARPAK",
+      "code": "BARP1",
+      "district": "GORKHA",
+      "phone": "9801984511",
+      "covered_areas": "KOTDADA, BARPAK BUSPARK, BARPAK MILANCHOWK,BARPAK  MILANDADA, BARPAK  MANIDADA, SWORTHA TOLE, KHARKA TOLE, TAKLENAN, DHUNGEDHARA, XUMBOGAU, BARPAK LAGURIBOT, THALIWAR, BARPAK  SHREE HIMALAYAN SCHOOL AREA",
+      "d2d_price": 245,
+      "d2b_price": 195
+    },
+    {
+      "name": "BASABASAHI",
+      "code": "BASA2",
+      "district": "NAWALPARASI WEST",
+      "phone": "9801869464",
+      "covered_areas": "BASABASAHI",
+      "d2d_price": 195,
+      "d2b_price": 145
+    },
+    {
+      "name": "BASANTAPUR BAZAR",
+      "code": "BASA1",
+      "district": "CHITWAN",
+      "phone": "9701010688",
+      "covered_areas": "BASANTAPUR, KALYANPUR, KIRTANPUR, RAM KUNDA, CHIRAULI, BARUWA, RAMAILO DADA, BAGHAUDA, SITALPUR SCHOOL, GARDI CHOWK, AMRAULI,",
+      "d2d_price": 220,
+      "d2b_price": 170
+    },
+    {
+      "name": "BASTIPUR",
+      "code": "BAST1",
+      "district": "SIRAHA",
+      "phone": "9801984439",
+      "covered_areas": "BASTIPUR, KARJANHA, BANDIPUR, SIMRA MAREBA, RAMPURA, BHERYA, BAGHA, BHOKRAHA",
+      "d2d_price": 220,
+      "d2b_price": 170
+    },
+    {
+      "name": "BASTIPUR MAKAWANPUR",
+      "code": "BAST2",
+      "district": "MAKWANPUR",
+      "phone": "9701010623",
+      "covered_areas": "DAMINTAR,SANNANITAR,HADIKHOLA,NEWARPANI,SCHOOL VHOK GUMBA CHOK,RAJAIYA,LAMITAR,Y CHOK, KHARANGA, JAISING ,KHARANGA CHOK",
+      "d2d_price": 220,
+      "d2b_price": 170
+    },
+    {
+      "name": "BASUNDHARA",
+      "code": "BASU1",
+      "district": "KATHMANDU",
+      "phone": "9801869458",
+      "covered_areas": "BASUNDHARA, MAHARAJGUNJ, BANSBARI, DHUMBARAHI, TEACHING HOSPITAL, PANIPOKHARI, DHAPASI, CHYASINGDOL, US EMBASSY, GAULE KHASI, CHAPPAL KARKHANA, NARAYAN GOPAL CHOWK, CHAKRAPATH",
+      "d2d_price": 120,
+      "d2b_price": 70
+    },
+    {
+      "name": "BATESHWOR",
+      "code": "BATE1",
+      "district": "DHANUSHA",
+      "phone": "9701003626",
+      "covered_areas": "BATESHWOR",
+      "d2d_price": 220,
+      "d2b_price": 170
+    },
+    {
+      "name": "BAUNIYA",
+      "code": "BAUN1",
+      "district": "KAILALI",
+      "phone": "9801984443",
+      "covered_areas": "BAUNIYA BAZAR, KOHILIBHURUWA,  SAJHACHOK, KUMVIYA,  RANIKUNDA, MUDA GAU, JHAGADPUR, BARDAGORIYA MANDIYA AREA, RAMPUR,  BAUNIYA GAU, BASANTAMURARI SCHOOL AREA, MUDA BAZAR, BELUWA, TEEN BAZAR, KATTIPUR, DOGHARA GAU WARD NO. 1,2,3,4,5,6",
+      "d2d_price": 220,
+      "d2b_price": 170
+    },
+    {
+      "name": "BAYALBAS",
+      "code": "BAYA1",
+      "district": "SARLAHI",
+      "phone": "9801984212",
+      "covered_areas": "NOKAILWA, CHAULIKHA BAZZAR, BABARGUNJ, POKHARIA, TINGHARIA, SOKNAHABAZZAR, SHREENAGAR BAZZAR, PHULJOR, KHADKA TOLE, BHAKTIPUR, CHANDRANAGAR",
+      "d2d_price": 245,
+      "d2b_price": 195
+    },
+    {
+      "name": "BAYARGHARI",
+      "code": "BAYA2",
+      "district": "SYANGJA",
+      "phone": "9801984162",
+      "covered_areas": "HELU, DARSING, BAYARGHARI, BAGREBAZAR, DAHATHUM, CHHANGCHHANGDI",
+      "d2d_price": 245,
+      "d2b_price": 195
+    },
+    {
+      "name": "BELA",
+      "code": "BELA4",
+      "district": "KAILALI",
+      "phone": "9701010269",
+      "covered_areas": "JALI, GHODSUWA, BHATTI CHOWK, DHUNGE BAZAR, LAXMINAGAR",
+      "d2d_price": 220,
+      "d2b_price": 170
+    },
+    {
+      "name": "BELAKA RAMPUR",
+      "code": "BELA1",
+      "district": "UDAYAPUR",
+      "phone": "9801472192",
+      "covered_areas": "BELAKA RAMPUR",
+      "d2d_price": 245,
+      "d2b_price": 195
+    },
+    {
+      "name": "BELATARI",
+      "code": "BELA3",
+      "district": "NAWALPARASI WEST",
+      "phone": "9701003356",
+      "covered_areas": "BELATARI",
+      "d2d_price": 195,
+      "d2b_price": 145
+    },
+    {
+      "name": "BELAURI",
+      "code": "BELA2",
+      "district": "KANCHANPUR",
+      "phone": "9801984195",
+      "covered_areas": "BELAURI, KALKATTA, BUTABARI, DUMALLI, KUCHUI, SHANTIPUR, MAINAHA, PAULAHA CHOWK, DHAKKA, CHANDEU, TERIYA, VAGATPUR, PAXIYE, RITHAHA, PREMNAGAR, BURAKOT",
+      "d2d_price": 245,
+      "d2b_price": 195
+    },
+    {
+      "name": "BELBARI",
+      "code": "BELB1",
+      "district": "MORANG",
+      "phone": "9801984651",
+      "covered_areas": "NAKSALBARI,LAXMIMARGA ,BHAUNNE,BIRENDRA CHOWK, KANEPOKHARI,KASINI,DANGI HAAT,NALBARI,SANGLINAR,NAYA BAHUNNE,PURANO BAHUNNE,SOMBARE,BANWAL,BHAKA CHOWK,KERAUN,KADAM CHOWK",
+      "d2d_price": 220,
+      "d2b_price": 170
+    },
+    {
+      "name": "BELDANGI",
+      "code": "BELD1",
+      "district": "JHAPA",
+      "phone": "9801984101",
+      "covered_areas": "BELDANGI CAMP, DUMSE SCHOOL, BHANGBARI, BELDAG-1, NEW RATUWA BRIDGE AREA, BARGACHHI, AAM CHOWK, DEWAN CHOWK, FUNPARK, JOGI CHOWK, BAGHKHOR CHOWK, RAM CHOWK, JOGI CHOWK, AAITABARE CHOWK, AAITABARE SCHOOL, BELDANGI SCHOOL, BELDANGI 2",
+      "d2d_price": 220,
+      "d2b_price": 170
+    },
+    {
+      "name": "BELHI CHAPENA",
+      "code": "BELH1",
+      "district": "SAPTARI",
+      "phone": "9801984192",
+      "covered_areas": "BELHI CHAPENA",
+      "d2d_price": 195,
+      "d2b_price": 145
+    },
+    {
+      "name": "BELSOT",
+      "code": "BELS1",
+      "district": "UDAYAPUR",
+      "phone": "9701003176",
+      "covered_areas": "GRASS, HADIYA, BALIYA, GIDDHABAR, SIMANPUR",
+      "d2d_price": 220,
+      "d2b_price": 170
+    },
+    {
+      "name": "BELTAR BASAHA",
+      "code": "BELT1",
+      "district": "UDAYAPUR",
+      "phone": "9801984200",
+      "covered_areas": "MAGHI TOL, AAP DADA, POLICE CHAUKI ,SATHEDORE, PUSHPALAL CHOWK , BUSPARK BELTAR, B.P CHOWK, SHANTI CHOWK, BHULKE",
+      "d2d_price": 245,
+      "d2b_price": 195
+    },
+    {
+      "name": "BENI",
+      "code": "BENI1",
+      "district": "MYAGDI",
+      "phone": "9801984313",
+      "covered_areas": "BAGARPHAT, MANGLAGHAT, MILANCHOK, KALIPUL, ARTHINGA, GALESHWOR, LAMAKHET, PARBAT BENI, DAMBARA",
+      "d2d_price": 220,
+      "d2b_price": 170
+    },
+    {
+      "name": "BESISAHAR",
+      "code": "BESI1",
+      "district": "LAMJUNG",
+      "phone": "9801984263",
+      "covered_areas": "NARAYAN THAN, MANANGE CHAUTARA, SITAL PATI, SAHAJE, CAMPUS ROAD, PURANO BANK CHOK, THADO LINE, BHIMSEN THAN, HIGH SCHOOL CHOK, RANIKUWA, BOHARA BESI, BHAKUNDE, GAIRI, DANAI PHAT, FLIM HALL CHOK, SERA, SERA KUNA, SPORTS HALL",
+      "d2d_price": 220,
+      "d2b_price": 170
+    },
+    {
+      "name": "BHADRAPUR",
+      "code": "BHAD1",
+      "district": "JHAPA",
+      "phone": "9801984181",
+      "covered_areas": "BHIMNAGAR, HALDIBARI, CHANDRAGADHI, ANJANMODE, SAGARMATHA, GYANECHOWK, MANTRICHOWK,BHADRAPUR NAYABAZAR, GHODAMARA, POKAPADA, DHANSHMODE, KENDRAMODE, KAFLETOL, DEUNIYA PUL, CHANDRAGADI, GARMENT CHOWK, BOKTOBARI, PUWATUBARI, DEVKOTA CHOWK, LEKHANATH CHOWK, GOLE CHOWK, RANGILA CHOWK, JHILMILE PUL, DHADUWA, BANGE,  JHAPA CHOWK,",
+      "d2d_price": 220,
+      "d2b_price": 170
+    },
+    {
+      "name": "BHAGWANPUR",
+      "code": "BHAG1",
+      "district": "SIRAHA",
+      "phone": "9701010271",
+      "covered_areas": "KATHA, CHHARAPATI, GADHIYA, LATHNATHA, PARYARPUR, MAHESHWARI, BHAGWANPUR",
+      "d2d_price": 220,
+      "d2b_price": 170
+    },
+    {
+      "name": "BHAIRAHAWA",
+      "code": "BHAI1",
+      "district": "RUPANDEHI",
+      "phone": "9801984358",
+      "covered_areas": "THUTIPIPAL, KATAIYA, LAKHANCHOWK, PADSARI, AANCHALPUR, BUDDHACHOWK, DEVKOTACHOWK, BASANTAPUR, BYPASS, SUNAULI, BANROAD, KHAJANA, UCMS, PAKHIHAWA, AIRPOT, BANGAI, BETHARI, BUSDHILIWA, ANNAPURNATOL,KALIKASTAN, AAWAROOD, DHOGARA ,MEAUDEHAWA",
+      "d2d_price": 170,
+      "d2b_price": 120
+    },
+    {
+      "name": "BHAJANI",
+      "code": "BHAJ1",
+      "district": "KAILALI",
+      "phone": "9801984443",
+      "covered_areas": "KUNDI, DHANAURA, GAUNAHIYA, KADHA, NAWALPUR, BAHADURPUR, KRISHNANAGAR, THEKI, KUSHUMGADH, KANAIYAPUR , BHAJANI , JOSHIPUR",
+      "d2d_price": 220,
+      "d2b_price": 170
+    },
+    {
+      "name": "BHAKUNDEBESI",
+      "code": "BHAK1",
+      "district": "KAVREPALANCHOK",
+      "phone": "9701003504",
+      "covered_areas": "BHAKUNDEBESI",
+      "d2d_price": 245,
+      "d2b_price": 195
+    },
+    {
+      "name": "BHALUWANG",
+      "code": "BHAL1",
+      "district": "DANG",
+      "phone": "9801984171",
+      "covered_areas": "BHALUBANG BAZAR, CHAITYA, SISANIYA, KALAGATE, BARBAN, RAUNIYA",
+      "d2d_price": 245,
+      "d2b_price": 195
+    },
+    {
+      "name": "BHANDARA",
+      "code": "BHAN1",
+      "district": "CHITWAN",
+      "phone": "9701003527",
+      "covered_areas": "BHANDARA CHOWK,KHAREPOOL CHOWK,KHURKHURE, BADAHARA, BIRENDRANAGAR, HARDI, PUMPA POOL, SIX GROUP, FIVE GROUP, ONE GROUP, BARMANAGAR, RASAULI, SIMALTANDI, KATHAR, MAJHUE, SHANTIBAZAR, PIPARA, CHAUKI DANDA, MUDABAR, SIDDHARTHA CHOWK, PADARIYA, DADUWA, APF BARRACK, LAXMI NARAYAN CHOWK, GADYAULI, JHURJHURE, SIMARA CHOWK, BELUWA, GHADERI DANDA, LALPUR CHOWK",
+      "d2d_price": 220,
+      "d2b_price": 170
+    },
+    {
+      "name": "BHANGAHA",
+      "code": "BHAN2",
+      "district": "MAHOTTARI",
+      "phone": "9701003626",
+      "covered_areas": "BHANGAHA",
+      "d2d_price": 220,
+      "d2b_price": 170
+    },
+    {
+      "name": "BHAWANIPUR",
+      "code": "BHAW1",
+      "district": "SARLAHI",
+      "phone": "9701003403",
+      "covered_areas": "BHAWANIPUR",
+      "d2d_price": 220,
+      "d2b_price": 170
+    },
+    {
+      "name": "BHEDETAR",
+      "code": "BHED1",
+      "district": "DHANKUTA",
+      "phone": "9863489517",
+      "covered_areas": "KARKI CHAAPT, DEVISTHAN, THUMKI",
+      "d2d_price": 220,
+      "d2b_price": 170
+    },
+    {
+      "name": "BHIMAD",
+      "code": "BHIM1",
+      "district": "TANAHU",
+      "phone": "9701010579",
+      "covered_areas": "BHIMAD, MULABARI, RISING PATAN, XANG PATAN, JALAUDI, BAGTAR, 28, THANGADI, SISNARY, SITAL CHAUTARA, THADO LINE, DENMARK TOLE, MASSTAR, SANTINAGAR",
+      "d2d_price": 245,
+      "d2b_price": 195
+    },
+    {
+      "name": "BHIMAN",
+      "code": "BHIM3",
+      "district": "SINDHULI",
+      "phone": "9765010514",
+      "covered_areas": "BHIMAN",
+      "d2d_price": 220,
+      "d2b_price": 170
+    },
+    {
+      "name": "BHIMPHEDI",
+      "code": "BHIM2",
+      "district": "MAKWANPUR",
+      "phone": "9701010628",
+      "covered_areas": "SAMARI ,DHADING ,SUPARETAYAR ,SANNANITAR,RATOMATE,TAUBAS ,TRIKHANDI ,BHAISE, PANDRANG,KALITAR, NIBUWATAR ,CHIURIBAGAICHA RANIKHOLA,GOLPING BESI ,DHORSING ,BHIMPHEDI ,DAMKI DAMAR SUPPING,DHUSENI,CHHABELI,JUDIKHET,SIMLTAR",
+      "d2d_price": 220,
+      "d2b_price": 170
+    },
+    {
+      "name": "BHINGRI",
+      "code": "BHIN1",
+      "district": "PYUTHAN",
+      "phone": "9764643052",
+      "covered_areas": "SODA, CHARABARI, SAYAMUREY, BATULE, BHINGRI BAZAR, JIMURPATA, BAGHIPUR, GOTIBANG",
+      "d2d_price": 220,
+      "d2b_price": 170
+    },
+    {
+      "name": "BHISAWA SHIKTA",
+      "code": "BHIS1",
+      "district": "PARSA",
+      "phone": "9701003226",
+      "covered_areas": "BHISAWA SHIKTA, MIRJAPUR, TIHUKI, VEDIYARWA, JAYMANGALPUR, JHALMAHIYA, TULSI-BARWA, BANJARI",
+      "d2d_price": 220,
+      "d2b_price": 170
+    },
+    {
+      "name": "BHOJPUR",
+      "code": "BHOJ1",
+      "district": "BHOJPUR",
+      "phone": "9701010471",
+      "covered_areas": "KAFLE, TAKSAR BAZAR, BOKHIM, BHOTE PASAL, CHAT BHANJYANG, DEURALI ,DADAGAUN,",
+      "d2d_price": 245,
+      "d2b_price": 195
+    },
+    {
+      "name": "BHOKRAHA",
+      "code": "BHOK1",
+      "district": "SUNSARI",
+      "phone": "9701003304",
+      "covered_areas": "BHOKRAHA",
+      "d2d_price": 195,
+      "d2b_price": 145
+    },
+    {
+      "name": "BHURANG TATOPANI",
+      "code": "BHUR2",
+      "district": "MYAGDI",
+      "phone": "9846739004",
+      "covered_areas": "BHURUNG TATOPANI, DANA BAZAR, GHARA, DHOBA TALO BAZAR, TIPLANG, MAHAVIR",
+      "d2d_price": 220,
+      "d2b_price": 170
+    },
+    {
+      "name": "BHURIGAUN",
+      "code": "BHUR1",
+      "district": "BARDIYA",
+      "phone": "9801984161",
+      "covered_areas": "NEULAPUR, JAMATI, BAWANPUR, KARMALA, PRATAPUR,",
+      "d2d_price": 245,
+      "d2b_price": 195
+    },
+    {
+      "name": "BIBLATE BAZAR",
+      "code": "BIBL1",
+      "district": "ILAM",
+      "phone": "9801984063",
+      "covered_areas": "BIBLATE, CHUREGHATI, GUMBADADA, TORIBARI, DAIRY, RIVS SCHOOL, SAHAKARI CHOWK, CHARCHARE, BARBOTE",
+      "d2d_price": 245,
+      "d2b_price": 195
+    },
+    {
+      "name": "BIJUWAR",
+      "code": "BIJU1",
+      "district": "PYUTHAN",
+      "phone": "9764643055",
+      "covered_areas": "PYUTHAN, PUTHAN, BAGDULLA, JUMRE, QWADI",
+      "d2d_price": 245,
+      "d2b_price": 195
+    },
+    {
+      "name": "BINDABASINI",
+      "code": "BIND1",
+      "district": "PARSA",
+      "phone": "9701003328",
+      "covered_areas": "BAHUWARA-BHATHA CHAUK, GARDAUL, JHAUWA, AMARPATI, MADHAWAL, HASWA, VATSAULA, VELAHA",
+      "d2d_price": 220,
+      "d2b_price": 170
+    },
+    {
+      "name": "BIRATCHOWK",
+      "code": "BIRA2",
+      "district": "MORANG",
+      "phone": "9801984651",
+      "covered_areas": "INDRAPUR, BHULKE, GOTHGAON, SALAKPUR, SUNDARHARAICHA, PURWANCHAL UNIVERSITY,KHORSANE,HARICHA MODE,SISAU GHARI,TRIVENI CHOWK",
+      "d2d_price": 220,
+      "d2b_price": 170
+    },
+    {
+      "name": "BIRATNAGAR",
+      "code": "BIRA1",
+      "district": "MORANG",
+      "phone": "9801984177",
+      "covered_areas": "TINPAINI, PANITANKI, NETACHWOK, DURGA CHOWK, SHANTI CHOWK, SHANKAR CHOWK, PAROPAKAR GHAT, BHATTA CHOWK, BAN KARYALAYA, POKHARIYA SCHOOL, THULO MILL CHOWK, BUDHDHA CHOWK, FOOTBALL CHOWK, PUSPALAL CHOWK, SELFIE ROAD, TRIVENI CHOWK, NOBEL DAIRY CHOWK, GHINAGHAT, MILANCHOWK, JHORAHAT, TETARIYA, KHADRA, PIDARBANI, KANCHANBARI, OIL NIGAM, DUDH FARAM, AUSADHI VIVAAG, RAJBANSHI CHOWK, TITRI GACHHI, KHARJI CHOWK, DHAAT, MANGADH KHANEPANI, APF CAMP, BYPASS RINGROAD, TANKI, THAKUR CHOWK, NOBEL HOSPITAL, IK",
+      "d2d_price": 170,
+      "d2b_price": 120
+    },
+    {
+      "name": "BIRBAS",
+      "code": "BIRB1",
+      "district": "GULMI",
+      "phone": "9801984214",
+      "covered_areas": "BIRBAS, GAUDAKOT, GHUMTE, CHOYEGA, BHEDUWA BAZAR",
+      "d2d_price": 245,
+      "d2b_price": 195
+    },
+    {
+      "name": "BIRENDRA BAZAR",
+      "code": "BIRE1",
+      "district": "DHANUSHA",
+      "phone": "9801984309",
+      "covered_areas": "DHARAPANI, BHIMAN, BIRENDRABAZAR, GODAR, JUDI, MALTOL, PORTAHA,",
+      "d2d_price": 220,
+      "d2b_price": 170
+    },
+    {
+      "name": "BIRGUNJ",
+      "code": "BIRG1",
+      "district": "PARSA",
+      "phone": "9801984183",
+      "covered_areas": "RAXAUL, PARWANIPUR, NITANPUR,GHANTAGHAR, ADHARSHNAGAR, MALPOT CHOWK, BIRTA CHOWK, CHHAPKAIYA, NAGAWA, BUSPARK, PRATIMA CHOWK, GANDAK , DRYPORT, ALAHU CHOWK ONLY, ICP( DRYPORT), BINDAWASNI,TILAWA PULL, CHANDAL CHOWK, RAMGHADAWA, RADHEMAI, POWERHOUSE CHOWK",
+      "d2d_price": 220,
+      "d2b_price": 170
+    },
+    {
+      "name": "BIRTAMOD",
+      "code": "BIRT1",
+      "district": "JHAPA",
+      "phone": "9801984066",
+      "covered_areas": "BHATBHATENI,SAINIKMOD, RAMCHOWK, BHAGAWAN CHOWK, CHARPANE, LAXMIPUR, ANARMANI, BUTTABARI, SANISCHARE, BIRTABAZAR, GARAMUNI, , ARJUNDHARA,MAHANANDACHOWK, MATA MANDIR, CHHATA CHOWK, PUSPALAL CHOWK, KAPTANBAADI, SAALBAARI, KAALIJHODA, KALISTHAN,MUKTICHOWK, SYALDANDI,MEGHABARI, MUSICHOWK, PUEBELI TOL, SAGARMATHA TOL, ATITHI SADAN,MIYABARI,",
+      "d2d_price": 220,
+      "d2b_price": 170
+    },
+    {
+      "name": "BIRUWA",
+      "code": "BIRU1",
+      "district": "SYANGJA",
+      "phone": "9743938112",
+      "covered_areas": "BIRUWA BAZAR, WARD 1 AREA, WARD 2 AREA, ARCHALEY, BAHU AREA, NAGASTHAN, JAREWAR, LATO PIPAL, LALANGPANDHARA",
+      "d2d_price": 220,
+      "d2b_price": 170
+    },
+    {
+      "name": "BISHNUPUR",
+      "code": "BISH1",
+      "district": "SIRAHA",
+      "phone": "9701010337",
+      "covered_areas": "BISHNUPUR",
+      "d2d_price": 220,
+      "d2b_price": 170
+    },
+    {
+      "name": "BISHNUPUR SAPTARI",
+      "code": "BISH2",
+      "district": "SAPTARI",
+      "phone": "9701010742",
+      "covered_areas": "BISHANPUR CHOWK, BAIDHYA, KHARCHUIYA, KALYANPUR",
+      "d2d_price": 220,
+      "d2b_price": 170
+    },
+    {
+      "name": "BISHNUPUR SARLAHI",
+      "code": "BISH4",
+      "district": "SARLAHI",
+      "phone": "9701002298",
+      "covered_areas": "BISHNUPUR SARLAHI",
+      "d2d_price": 195,
+      "d2b_price": 145
+    },
+    {
+      "name": "BISHRAMPUR",
+      "code": "BISH3",
+      "district": "BARA",
+      "phone": "9801984186",
+      "covered_areas": "BISHRAMPUR",
+      "d2d_price": 195,
+      "d2b_price": 145
+    },
+    {
+      "name": "BITTHAD",
+      "code": "BITT1",
+      "district": "BAJHANG",
+      "phone": "9743938110",
+      "covered_areas": "DEULEKH, SYADI, LIM, RAMILAPUR, SHRIBHABAR, SUILEKH, DHOLYAMOD",
+      "d2d_price": 270,
+      "d2b_price": 220
+    },
+    {
+      "name": "BODEBARSAIN",
+      "code": "BODE1",
+      "district": "SAPTARI",
+      "phone": "9701003612",
+      "covered_areas": "GAURA, SATRUDHAN CHOWK, JAGER",
+      "d2d_price": 220,
+      "d2b_price": 170
+    },
+    {
+      "name": "BRAHAMPURI",
+      "code": "BRAH2",
+      "district": "SARLAHI",
+      "phone": "9701003107",
+      "covered_areas": "BRAHAMPURI",
+      "d2d_price": 195,
+      "d2b_price": 145
+    },
+    {
+      "name": "BRAHMADEV",
+      "code": "BRAH1",
+      "district": "KANCHANPUR",
+      "phone": "9701010725",
+      "covered_areas": "BRAHMADEV BAJAR, BRAHMADEV APF CAMP, KAMIKATE POOL, TILKENI, MATENA, TUMDAINI, JIMWA KALPATE MANDIR, BRAHMADEV PANI TANKI, BHAMKENI DHAM, BAL BHADRA MARG",
+      "d2d_price": 220,
+      "d2b_price": 170
+    },
+    {
+      "name": "BRINDABAN",
+      "code": "BRIN1",
+      "district": "RAUTAHAT",
+      "phone": "9801984146",
+      "covered_areas": "BRINDABAN",
+      "d2d_price": 195,
+      "d2b_price": 145
+    },
+    {
+      "name": "BUDAR",
+      "code": "BUDA1",
+      "district": "DOTI",
+      "phone": "9701776175",
+      "covered_areas": "BUDAR",
+      "d2d_price": 245,
+      "d2b_price": 195
+    },
+    {
+      "name": "BUDHABARE",
+      "code": "BUDH1",
+      "district": "JHAPA",
+      "phone": "9701010230",
+      "covered_areas": "JHAMKECHOWK, SUNMAI CHOWK,, HALFPAN CHOWK, HOKSHE, JAYAPUR, BARNE, 7 NUMBER CHOWK, DHARMAKATA, SAYAPATRI CHOEK, KALIKHOLA,PULCHOWK BUDHABARE, MAGAR CHOWK, BARAGHARE, KATARDANDA, MILAN CHOWK,KHATIWADA CHOWK, SIMALGACHHI,GOPAL DANDA, SETIPANI, AAITABARE ( BUDDHASANTI)",
+      "d2d_price": 220,
+      "d2b_price": 170
+    },
+    {
+      "name": "BUDHANILKANTHA",
+      "code": "BUDH2",
+      "district": "KATHMANDU",
+      "phone": "9701004726",
+      "covered_areas": "BUDHANILKANTHA, GOLFUTAR, HEPALI HIGHT, HATTIGAUDA, GANESH CHOWK, ITALITAR CHOWK, CHAPALI CHOWK PASIKOT AREA, RUDRESHWOR CHOWK, SPECIAL CHOWK, NAYA CHOWK, DEUBA CHOWK, MATHILLO BHANGAL, NCELL CHOWK, BUDHANILKANTHA SCHOOL AREA, BUDHANILKANTHA MILAN CHOWK, COMFORT APARTMENT AREA, ROAD SHOW HOUSING, NARAYANTHAN AREA, TAULUNG CHAUTARA, CHHOILING GUMBA, DANDA GAUN, STAFF COLLAGE, MERAKI, PANCHAKANYA SCHOOL, HATTIGAUDA BISHNUMATI POLL, BUDHANILKANTHA NILO POOL, MUHANPOKHARI, ISKON TEMPLE, LEMON TREE,",
+      "d2d_price": 120,
+      "d2b_price": 70
+    },
+    {
+      "name": "BULINGTAR",
+      "code": "BULI1",
+      "district": "NAWALPARASI EAST",
+      "phone": "9701003430",
+      "covered_areas": "BULINGTAR",
+      "d2d_price": 195,
+      "d2b_price": 145
+    },
+    {
+      "name": "BURTIBANG",
+      "code": "BURT1",
+      "district": "BAGLUNG",
+      "phone": "9701010480",
+      "covered_areas": "DEVISTHAN, BHIMGITHE, RINAMBESI, BALYALKHARKA, KUTHAPLA, HUNDRAPHEDI, DHAIBANG, BHIMGITHE, KHALA, KHARA, KHAULARA, NAWRA, RAKSHYA, KHARBANG, TAMAN, NISIKHOLA",
+      "d2d_price": 245,
+      "d2b_price": 195
+    },
+    {
+      "name": "BUTTABARI",
+      "code": "BUTT1",
+      "district": "JHAPA",
+      "phone": "9801984074",
+      "covered_areas": "BUTTABARI, STAFF CHOWK, AUTOLINE, BELGACHHI, BIRANSCHOOL, DEVI CHOWK, MANGAL CHOWK, TRIDARSHAN CHOWK, MILDADA, LAURE TOLL, PIPALCHOWK, KALIJHODA, SHREEJANGA CHOWK",
+      "d2d_price": 220,
+      "d2b_price": 170
+    },
+    {
+      "name": "BUTWAL",
+      "code": "BUTW1",
+      "district": "RUPANDEHI",
+      "phone": "9801984355",
+      "covered_areas": "SIDDABABA MANDIR, GOLPARK, PARI BUTWAL, JITGADHI, RAM NAGAR, DRIVERTOL, DEVINAGAR CHOWK, BUTWAL MAJUWA, CHAURAHA, BELBAS, KALIKANAGAR, JOGIKUTI, JANAKI NAGAR, SHANKARNAGAR, DRIVERTOL, MAINABAGAR, BASECAMP, CHARENGE, DEEP NAGAR, SUKKHA NAGAR, LAXMI NAGAR, MAGAR GHAT, BANBATIKA",
+      "d2d_price": 170,
+      "d2b_price": 120
+    },
+    {
+      "name": "CHABAHIL",
+      "code": "CHAB1",
+      "district": "KATHMANDU",
+      "phone": "9801984427",
+      "covered_areas": "CHABAHIL, GAUSHALA, RAMHITI, TILGANGA, SARASWATINAGAR, SUKEDHARA, BAUDDHA, PIPALBOT, NAYABASTI, TINCHULI, MAKALBARI, JAMBUDANDA, DAKSHINDHOKA, SHIVACHOWK, ARYAL GAUN, GAURIGHAT, KUMARIGAL, TUSHAL, GOKARNESHWOR TEMPLE, CHUCHEPATI, GUHESHWORI, JORPATI, NAXAL, BALUWATAR, MAITIDEVI, HANDIGAU, KALOPUL, RATOPUL, PAHELOPUL, BHATKEKO PUL, MAHANKAL, MAIJUBAHAL, PASHUPATI TEMPLE, JAYABAGESHWORI, MITRAPARK, SIFAL, GANGAHITI, GOPIKRISHNA",
+      "d2d_price": 120,
+      "d2b_price": 70
+    },
+    {
+      "name": "CHAINPUR BAJHANG",
+      "code": "CHAI1",
+      "district": "BAJHANG",
+      "phone": "9701003465",
+      "covered_areas": "CHAINPUR BAZAR, DEWAL, BASTI, GOLAI, PADESH, DAMDUR BHOPUR, DUNGRI",
+      "d2d_price": 270,
+      "d2b_price": 220
+    },
+    {
+      "name": "CHAINPUR SANKHUWASAB",
+      "code": "CHAI2",
+      "district": "SANKHUWASABHA",
+      "phone": "9768987800",
+      "covered_areas": "CHAINPUR SANKHUWASABHA,CHAINPUR BAZZAR, POKHARI BAZZAR,SIDDHAKALI MANDIR, JALJALE",
+      "d2d_price": 270,
+      "d2b_price": 220
+    },
+    {
+      "name": "CHAKARGHATTI SUNSARI",
+      "code": "CHAK1",
+      "district": "SUNSARI",
+      "phone": "9701010470",
+      "covered_areas": "CHAKARGHATTI SUNSARI",
+      "d2d_price": 220,
+      "d2b_price": 170
+    },
+    {
+      "name": "CHAKCHAKE",
+      "code": "CHAK3",
+      "district": "PYUTHAN",
+      "phone": "9849495545",
+      "covered_areas": null,
+      "d2d_price": 245,
+      "d2b_price": 195
+    },
+    {
+      "name": "CHAKRAGHATTA SARLAHI",
+      "code": "CHAK2",
+      "district": "SARLAHI",
+      "phone": "9701002298",
+      "covered_areas": "CHAKRAGHATTA SARLAHI",
+      "d2d_price": 195,
+      "d2b_price": 145
+    },
+    {
+      "name": "CHAME",
+      "code": "CHAM1",
+      "district": "MANANG",
+      "phone": "9764643064",
+      "covered_areas": "CHAME BAZAR, KOTO, KHITPO, THAN CHOK, SAREQUE",
+      "d2d_price": 270,
+      "d2b_price": 220
+    },
+    {
+      "name": "CHANAULI",
+      "code": "CHAN3",
+      "district": "CHITWAN",
+      "phone": "9701010614",
+      "covered_areas": "CHANAULI, BHIMNAGAR, JOTINAGAR, TELAURI ,PATAHANI, DIBYANAGAR, KHADRAULI KHAYARGHARI, SESI, SESUWAR, SIMARITOWN, SIMARA, BHUWANBASTI, GAJIPUR, RAMPUR, GUNJANAGAR, BABURAM CHOWK, NAYABAZER, MILDADA, SUVAKAMANA CHOWK, PARBATI PUR, RANIPHOKARI, DHARAMBHAKARI, KRISHNA CHOWK, MAILI CHOWK, KANCHHI CHOWK, AMRIT CHOWK, SUKRANAGAR, SOSI, SASINAGAR, CHAHARI CHOWK, DAHRENI, KABRE CHOWK, MINAL CHOWK, RATAPUR, CHADANI CHOWK, DHARMA CHOWK, PARSADHAP,TELAURI, NAMESTA CHOWK, LAURE CHOWK, SAUGAT CHOWK, HIMANSING",
+      "d2d_price": 170,
+      "d2b_price": 120
+    },
+    {
+      "name": "CHANDRANIGAHAPUR",
+      "code": "CHAN1",
+      "district": "RAUTAHAT",
+      "phone": "9701003706",
+      "covered_areas": "CHANDRAPUR, MOTIYAHI, BALCHANPUR, BASANTAPUR, SINDHUREGHARI, CHETNAGAR, MASLO NAJARPUR, SANTPUR, BINGARA, JUDIBELA, GAIDATAR,CHAPUR BAZAR, BELDI, JHANJHAN TOL, DUMARIYA, SANTAPUR, BETAUNIA, HATTISAR, BASANTAPUR, NAYABASTI, BANBORI, DABARI",
+      "d2d_price": 220,
+      "d2b_price": 170
+    },
+    {
+      "name": "CHANDRAUTA",
+      "code": "CHAN2",
+      "district": "KAPILBASTU",
+      "phone": "9801984142",
+      "covered_areas": "CHANDRAUTA BAZAR , SHIVPUR CHOWK, UMARI CHOWK, BALAPUR, HALLANAGAR, RUDRAPUR CHOK, KHARENDRAPUR",
+      "d2d_price": 245,
+      "d2b_price": 195
+    },
+    {
+      "name": "CHANHI BAZAR",
+      "code": "CHAN4",
+      "district": "SAPTARI",
+      "phone": "9701010271",
+      "covered_areas": "CHANHI BAZAR",
+      "d2d_price": 194.99,
+      "d2b_price": 144.99
+    },
+    {
+      "name": "CHAPAGAUN",
+      "code": "CHAP2",
+      "district": "LALITPUR",
+      "phone": "9701003277",
+      "covered_areas": "SUNAKOTI, THECHO, LELE, TIKABHAIRAB, SANTANESHWOR, BAJRABARAHI, TAKHEL, CHYAU DANDA, DHOLAHITY, PANGAU, SHERAFHAT",
+      "d2d_price": 120,
+      "d2b_price": 70
+    },
+    {
+      "name": "CHAPAKOT",
+      "code": "CHAP1",
+      "district": "SYANGJA",
+      "phone": "9701010401",
+      "covered_areas": "CHAPAKOT BAZAR, BATATAR, DAMACHAUR, KISAN, BARIKUNA, NAYAPATAN, CHHAPA, RATNAPUR, BAIDI, NIRDIM, MADI, RAMPUR BARDHALA WARD NO. 10, WARD NO 1, 2, 8,9,10",
+      "d2d_price": 220,
+      "d2b_price": 170
+    },
+    {
+      "name": "CHARAALI",
+      "code": "CHAR2",
+      "district": "JHAPA",
+      "phone": "9701003240",
+      "covered_areas": "CHARAALI, DHAIJAN, SAHAREDANGI,DUWAGADI, KALIJHODA, PIPAL CHOWK, MAILA BAARI, SARPADANSA HOSPITAL, CHARALI",
+      "d2d_price": 220,
+      "d2b_price": 170
+    },
+    {
+      "name": "CHARAUDI",
+      "code": "CHAR3",
+      "district": "DHADING",
+      "phone": "9701003659",
+      "covered_areas": "BISHALTAR,  CHARAUDI, DHUSA, KRISHNABHIR, KHATAUTI, JYAMIREGHAT, LALTIN BAZAR, MAJHIMTAR, HUGDIKHOLA, MOWAKHOLA",
+      "d2d_price": 220,
+      "d2b_price": 170
+    },
+    {
+      "name": "CHARIKOT",
+      "code": "CHAR1",
+      "district": "DOLAKHA",
+      "phone": "9801984474",
+      "covered_areas": "PUWANLE, MARBU, JILU, MAKAIBARI",
+      "d2d_price": 245,
+      "d2b_price": 195
+    },
+    {
+      "name": "CHATARA",
+      "code": "CHAT1",
+      "district": "SUNSARI",
+      "phone": "9801984366",
+      "covered_areas": "KOSHI POOL, BAYERBAN, HATKHOLA, CHATARA BUS PARK",
+      "d2d_price": 220,
+      "d2b_price": 170
+    },
+    {
+      "name": "CHAUGHADA BAZAR",
+      "code": "CHAU4",
+      "district": "MAKWANPUR",
+      "phone": "9801984687",
+      "covered_areas": "SHANTITOAL, PUTALI BAZAR, CHUCHEKHOLA, CHUNDADA, SALAKPARK, GAIRIGAU",
+      "d2d_price": 245,
+      "d2b_price": 195
+    },
+    {
+      "name": "CHAUMALA",
+      "code": "CHAU3",
+      "district": "KAILALI",
+      "phone": "9801869358",
+      "covered_areas": "BANBEHADA, JHIL, RAJIPUR, KHUCHAINI",
+      "d2d_price": 220,
+      "d2b_price": 170
+    },
+    {
+      "name": "CHAURJAHARI",
+      "code": "CHAU1",
+      "district": "RUKUM WEST",
+      "phone": "9801984329",
+      "covered_areas": "LAMICHHANE GAUN, AIRPORT, TRIVENI CHOWK, NEWROAD, SHITAL CAMPUS,TATA GAUN,GHARI GAUN",
+      "d2d_price": 270,
+      "d2b_price": 220
+    },
+    {
+      "name": "CHAUTARA",
+      "code": "CHAU2",
+      "district": "SINDHUPALCHOK",
+      "phone": "9801984336",
+      "covered_areas": "CHAUTARA BAZAR, SANO SIRUWARI, MELCHAUR, GAURATI, MATHLO HUNDRUNG",
+      "d2d_price": 245,
+      "d2b_price": 195
+    },
+    {
+      "name": "CHAWANNI BELDANDI",
+      "code": "CHAW1",
+      "district": "KANCHANPUR",
+      "phone": "9801984683",
+      "covered_areas": "CHAWANNI BELDANDI",
+      "d2d_price": 220,
+      "d2b_price": 170
+    },
+    {
+      "name": "CHIDIKA",
+      "code": "CHID1",
+      "district": "ARGHAKHANCHI",
+      "phone": "9701010217",
+      "covered_areas": "BALKOT, CHIDIKA, BAKHRE DANDA, CHAPAPOKHARA, SAJBOT, KHARJYAN BAZAR,",
+      "d2d_price": 245,
+      "d2b_price": 195
+    },
+    {
+      "name": "CHINCHU",
+      "code": "CHIN1",
+      "district": "SURKHET",
+      "phone": "9801984378",
+      "covered_areas": "CHINCHU BAZAR, TOLIKHOLA PUL, DEUTIBAJAI, TRAFFIC CHOWK, RATACHAUR, RAMGHAT, CHIPLE, SAADHIKHOLA, DEUTI TOLE, NEAR CHHINCHU POLICE STATION",
+      "d2d_price": 245,
+      "d2b_price": 195
+    },
+    {
+      "name": "CHISAPANI",
+      "code": "CHIS1",
+      "district": "KAILALI",
+      "phone": "9801984457",
+      "covered_areas": "BALCHAUR, GORANGE BARRACK, CHISAPANI BAZAR, KATASE, PAL BAZAR, KHAIRIPHATA, DUREJHARI BARRACK AREA",
+      "d2d_price": 220,
+      "d2b_price": 170
+    },
+    {
+      "name": "CHORMARA",
+      "code": "CHOR1",
+      "district": "NAWALPARASI EAST",
+      "phone": "9712001216",
+      "covered_areas": "BASANTAPUR , GIRBARI ,KOLIYA, GIRBARI , BELANI , JHYALBAS, BELUWA , GUDCHARI, ABIWAN,DHWAJMAN CHOWK, PATWARI , KOLHUWA, CHANAULI CHOWK,  MADANPUR , PANAUTI , BHAGKHOR , DAWANBARI , BARUWA , VANDARA , CHORMARA TANDI , CHORMARA BAZAR , CHAURANGI , FULABRI, LOSEDHARA , AMRASH, RANITAR",
+      "d2d_price": 220,
+      "d2b_price": 170
+    },
+    {
+      "name": "CHYAMA",
+      "code": "CHYA1",
+      "district": "BANKE",
+      "phone": "9701010373",
+      "covered_areas": "CHYAMA",
+      "d2d_price": 220,
+      "d2b_price": 170
+    },
+    {
+      "name": "DAIJEE",
+      "code": "DAIJ1",
+      "district": "KANCHANPUR",
+      "phone": "9801984436",
+      "covered_areas": "DAIJEE CHOCK, SAMA DAIJEE, CHAMPAPUR, CHATAHARI, SHANTIPUR, CHAURI, BHAMKA, BAITADA, CHHELA, JADEPANI, MUKTI, BAGUN, HATTITHALA, RADAHA, BASANTHALA",
+      "d2d_price": 220,
+      "d2b_price": 170
+    },
+    {
+      "name": "DAILEKH BAZAAR",
+      "code": "DAIL1",
+      "district": "DAILEKH",
+      "phone": "9801984431",
+      "covered_areas": "JARKOT, KIMU GAUN, TARTANG, KHURSANI BARI, BASKOT, BURTI, NAYA GAUN, RAMPUR, THALDADA HOSPITAL, KADACHAUR",
+      "d2d_price": 245,
+      "d2b_price": 195
+    },
+    {
+      "name": "DALDALE",
+      "code": "DALD1",
+      "district": "NAWALPARASI EAST",
+      "phone": "9801984321",
+      "covered_areas": "LOKAHA  , PRAGATINAGAR BAZAR, CAMPUS CHOWK, DEVCHULI CHOWK, DHAULAGIRI CHOWK, DALDALE BAZAR ALL AREA, KAILASH CHOWK , PARBATI CHOWK , AASHRAM CHOWK , DHARAPANI , S MODE , KUNAGHAT , LAXMIPUR , GAIDI, BISHALTAR, PRITHIVINAGAR, SALGHARI , CHAUTARI CHOWK ,  SAHARA CHOWK, RAMBAS , BHAGAWATI TOLE",
+      "d2d_price": 220,
+      "d2b_price": 170
+    },
+    {
+      "name": "DAMAK",
+      "code": "DAMA1",
+      "district": "JHAPA",
+      "phone": "9801984106",
+      "covered_areas": "LAKHANPUR, PANDAJUNGI,  FALGUNANDA CHOWK, MAMA CHOWK, CAMPUS MOD, KIRAT CHOWK, BARAGHARE, MANGALBARE (DAMAK), LAXMICHOWK, AAMCHOWK, DHUKURPANI, SRIPALI CHOWK, HAVALDAR CHOWK, PELTIMARI(AAITABARE)NEW RATUWA BRIDGE,SANU BHARAGHARE,SETUMARI,CHIYA DOKAN,GEURIYA,GUWABARI,JIWANCHOK,DHUMSE,KRISHNAMANDIR,GOLATAR,TARABARI, DAKINI, MILDADA, VIEW TOWER",
+      "d2d_price": 220,
+      "d2b_price": 170
+    },
+    {
+      "name": "DAMAN",
+      "code": "DAMA2",
+      "district": "MAKWANPUR",
+      "phone": "9801984323",
+      "covered_areas": "SIKHARKOT BAJAR, PALUNG, DAMAN, GHATTEKHOLA, KITENI, DADAGAU, GOPLAIGAU, OKHAR BAJAR, THANA BAJAR, TAHAKHEL, PALUNG BAJAR, MAHADEVSTHAN, ANJHARE, FATBAJAR, GAIRIGAUN, SOLTOGAUN, KARKI GAUN, THAHA NAGARPALIKA WARD NO 1/2/3/4.",
+      "d2d_price": 245,
+      "d2b_price": 195
+    },
+    {
+      "name": "DAMAR CHOWK",
+      "code": "DAMA4",
+      "district": "RAUTAHAT",
+      "phone": "9701010681",
+      "covered_areas": "RAJPUR, DAMAR, FATUWA, BHAGWANPUR, PANITANKI, AKOLWA, BAIRIYA",
+      "d2d_price": 220,
+      "d2b_price": 170
+    },
+    {
+      "name": "DAMAULI",
+      "code": "DAMA3",
+      "district": "TANAHU",
+      "phone": "9801984149",
+      "covered_areas": "DAMAULI BAZAR, TALGHARE, KARANKAT, LITCHI GHARI, HIGH SCHOOL TAR, ZERO TAR, 20 GHARE, BAG BHANJYANG, SIMALTAR, RANI GAUN, SIRDI, D-GAUN, BARCHAUR, DHAGERE, JAMUNE, GUNADI, CHAPAGHAT, BHATGAUN, KERABARI, GALGUBESI, SANTINAGAR, AMARAPURI, GANESHMAN CHOWK, KANTAR, KALESTI, PIGEN HILL, DUMSI, DUMSI CHAUR, DUMSI KOT, BAIRENI, THARPU, GHUMTI, BELBAS, 4 KUNE, GHASIKUWA, JALBIRE, KAMAL BARI, DEURALI, JHAPUTAR,PATAN, AMRENI, VYAS 2,3,4, DUMSI CHAUR, SHEWOR, BELTARI, DUMSI KOT",
+      "d2d_price": 170,
+      "d2b_price": 120
+    },
+    {
+      "name": "DAMRABHITTA",
+      "code": "DAMR1",
+      "district": "MORANG",
+      "phone": "9701003648",
+      "covered_areas": "VAUDA,DURGAPURI,LAXMI CHOWK,ITAHARA,AMBADI,SAUTHA,KADUPADA",
+      "d2d_price": 220,
+      "d2b_price": 170
+    },
+    {
+      "name": "DANABARI",
+      "code": "DANA1",
+      "district": "ILAM",
+      "phone": "9801984070",
+      "covered_areas": "DANABARI, SITALI,SUKRABARE BAZAR",
+      "d2d_price": 245,
+      "d2b_price": 195
+    },
+    {
+      "name": "DANDA BAZAR",
+      "code": "DAND1",
+      "district": "NAWALPARASI EAST",
+      "phone": "9701010600",
+      "covered_areas": null,
+      "d2d_price": 245,
+      "d2b_price": 195
+    },
+    {
+      "name": "DARBANG MYAGDI",
+      "code": "DARB1",
+      "district": "MYAGDI",
+      "phone": "9764643065",
+      "covered_areas": "FULBARI, FEDI, KHARA, RANABANG, BASHBOT, DARBANG BAZAR, DHAULAGIRI CHOWK, DARBANG BUSPARK AREA,UPALLO BAZAR, THAPACHAUR, RIVER SIDE",
+      "d2d_price": 220,
+      "d2b_price": 170
+    },
+    {
+      "name": "DARCHULA KHALANGA",
+      "code": "DARC1",
+      "district": "DARCHULA",
+      "phone": "9801984193",
+      "covered_areas": "GHAT BAZAR, BANGABAGAR, GALPHTI, CAMPUS ROAD, BUSPARK, MOHATI BAZAR",
+      "d2d_price": 270,
+      "d2b_price": 220
+    },
+    {
+      "name": "DARVAN PYUTHAN",
+      "code": "DARV1",
+      "district": "PYUTHAN",
+      "phone": "9801984171",
+      "covered_areas": "DARVAN PYUTHAN",
+      "d2d_price": 220,
+      "d2b_price": 170
+    },
+    {
+      "name": "DEDGAUN",
+      "code": "DEDG1",
+      "district": "NAWALPARASI EAST",
+      "phone": "9701003430",
+      "covered_areas": "DEDGAUN",
+      "d2d_price": 195,
+      "d2b_price": 145
+    },
+    {
+      "name": "DEVGHAT",
+      "code": "DEVG1",
+      "district": "TANAHU",
+      "phone": "9701010208",
+      "covered_areas": "DEVGHAT, TOWN CHOWK, KIUNDI, BAGALE CHOWK, KALIMATI, THAPA CHOWK, BUDHHA CHOWK, DEUPUR",
+      "d2d_price": 220,
+      "d2b_price": 170
+    },
+    {
+      "name": "DEVTAL BENAULI",
+      "code": "DEVT1",
+      "district": "BARA",
+      "phone": "9801984188",
+      "covered_areas": "DEVTAL BENAULI",
+      "d2d_price": 195,
+      "d2b_price": 145
+    },
+    {
+      "name": "DEWAHI GONAHI",
+      "code": "DEWA1",
+      "district": "RAUTAHAT",
+      "phone": "9761423711",
+      "covered_areas": "JAYANAGAR, SAKHUHAWA, DIPAHI, KHESHRAHIYA, POTHIYAHI, DEWAHI GONAHI",
+      "d2d_price": 220,
+      "d2b_price": 170
+    },
+    {
+      "name": "DEWANGANJ",
+      "code": "DEWA2",
+      "district": "SUNSARI",
+      "phone": "9701010502",
+      "covered_areas": "GHUSKI, DEWANGUNJ CHOWK, KAPTANGUNJ, NAYA HATIYA, JIROGUWA CHOWK, SANU CHOWK, HANUMAN CHOWK, MADHAHAR SHAHI CHOWK, SINWARI CHOWK, RAJGUNJ CHOWK, BISWAKARMA CHOWK, RAMJANAKI CHOWK, SHAHEBGUNJ",
+      "d2d_price": 220,
+      "d2b_price": 170
+    },
+    {
+      "name": "DHADING BESI",
+      "code": "DHAD1",
+      "district": "DHADING",
+      "phone": "9764643079",
+      "covered_areas": "PUCHHAR BAZAR, YAMALE CHOWK , BUSPARK , SANTA BAZAR , DIPTOLE , MALE BAGAR, MILANTOLE , SUGAM TOLE ,BICH BAZAR , SIRAN BAZAR , JAREBAR , IJARA, RAYATAR, KHATRI KUWA, KUDULE PHAT, PASHUPATI TEMPLE",
+      "d2d_price": 220,
+      "d2b_price": 170
+    },
+    {
+      "name": "DHAKDAI",
+      "code": "DHAK1",
+      "district": "RUPANDEHI",
+      "phone": "9801984358",
+      "covered_areas": "DHAKDAI, BAIKUNTHAPUR, BASANTAPUR, RAMNAGAR",
+      "d2d_price": 220,
+      "d2b_price": 170
+    },
+    {
+      "name": "DHALKEBAR",
+      "code": "DHAL1",
+      "district": "DHANUSHA",
+      "phone": "9801984309",
+      "covered_areas": "DHALKEBAR, JAMUNIBAS, NAKTAJHIJ, PUSPAWALPUR, MALTOL, DHARAPANI, HARIHARPUR",
+      "d2d_price": 220,
+      "d2b_price": 170
+    },
+    {
+      "name": "DHANAUJI",
+      "code": "DHAN6",
+      "district": "DHANUSHA",
+      "phone": "9801984123",
+      "covered_areas": "DHANAUJI",
+      "d2d_price": 195,
+      "d2b_price": 145
+    },
+    {
+      "name": "DHANGADHI",
+      "code": "DHAN1",
+      "district": "KAILALI",
+      "phone": "9701003530",
+      "covered_areas": "RAJPUR, BORADADI, DOKEBAZAR, MANEHARA,CAMPUSROAD,BUDDHA CHOCK, PUSPALAL CHOCK, DHANGADHI GAU, SHYBNAGAR, PASHUPATI TOLE, YELIN CHOCK, HASANPUR, TARANAGAR, UTTARBEDHIDI, BAEYABEHADHI, MILAN CHOCK, CHATAKPUR, BISHALNAGAR, JOKHADTAL, NAINA DEVI, MATIYARI, JALI, HASANPUR, VANSAR, CHAURAHA",
+      "d2d_price": 220,
+      "d2b_price": 170
+    },
+    {
+      "name": "DHANGADHIMAI",
+      "code": "DHAN4",
+      "district": "SIRAHA",
+      "phone": "9801984516",
+      "covered_areas": "CHAINPUR, ZEROMILE, MUSHARNIYA, DHANGADI",
+      "d2d_price": 220,
+      "d2b_price": 170
+    },
+    {
+      "name": "DHANKAUL",
+      "code": "DHAN5",
+      "district": "SARLAHI",
+      "phone": "9701003403",
+      "covered_areas": "DHANKAUL",
+      "d2d_price": 195,
+      "d2b_price": 145
+    },
+    {
+      "name": "DHANKUTA BAZAAR",
+      "code": "DHAN2",
+      "district": "DHANKUTA",
+      "phone": "9801984301",
+      "covered_areas": "MADAN CHOWK, SITALPATI, SARASAWATI CHOWK, KAGATE, TUDIKHEL",
+      "d2d_price": 270,
+      "d2b_price": 220
+    },
+    {
+      "name": "DHANUSADHAM",
+      "code": "DHAN3",
+      "district": "DHANUSHA",
+      "phone": "9701010527",
+      "covered_areas": "SIKIYAHA, KISANPUR, MAKHNAHA, GOVINDAPUR, MANGALPUR, SIRSIYA, DHANUSHADHAM",
+      "d2d_price": 220,
+      "d2b_price": 170
+    },
+    {
+      "name": "DHARAN",
+      "code": "DHAR1",
+      "district": "SUNSARI",
+      "phone": "9801984690",
+      "covered_areas": "PANMARA, BUDASUBBA, RAILWAY ,DEURALI, ZERO POINT",
+      "d2d_price": 220,
+      "d2b_price": 170
+    },
+    {
+      "name": "DHARKE",
+      "code": "DHAR2",
+      "district": "DHADING",
+      "phone": "9764643075",
+      "covered_areas": "DHARKE,  NAUBISE, KHANIKHOLA, TAYALGHAR, CHALISE, TARKARI BAZAR, 4 KILA, 7 KILA, 8 KILA, 9 KILA, 10 KILA, MAHADEVDESI, ALLJAYATAR,  JUNGKHOLA",
+      "d2d_price": 170,
+      "d2b_price": 120
+    },
+    {
+      "name": "DHAUBINI",
+      "code": "DHAU1",
+      "district": "PARSA",
+      "phone": "9701003226",
+      "covered_areas": "LANGADI CHAUK, PIPARA, VIKHAMPUR, GULARIYA, HARIHARPUR, DHOBINI",
+      "d2d_price": 220,
+      "d2b_price": 170
+    },
+    {
+      "name": "DHULABARI",
+      "code": "DHUL2",
+      "district": "JHAPA",
+      "phone": "9701010643",
+      "covered_areas": "KHUTEDANGI, JYAMIRGADI, LILABASTI, KHARDANGI, TELEBARI, GAJABASTI,DHULABARI BAZAR AREA, LALJHODA,KHAWAS GAUN, KACCHUBARI, CHADANI CHOWK, DHAKAL CHOWK, KHAREDAGI,PATHIBHARA TOLE, JORSIMAL, NAGARIK TOLE, HELPPOST LINE, AMDA ROAD DHULABARI, LALPANI",
+      "d2d_price": 220,
+      "d2b_price": 170
+    },
+    {
+      "name": "DHULIKHEL",
+      "code": "DHUL1",
+      "district": "KAVREPALANCHOK",
+      "phone": "9801984268",
+      "covered_areas": "DHULIKHEL BAZAR ,VOTE DADA, KHAWA, MAYUR BUSPARK",
+      "d2d_price": 170,
+      "d2b_price": 120
+    },
+    {
+      "name": "DHUNCHE",
+      "code": "DHUN1",
+      "district": "RASUWA",
+      "phone": "9801984297",
+      "covered_areas": "DHUNCHE BAZAR, SHIVA MANDIR, ARMY CAMP, POLICE CAMP, MINERAL WATER COMPANY,WELCOME GATE, HOSPITAL AREA",
+      "d2d_price": 245,
+      "d2b_price": 195
+    },
+    {
+      "name": "DIKTEL",
+      "code": "DIKT1",
+      "district": "KHOTANG",
+      "phone": "9765010519",
+      "covered_areas": "DIKTEL BAZAR AREA",
+      "d2d_price": 270,
+      "d2b_price": 220
+    },
+    {
+      "name": "DIMAN",
+      "code": "DIMA1",
+      "district": "SAPTARI",
+      "phone": "9801984379",
+      "covered_areas": "DIMAN,  GOITHI, BANAULI",
+      "d2d_price": 220,
+      "d2b_price": 170
+    },
+    {
+      "name": "DINGLA",
+      "code": "DING1",
+      "district": "BHOJPUR",
+      "phone": "9764643069",
+      "covered_areas": "DINGLA",
+      "d2d_price": 245,
+      "d2b_price": 195
+    },
+    {
+      "name": "DIPAYAL",
+      "code": "DIPA1",
+      "district": "DOTI",
+      "phone": "9801984180",
+      "covered_areas": "PIPALLA BAZAR, AIRPORT BAZAR, KULPATE, STS, RAJPUR, PIPALLA GAU, POLICE TALIM KENDRA, GHOLTADA, PULL BAZAR, SILGADHI BAZAR, NACHANTHALI KARAGAR, PUNNA GAU, SILGAU, THAPLA SILGADHI",
+      "d2d_price": 270,
+      "d2b_price": 220
+    },
+    {
+      "name": "DODHARA CHADANI",
+      "code": "DODH1",
+      "district": "KANCHANPUR",
+      "phone": "9701010405",
+      "covered_areas": "DODHARA, CHADANI, JHULUNGE POOL, FOUR LANE POOL, PANITANKI, CHAKKI BAZAR, 6 NUMBER BAZAR, HEALTH POST, BABATHAN, MANNYA CHAURAI, KARCHABHOJ POOL, SHIV PARBATI SCHOOL, SUNDARNAGAR, KUTIYA KABAR, BADWAL TOLE, SHYAULI BAZAR, DAMMAR CHAURAHA, KALIKA BAZAR, JAMUNA GHADI, SHRESTHA CHOWK, DEURALI GHAT, 4 NO. PARK",
+      "d2d_price": 245,
+      "d2b_price": 195
+    },
+    {
+      "name": "DUDHAULI",
+      "code": "DUDH1",
+      "district": "SINDHULI",
+      "phone": "9701003616",
+      "covered_areas": "DUDHAULI BAZAR AREA, TALIM KENDRA, SANKHATAR, KHIRIYANI, KHANIYA, MANGALPUR, DADA TOLE, DAKAHA, LADABHIR",
+      "d2d_price": 220,
+      "d2b_price": 170
+    },
+    {
+      "name": "DUDUWA",
+      "code": "DUDU1",
+      "district": "BANKE",
+      "phone": "9801984225",
+      "covered_areas": "DUDUWA",
+      "d2d_price": 195,
+      "d2b_price": 145
+    },
+    {
+      "name": "DUHABI",
+      "code": "DUHA1",
+      "district": "SUNSARI",
+      "phone": "9701003589",
+      "covered_areas": "HATIMUDHA, SIMARIYA, SONAPUR",
+      "d2d_price": 220,
+      "d2b_price": 170
+    },
+    {
+      "name": "DUIPIPLE",
+      "code": "DUIP1",
+      "district": "LAMJUNG",
+      "phone": "9801869333",
+      "covered_areas": "Duipiple bazar, Pathra,  Dulipani,  Satrasaya, Chardi,  Schooltar,  Kumal gaun,  Patal,  Baniya gaun,  Sotipasal, Neupanibesi,  Amil Dhara, Polang, Sisaghat, Parajulibesi, Bhorletar, Rambazar,  Karputar",
+      "d2d_price": 250,
+      "d2b_price": 200
+    },
+    {
+      "name": "DULEGAUDA",
+      "code": "DULE1",
+      "district": "TANAHU",
+      "phone": "9801472144",
+      "covered_areas": "GHUMTI, MANHARI, AKALA MANDIR, SERA SURYA NEPAL, DHARA PANI, KUMLE KHOLA, TIMILSHINA CHOWK, KHAIRENITAR, MILDADA, MILAN CHOWK, BRIGHTCHOWK, SANTITOL, MASJITTOL, PANCHAMUNI CHOWK, BANKYA CHOWK, BP CHOWK, SINGA PETROL PUMP, SYAULI BAZAR, VOTEPANI, KHAIRENI TUDA, EKLEKHET, NURSERY, HALEDI, PULCHOK, GANAPATE, DHORFIRDI CHOK, GACHHEPANI, MAJUWA, KOTRE, GHAARI, LAMEAAHAL, SUKLAGANDAKI, DOVAN POOL, PATAN CHAUTARA",
+      "d2d_price": 170,
+      "d2b_price": 120
+    },
+    {
+      "name": "DULLU",
+      "code": "DULL1",
+      "district": "DAILEKH",
+      "phone": "9812525906",
+      "covered_areas": null,
+      "d2d_price": 245,
+      "d2b_price": 195
+    },
+    {
+      "name": "DUMARI KALYANPUR",
+      "code": "DUMA1",
+      "district": "SIRAHA",
+      "phone": "9801519898",
+      "covered_areas": "DUMARI, KALYANPUR BAZAR, PARSAHI,SITAPUR,",
+      "d2d_price": 220,
+      "d2b_price": 170
+    },
+    {
+      "name": "DUMKIBAS",
+      "code": "DUMK1",
+      "district": "NAWALPARASI EAST",
+      "phone": "9801984168",
+      "covered_areas": "DUMKIBAS BAZAR, SISELI JYAMIRE, TALLO JYAMIRE, SUNTADI, DADAJUR, GHUSHEDI, MAJUWA, SIDRE, SARDI, KOLTADI, HONGSI CEMENT COMPANY, BAGAICHA, DEURALI, KUMALTAR",
+      "d2d_price": 220,
+      "d2b_price": 170
+    },
+    {
+      "name": "DUMRE",
+      "code": "DUMR1",
+      "district": "TANAHU",
+      "phone": "9701010411",
+      "covered_areas": "CHIRKENE, BELBHYANGANG, NALA, REMALNI, SAULI BANDIPOR GATE, CHISAPANI, DUMRE BAZAR, PURANO DUMRE, THULO DHUNGA, BIMAL NAGAR, NAYAPOOL, SAJBOTE, BHANSAR, YAMPA PHAT, BHANU 2, NASETAR, FUSETAR, BARIFAT, CHUDIGAUN, SEPABAGAICHA, CHANDRAWATI, KHAHARE, CHAMBAS, KHAHARE, CHAMBAS, KALIMATI",
+      "d2d_price": 170,
+      "d2b_price": 120
+    },
+    {
+      "name": "DUNAI",
+      "code": "DUNA1",
+      "district": "DOLPA",
+      "phone": "9764643057",
+      "covered_areas": "DUNAI, JHUPAL",
+      "d2d_price": 270,
+      "d2b_price": 220
+    },
+    {
+      "name": "DURGAULI",
+      "code": "DURG1",
+      "district": "KAILALI",
+      "phone": "9801984057",
+      "covered_areas": "DURGAULI",
+      "d2d_price": 220,
+      "d2b_price": 170
+    },
+    {
+      "name": "EKADARA",
+      "code": "EKAD1",
+      "district": "MAHOTTARI",
+      "phone": "9801984655",
+      "covered_areas": "EKADARA",
+      "d2d_price": 220,
+      "d2b_price": 170
+    },
+    {
+      "name": "FATTEPUR",
+      "code": "FATT1",
+      "district": "SAPTARI",
+      "phone": "9701003907",
+      "covered_areas": "BANDRA, BALUWA, QUARTER MALETH, VAGANI, BALARDHA, AMBASHI, BHAUDA DEVI, BHALAMNTI, SUNDARPUR, SANIBAARE, MEJAR CHAUTAR",
+      "d2d_price": 220,
+      "d2b_price": 170
+    },
+    {
+      "name": "FATUWA HARSAHA",
+      "code": "FATU1",
+      "district": "RAUTAHAT",
+      "phone": "9701010377",
+      "covered_areas": "FATUWA HARSAHA",
+      "d2d_price": 195,
+      "d2b_price": 145
+    },
+    {
+      "name": "FIKKAL",
+      "code": "FIKK1",
+      "district": "ILAM",
+      "phone": "9801984409",
+      "covered_areas": "PHIKKAL, TINGHARE, AAITABARE, KANYAM, XIBITAR, KARFOK, BARBOTE, MALUM, AAHALE, PALTAGE, KUTIDADA, SHANTI CHOOK, HARKATE, GAHIRIGAW, RAMPHOK, DHODE, AARUBOTE, CHANDER GROUND, GOGANE, SIDDHIGAW",
+      "d2d_price": 245,
+      "d2b_price": 195
+    },
+    {
+      "name": "GADDA CHAUKI",
+      "code": "GADD1",
+      "district": "KANCHANPUR",
+      "phone": "9701003658",
+      "covered_areas": null,
+      "d2d_price": 245,
+      "d2b_price": 195
+    },
+    {
+      "name": "GADHAWA",
+      "code": "GADH1",
+      "district": "DANG",
+      "phone": "9801984119",
+      "covered_areas": "GADHAWA",
+      "d2d_price": 220,
+      "d2b_price": 170
+    },
+    {
+      "name": "GAIDAKOT",
+      "code": "GAID1",
+      "district": "NAWALPARASI EAST",
+      "phone": "9701003423",
+      "covered_areas": "BHIRKUTI CHOWK, CHAUKI, SILANAYAS CHOWK, MILAN CHOWK, BIKASH CHOWK, MAULA KALIKA, FEDI, BRITISH CAMP, CHANDANI CHOWK, KALIKA CHOWK, GANESH MANDIR, NAMASTE CHOWK, JANAK SCHOOL, BUDDHA CHOWK, CONGRESS CHOWK, LAKHAN CHOWK, BIJAYA CHOWK, KISHAN CHOWK, JANAKI GAS, GAIRI, JAYASHREEPUL, THUMS",
+      "d2d_price": 220,
+      "d2b_price": 170
+    },
+    {
+      "name": "GAIGHAT",
+      "code": "GAIG1",
+      "district": "UDAYAPUR",
+      "phone": "9801869356",
+      "covered_areas": "JALJALE, DEURI, BAGAHA, TRIYUGA, MOTI GADH BAZZAR, ASARI, RAJABASH, BOKSE",
+      "d2d_price": 220,
+      "d2b_price": 170
+    },
+    {
+      "name": "GAIR BAZAR",
+      "code": "GAIR1",
+      "district": "SARLAHI",
+      "phone": "9701002298",
+      "covered_areas": "GAIR BAZAR, PIDARI, PIPARIYA, YEMPUR, MADANPUR, SALIMPUR",
+      "d2d_price": 220,
+      "d2b_price": 170
+    },
+    {
+      "name": "GAJURI",
+      "code": "GAJU1",
+      "district": "DHADING",
+      "phone": "9701003699",
+      "covered_areas": "BIHANIPUMP,CHALISE BAZAR, CHAMBAAS, GAJURI BAZAR, GALAUDI BAZAR, GHATBESI NAYAPOOL",
+      "d2d_price": 220,
+      "d2b_price": 170
+    },
+    {
+      "name": "GALCHI",
+      "code": "GALC1",
+      "district": "DHADING",
+      "phone": "9801472180",
+      "covered_areas": "BAIRANI ,MASDOBAN,MASTAR,BELKHU,AADAMGHAT,SIMLE,MASDIKHOLA,DADHA,22KILA,KHOLPUTAR,EKLEPHAAT,BHALTAR,KEURANI",
+      "d2d_price": 220,
+      "d2b_price": 170
+    },
+    {
+      "name": "GALKOT",
+      "code": "GALK1",
+      "district": "BAGLUNG",
+      "phone": "9764643066",
+      "covered_areas": "NARETHATI, ANGAKHET, HATIYA, BASKHOLA, MALMA, HARICHAUR, BAMIYA",
+      "d2d_price": 245,
+      "d2b_price": 195
+    },
+    {
+      "name": "GALYANG",
+      "code": "GALY1",
+      "district": "SYANGJA",
+      "phone": "9701010536",
+      "covered_areas": "GALYANG BAZAR, TALLO GALYANG, MATHILLO GALYANG, MODKILLA, PETROL PUMP SIDE, CHURI, KARADI.",
+      "d2d_price": 245,
+      "d2b_price": 195
+    },
+    {
+      "name": "GAMGADHI",
+      "code": "GAMG1",
+      "district": "MUGU",
+      "phone": "9768552251",
+      "covered_areas": "GAMGADHI, MILAN CHOWK, TRAFFIC OFFICE, KRISHNA CHOWK, ADALAT CHOWK, SORU HAIGWAY, NEWROAD CHOWK,",
+      "d2d_price": 270,
+      "d2b_price": 220
+    },
+    {
+      "name": "GANESHPUR KAPILBASTU",
+      "code": "GANE2",
+      "district": "KAPILBASTU",
+      "phone": "9701010633",
+      "covered_areas": "GANESHPUR KAPILBASTU",
+      "d2d_price": 195,
+      "d2b_price": 145
+    },
+    {
+      "name": "GANESHPUR SIRAHA",
+      "code": "GANE1",
+      "district": "SIRAHA",
+      "phone": "9701010337",
+      "covered_areas": "GANESHPUR",
+      "d2d_price": 220,
+      "d2b_price": 170
+    },
+    {
+      "name": "GARUDA",
+      "code": "GARU1",
+      "district": "RAUTAHAT",
+      "phone": "9701003475",
+      "covered_areas": "KATARIYA, DUDHIYAWAR, FATTEPUR, SHIVNAGAR, JAYANAGAR, SAKHUHAWA, SUKDEV CHOWK, DIPAHI, DEBAHI, GONAHI BAZAR, DHARARI, MAHAMADPUR, MALAHI TOLE, SUNDARPUR, SAMANPUR, BINAGRA, DHANANDI, GERAHI, DHARAMPUR, MADHABPUR, JIMARIYA, BIRATA CHOWK, HUSENI CHOWK, DHAMAURA CHOWK, KAMALPATI, HARTAHA CHOWK.",
+      "d2d_price": 220,
+      "d2b_price": 170
+    },
+    {
+      "name": "GAUR",
+      "code": "GAUR1",
+      "district": "RAUTAHAT",
+      "phone": "9801984337",
+      "covered_areas": "TIKAULIYA, MAHADEVPATI,SHIRSIYA, PATHAYE, BARAMPURI,BAMNAGAR,FATUYAPUL, RAJDEVI, JHUNKHINIYA, SHISUWA,KORIYATO, BHANSAR",
+      "d2d_price": 220,
+      "d2b_price": 170
+    },
+    {
+      "name": "GAURADAHA",
+      "code": "GAUR2",
+      "district": "JHAPA",
+      "phone": "9801869451",
+      "covered_areas": "GEURIYA,MILL CHOWK,GURUNG CHOWK,GAURADAHA SITAPURI,RANGPUR CHOWK,CHAITE CHOWK,GURASH CHOWK,GAURADAHA BELDANGI,DHIMDHIME,DHOBINIYA,SOLMARI,DITHA CHOWK,PETROL PUMP,BHOJPURE TOLE ,DAHAGAUN,GALDUBBA,MILAN CHOWK,MAJUWA SCHOOL,SCHOOL CHOWN,NAMUNA SCHOOL,BHETWAL CHOWK",
+      "d2d_price": 220,
+      "d2b_price": 170
+    },
+    {
+      "name": "GAURIGANJ",
+      "code": "GAUR3",
+      "district": "JHAPA",
+      "phone": "9701010329",
+      "covered_areas": "PRAGATI CHOWK, JUROPANI,GAURIGANJ,KHAJURGACHI BAZZAR,TULACHAN,BIRPUR POLICE STATION,DEVKOTA SCHOOL,GYAN KUNJA BOARDING,CHANDAN CHOWK,CHAURI BAZAR,TELGANI ,KUNJIBARI",
+      "d2d_price": 220,
+      "d2b_price": 170
+    },
+    {
+      "name": "GAUSHALA MAHOTTARI",
+      "code": "GAUS1",
+      "district": "MAHOTTARI",
+      "phone": "9801984239",
+      "covered_areas": "GAUSHALA, RAMNAGAR, ITATAR, SAMSI, BHARATPUR, NIGAUL, CHINI MILL, AURAHI SURTI BIKAS, IMLI BAZAR, KATHUWAR, RAJKHOR, PARSA",
+      "d2d_price": 220,
+      "d2b_price": 170
+    },
+    {
+      "name": "GERUWA",
+      "code": "GERU1",
+      "district": "BARDIYA",
+      "phone": "9801984275",
+      "covered_areas": "GERUWA",
+      "d2d_price": 195,
+      "d2b_price": 145
+    },
+    {
+      "name": "GETA",
+      "code": "GETA1",
+      "district": "KAILALI",
+      "phone": "9801984222",
+      "covered_areas": "GETA",
+      "d2d_price": 220,
+      "d2b_price": 170
+    },
+    {
+      "name": "GHACHOK",
+      "code": "GHAC1",
+      "district": "KASKI",
+      "phone": "9701003908",
+      "covered_areas": "GHACHOK, VALABOT, KANGMANG, LAMSAL THAR, CHETTRI THAR, KOT THAR, THUSEY, NEPALI THAR, DHEPRANG",
+      "d2d_price": 195,
+      "d2b_price": 145
+    },
+    {
+      "name": "GHARTIGAAUN",
+      "code": "GHAR1",
+      "district": "ROLPA",
+      "phone": "9767200676",
+      "covered_areas": "THABANG, MAADI, GANGADEV, TALABANG, BHITTABANG,",
+      "d2d_price": 245,
+      "d2b_price": 195
+    },
+    {
+      "name": "GHORAHI",
+      "code": "GHOR1",
+      "district": "DANG",
+      "phone": "9701010433",
+      "covered_areas": "GOGLEE, SAUDIYAR, DHARNA, SARRA, MASINA, KARJAI, DUMARGAU",
+      "d2d_price": 220,
+      "d2b_price": 170
+    },
+    {
+      "name": "GODAK",
+      "code": "GODA1",
+      "district": "ILAM",
+      "phone": "9701010308",
+      "covered_areas": "BAARA GOLAI, JAWBARI BHANGAYANG, NARAYAN CHOK, PURNASMARAK MA VI, GHATTA, LAXMIPUR POKHARI",
+      "d2d_price": 220,
+      "d2b_price": 170
+    },
+    {
+      "name": "GODAWARI",
+      "code": "GODA3",
+      "district": "LALITPUR",
+      "phone": "9701010375",
+      "covered_areas": "GODAWARI, THAIBA, TAUKHEL, KITINI, BADIKHEL, GODAMCHAUR, HARISIDDHI, BADEGAU, HATTIBAN",
+      "d2d_price": 120,
+      "d2b_price": 70
+    },
+    {
+      "name": "GODAWARI KAILALI",
+      "code": "GODA2",
+      "district": "KAILALI",
+      "phone": "9801984445",
+      "covered_areas": "SUNAKOTI, THECHO, LELE, TIKABHAIRAB, SANTANESHWOR, BAJRABARAHI, TAKHEL, CHYAU DANDA, DHOLAHITY, PANGAU, SHERAFHAT",
+      "d2d_price": 220,
+      "d2b_price": 170
+    },
+    {
+      "name": "GODETA",
+      "code": "GODE1",
+      "district": "SARLAHI",
+      "phone": "9701003107",
+      "covered_areas": "GODAITA, KODAINA, SUNDARPUR, SISAUTIYA, PARSA, CHAKKARGHATTA, PHULPARASI, SUKHCHAIN",
+      "d2d_price": 220,
+      "d2b_price": 170
+    },
+    {
+      "name": "GOKULESHWOR",
+      "code": "GOKU1",
+      "district": "DARCHULA",
+      "phone": "9801984494",
+      "covered_areas": "GOKULESHWOR",
+      "d2d_price": 270,
+      "d2b_price": 220
+    },
+    {
+      "name": "GOKULGANGA",
+      "code": "GOKU2",
+      "district": "RAMECHHAP",
+      "phone": "9765010513",
+      "covered_areas": "GOKULGANGA",
+      "d2d_price": 220,
+      "d2b_price": 170
+    },
+    {
+      "name": "GOLBAZAR",
+      "code": "GOLB1",
+      "district": "SIRAHA",
+      "phone": "9801984516",
+      "covered_areas": "KASHA ,BALWA, PANWARI, NEW CHOHARWA, GAURAHA, AYODHYANAGAR, DURGAPUR, FULKAHA KATI,NARAHA BALKAWA, CHANDRA AYODHYAPUR, GHURME, ZERO MILE",
+      "d2d_price": 220,
+      "d2b_price": 170
+    },
+    {
+      "name": "GOPETAR",
+      "code": "GOPE1",
+      "district": "PANCHTHAR",
+      "phone": "9701003624",
+      "covered_areas": "JORPOKARI , GANESH CHOWK, KHJURGACHI BAZAR, CHILLARA CHOWK, THEKI TOLA, BHAWANIPUR, RAJBANSI CHOWK",
+      "d2d_price": 220,
+      "d2b_price": 170
+    },
+    {
+      "name": "GOPIGUNJ JAMUNIYA",
+      "code": "GOPI1",
+      "district": "NAWALPARASI WEST",
+      "phone": "9801869464",
+      "covered_areas": "GOPIGUNJ, SEMARI, NARANCHOWK, SEMARI",
+      "d2d_price": 245,
+      "d2b_price": 195
+    },
+    {
+      "name": "GORKHA BAZAR",
+      "code": "GORK1",
+      "district": "GORKHA",
+      "phone": "9801984511",
+      "covered_areas": "DANDIDANDA, SATIPIPAL, THIGURESWARA, DALBHANJYANG, LAXMIBAZAR, 12 KILO, 13 KILO, 14 KILO, 15 KILO, 16 KILO, BIRENCHOWK, TAKSAR, KHOLKHOLE, HARAMTARI, GORKHA BUSPARK, NAYABAZAR, GORKHA CAMPUS, ROTEPANI, DHARAPANI, THULO AAGAN, DURBAR AREA, HOSPITAL CHOWK, GORKHA ALE, DHUNGAGADE, BARAHA, KATTEL DANDA, CHILDREN PARK",
+      "d2d_price": 220,
+      "d2b_price": 170
+    },
+    {
+      "name": "GORUSINGE",
+      "code": "GORU1",
+      "district": "KAPILBASTU",
+      "phone": "9701003457",
+      "covered_areas": "GORUSINGE,IMLIYA,BUDDHI,BADHARA,DUMRA CHOWK",
+      "d2d_price": 220,
+      "d2b_price": 170
+    },
+    {
+      "name": "GOTHALAPANI",
+      "code": "GOTH1",
+      "district": "BAITADI",
+      "phone": "9801984274",
+      "covered_areas": "SHAHILEK, CHHELA, GADHI, AAITA, BADILEK BINASAU, BABET, SAPARILE, TRIPURA SUNDARI, BASKOT, MARKANDA GAU, DEWALNATH",
+      "d2d_price": 270,
+      "d2b_price": 220
+    },
+    {
+      "name": "GULARIYA",
+      "code": "GULA1",
+      "district": "BARDIYA",
+      "phone": "9801984166",
+      "covered_areas": "AASHAPUR PAKADIA, GANESHPUR, MAHAMADPUR, SANOSHREE TARTAL, MANPUR MAINAPOKHAR, SORHAWA, TITIHIRIYA, KALIKA, MUNALBASTI, GANESHPUR, BHAISAHI",
+      "d2d_price": 220,
+      "d2b_price": 170
+    },
+    {
+      "name": "HAKPARA",
+      "code": "HAKP1",
+      "district": "SIRAHA",
+      "phone": "9701010337",
+      "covered_areas": "SAGARPUR, THENGAHI, HAKPARA",
+      "d2d_price": 220,
+      "d2b_price": 170
+    },
+    {
+      "name": "HALDIBARI",
+      "code": "HALD1",
+      "district": "JHAPA",
+      "phone": "9701002590",
+      "covered_areas": "HALDIBARI",
+      "d2d_price": 220,
+      "d2b_price": 170
+    },
+    {
+      "name": "HALESI",
+      "code": "HALE1",
+      "district": "KHOTANG",
+      "phone": "9765010517",
+      "covered_areas": "HALESI BAZAR, SOLTI BHANJYANG, MAHADEVSTHAN",
+      "d2d_price": 220,
+      "d2b_price": 170
+    },
+    {
+      "name": "HANSPUR KATHPULLA",
+      "code": "HANS1",
+      "district": "DHANUSHA",
+      "phone": "9707085529",
+      "covered_areas": "HANSPUR KATHPULLA",
+      "d2d_price": 220,
+      "d2b_price": 170
+    },
+    {
+      "name": "HANUMANNAGR",
+      "code": "HANU1",
+      "district": "SAPTARI",
+      "phone": "9701010245",
+      "covered_areas": "BHARDAHA, JOGINIYA, INARUWA, GHIDHKHORA, BANAJHULA, PORTAHA",
+      "d2d_price": 220,
+      "d2b_price": 170
+    },
+    {
+      "name": "HAPURE",
+      "code": "HAPU1",
+      "district": "DANG",
+      "phone": "9701010305",
+      "covered_areas": "HASTANAPUR, PANCHAKULE CHOWK, BAGARPUR",
+      "d2d_price": 220,
+      "d2b_price": 170
+    },
+    {
+      "name": "HARAIYA RUPANDEHI",
+      "code": "HARA1",
+      "district": "RUPANDEHI",
+      "phone": "9701003458",
+      "covered_areas": "RUDRAPUR,HARAIYA BAZAR AREA",
+      "d2d_price": 220,
+      "d2b_price": 170
+    },
+    {
+      "name": "HARINAGARA",
+      "code": "HARI3",
+      "district": "SUNSARI",
+      "phone": "9701010502",
+      "covered_areas": "BHUTAHA, CDO CHOWK, BUDHI KHOLA, THAAN CHOWK, HARINAGARA BAZAR",
+      "d2d_price": 220,
+      "d2b_price": 170
+    },
+    {
+      "name": "HARINAS TANAHUN",
+      "code": "HARI5",
+      "district": "TANAHU",
+      "phone": "9707085546",
+      "covered_areas": "SAALDANDA, XEKMA, KHAIRIKOT, GHAREDI, JAMUNEY, CHISAPANI, GHAIRISHAWARA, PYARSING, KHAHAREY, TARAA, RAHALEY, SHIRINDANDA, CHUIKUNA, BADHAREY, CHHAKRA, BALAMDI, BHUMDI, CHITREY, RAMCHEY, DHUNGEYTHATI, SIRAULEY",
+      "d2d_price": 245,
+      "d2b_price": 195
+    },
+    {
+      "name": "HARIPUR",
+      "code": "HARI2",
+      "district": "SARLAHI",
+      "phone": "9801472197",
+      "covered_areas": "LAXMIPUR, MAJURWA, JUTPANI, SITAYAN",
+      "d2d_price": 220,
+      "d2b_price": 170
+    },
+    {
+      "name": "HARIPURWA",
+      "code": "HARI4",
+      "district": "SARLAHI",
+      "phone": "9701003107",
+      "covered_areas": "HARIPURWA",
+      "d2d_price": 195,
+      "d2b_price": 145
+    },
+    {
+      "name": "HARIWON",
+      "code": "HARI1",
+      "district": "SARLAHI",
+      "phone": "9701003510",
+      "covered_areas": "HARIWON, NAYAROD, RAYAMAJHI CHOWK, ATARAULI, SASAPUR, GANESH CHOWK, DHARHARA",
+      "d2d_price": 220,
+      "d2b_price": 170
+    },
+    {
+      "name": "HARKAPUR 16 NO",
+      "code": "HARK1",
+      "district": "NAWALPARASI EAST",
+      "phone": "9701003594",
+      "covered_areas": null,
+      "d2d_price": 245,
+      "d2b_price": 195
+    },
+    {
+      "name": "HARNAIYA",
+      "code": "HARN1",
+      "district": "BARA",
+      "phone": "9801984188",
+      "covered_areas": "HARNAIYA CHAUK, DHARAMPUR CHAUK, CHIUTAHA CHAUK, LANGADA CHAUK, AMARPATI, PETARWA BAZAR, BHAGWANPUR-INARWA CHAUK",
+      "d2d_price": 220,
+      "d2b_price": 170
+    },
+    {
+      "name": "HARNAIYA SIYARI",
+      "code": "HARN2",
+      "district": "RUPANDEHI",
+      "phone": "9701010358",
+      "covered_areas": "HARNAIYA SIYARI",
+      "d2d_price": 195,
+      "d2b_price": 145
+    },
+    {
+      "name": "HARTHOK",
+      "code": "HART1",
+      "district": "PALPA",
+      "phone": "9801984381",
+      "covered_areas": "HARTHOK BAZAR, KUSUM KHOLA, BHAIRABISTHAN, SILANGTHOK, JOGIPANI, MALMUL",
+      "d2d_price": 220,
+      "d2b_price": 170
+    },
+    {
+      "name": "HASULIYA",
+      "code": "HASU1",
+      "district": "KAILALI",
+      "phone": "9801869358",
+      "covered_areas": "HASULIYA",
+      "d2d_price": 220,
+      "d2b_price": 170
+    },
+    {
+      "name": "HATEMALO CHOWK",
+      "code": "HATE1",
+      "district": "PARBAT",
+      "phone": "9867266289",
+      "covered_areas": "PAIYU GAUPALIKA, WAHAKI BHANGANG, BIHARI, TAKLAK, HUWAS BHORLE, KAHUDADA, HILE, KAHARE KHOLA, SETIBENI",
+      "d2d_price": 220,
+      "d2b_price": 170
+    },
+    {
+      "name": "HATIYA",
+      "code": "HATI1",
+      "district": "MAKWANPUR",
+      "phone": "9801984687",
+      "covered_areas": "CHAUGHADA ,HATTILET,CHISAPANICHOK RANGASALACHOK,GAURITARCHOK,SIKHARPANI,DIMALTOAL,GHAMPE,SIPALICHOK,HATIYA GA.BI.SA, TRISULE,BHORLE,SANO GANGATE,HATTISUDE,HARNAMADI ,RAMDHUNI,GAIRIGAU,RAIGAU,SIVAM ,KURLE,GADHI, SHIKHARKATERI",
+      "d2d_price": 195,
+      "d2b_price": 145
+    },
+    {
+      "name": "HEKULI",
+      "code": "HEKU1",
+      "district": "DANG",
+      "phone": "9801984417",
+      "covered_areas": "HEKULI",
+      "d2d_price": 195,
+      "d2b_price": 145
+    },
+    {
+      "name": "HEMJA",
+      "code": "HEMJ1",
+      "district": "KASKI",
+      "phone": "9701010617",
+      "covered_areas": "YAMDI, TIBETIAN CAMP, LAMO CHAUTARA, SAPKOTA CHOK, SHANTI CHOK, MILANCHOK, HANUMAN CHOK, CHAKLEY KULA, PRAGATI CHOK, MYAGDI CHOK, SUNDAR PURI, SUIKHET, KALIKA CHOK, TALLO PHEDI, MATHILO PHEDI, GHATTEY KHOLA, BASKOT",
+      "d2d_price": 220,
+      "d2b_price": 170
+    },
+    {
+      "name": "HETAUDA",
+      "code": "HETA1",
+      "district": "MAKWANPUR",
+      "phone": "9801984218",
+      "covered_areas": "MANASCHOK ,SANGAMCHOK, KAMANE,HUPRACHAUR, TCN ROAD, RATOMATE,SANGAMCHOK ,BUDDHACHOK,CHAINAQUATER,GARDAI ,SANOPOKHARA ,PIPLE,KARRA,KAMALDADA,CHAUKITOAL,GARDAI,SANTOL ,THANABHARYANG,NAWALPUR,SAHID SMARAK ,SARSOTI CHOK,BASAMADI,NAGSOTI CHAUGHADA,CAMPADADA,NAGASOTI,LAURINICHOK,HID ,HANUMANGET, SAMARI ,SIMACHOK ,PARIJATPATH,LATTINATH,SICHAITOAL,RAITOAL ,MANAKAMANA CHOK,BANSKHANDI ,SCHOOLROAD, SURYACHOK, MACHHAPLANI ,BHIRABROAD CHILDRENPARK ,BUSPARK",
+      "d2d_price": 220,
+      "d2b_price": 170
+    },
+    {
+      "name": "HILE",
+      "code": "HILE1",
+      "district": "DHANKUTA",
+      "phone": "9701003733",
+      "covered_areas": "PAKHRIBAS, UTARPANI",
+      "d2d_price": 245,
+      "d2b_price": 195
+    },
+    {
+      "name": "HOLERI",
+      "code": "HOLE1",
+      "district": "ROLPA",
+      "phone": "9764643077",
+      "covered_areas": "HOLERI",
+      "d2d_price": 220,
+      "d2b_price": 170
+    },
+    {
+      "name": "ILAM BAZAR",
+      "code": "ILAM1",
+      "district": "ILAM",
+      "phone": "9801984061",
+      "covered_areas": "GOLAKHARKHA BHANJYANG, SERA, GOLBASTI, TILKENI, 0 KM, KULDHARA, TUDIKHEL, ILAM BAZAR, FULGACHI, THEBE CHOWK, ILAM CAMPUS, CHUREGHANTI, BARBOTE,CHYARCHYARE,PIPALBOTE,GADHI THUMKA, VIEW TOWER,DHOBI DHARA,NAMUNA CHOWK, USHA CHOWK,JORDHARA,POKHARI SCHOOL,SINGHBAHINI MANDIR, BHARABASTI, CHIYABARI, VIEW TOWER, BHALUDHUNGA, O.P DHARA, ARMY BARRACK, NARAYANTHAN, DHOBIDHARA, KHARELDADA, PIPALBOTE, CHUREGHATI, GUMBA DADA, BIBLYATE, RIBS SCHOOL, XYARXYARE, DRIVER CHOWK, SIMLE KHOLSA,",
+      "d2d_price": 245,
+      "d2b_price": 195
+    },
+    {
+      "name": "INARUWA",
+      "code": "INAR1",
+      "district": "SUNSARI",
+      "phone": "9801869446",
+      "covered_areas": "LAUKAHI BHOKRAHA, CHANDBELA, AAURABANI, MADHESA, TITRIBAN, BALAHA",
+      "d2d_price": 220,
+      "d2b_price": 170
+    },
+    {
+      "name": "ITAHARI",
+      "code": "ITAH1",
+      "district": "SUNSARI",
+      "phone": "9801984138",
+      "covered_areas": "KHANAR, JHUMKA, PIPRA,LABIPUR,AAPGACHHI,DHANPURI TOL, BALIYA, BANSBARI, SANDARPUR,GACHIYA ,TARAHARA,SHANTINAGAR,TALTALAIYA",
+      "d2d_price": 170,
+      "d2b_price": 120
+    },
+    {
+      "name": "JAGARNATHPUR",
+      "code": "JAGA2",
+      "district": "PARSA",
+      "phone": "9701003226",
+      "covered_areas": "BOKAHAWA CHAUK, PIDARI-GUTHI, VISUNPURWA, JANKI TOL, LAXMIPUR, BIJBANIYA, JAGARNATHPUR, MASIHANI, PRASAUNI, BAHUWARI",
+      "d2d_price": 170,
+      "d2b_price": 120
+    },
+    {
+      "name": "JAGATPUR",
+      "code": "JAGA1",
+      "district": "CHITWAN",
+      "phone": "9701010630",
+      "covered_areas": "JAGATPUR, PAKAUDI, BANKATTA, MUKTARAJ CHOWK, PADAM POKHARI, DEVNAGAR, CHAMPA NAGAR, UJJALI NAGAR, GANGANAGAR, AMARBASTI, BARAMPURI, TIGERLAND CHOWK, BELTANDI, SHANTI CHOWK, KUMARI CHOWK, SITAPUR, MALLA CHOWK, HAWELI, BHARATPUR 22, BHARATPUR 23",
+      "d2d_price": 170,
+      "d2b_price": 120
+    },
+    {
+      "name": "JAHADA",
+      "code": "JAHA1",
+      "district": "MORANG",
+      "phone": "9701010235",
+      "covered_areas": "LAXMANIYA, JAYARAMPUR, MAJHARE, SHAILAJA ACHARYA GUTHI, JAHADA SCHOOL, THEKI TOLA, JAHADA POKHARIYA",
+      "d2d_price": 220,
+      "d2b_price": 170
+    },
+    {
+      "name": "JAJARKOT KHALANGA",
+      "code": "JAJA1",
+      "district": "JAJARKOT",
+      "phone": "9701010370",
+      "covered_areas": "KHALANGA JAJARKOT BAZAR, KALE GAUN, BOHARA, CHAPLE, THATI, RAWAT GAUN, RISANG, RANA GAUN, DURBAR, GAIRIKHALI, MATHILLO THAPLE, PIPALDANDA",
+      "d2d_price": 270,
+      "d2b_price": 220
+    },
+    {
+      "name": "JALESHWOR",
+      "code": "JALE1",
+      "district": "MAHOTTARI",
+      "phone": "9701010648",
+      "covered_areas": "SARI, DHABAULI, SUGA VAWANI, SIMARDAHI, PIGAUNA, LOCHANA, BHATAULIYA, FULAHATTA PARIKAULI, PIPRA, PARSA, BHITTHA MOD, MATIHANI,DHIRAPUR ,PARSA PATAILI",
+      "d2d_price": 220,
+      "d2b_price": 170
+    },
+    {
+      "name": "JANAKPUR",
+      "code": "JANA1",
+      "district": "DHANUSHA",
+      "phone": "9701003208",
+      "covered_areas": "KURTHA, SAPAHI, LAXMINIYA BAZAR, KAPALESWAR MAHUWA, DEVDIHA, BASAHIYA,RUPAITHA BINHI, BENGA SHIVPUR, JANAKPUR BELA,TARAPATTI, SAHORWA",
+      "d2d_price": 220,
+      "d2b_price": 170
+    },
+    {
+      "name": "JANGAL SAHIYA",
+      "code": "JANG1",
+      "district": "RAUTAHAT",
+      "phone": "9801984146",
+      "covered_areas": "JANGAL SAHIYA",
+      "d2d_price": 195,
+      "d2b_price": 145
+    },
+    {
+      "name": "JANGRAHAWA",
+      "code": "JANG2",
+      "district": "DANG",
+      "phone": "9806244874",
+      "covered_areas": "JANGRAHAWA",
+      "d2d_price": 195,
+      "d2b_price": 145
+    },
+    {
+      "name": "JAYANAGAR",
+      "code": "JAYA1",
+      "district": "BARDIYA",
+      "phone": "9765846484",
+      "covered_areas": "JAYANAGAR",
+      "d2d_price": 220,
+      "d2b_price": 170
+    },
+    {
+      "name": "JHALARI",
+      "code": "JHAL1",
+      "district": "KANCHANPUR",
+      "phone": "9701010321",
+      "covered_areas": "BANI, BANKA, KALUWAPUR, BANSAMITI, BANSHAHA, ARJUNI, PAHARIYA, FULELI, JUDA, KASRAUL, GARJEMUNI, PIPLAADI, DEKHATVULI, KALAPANI, SIMALFATA, AMARPUR, JONAPUR, JHALARI BAZAR, KHAJUWA, AMARPUR, LALBANIYA, TOTI, PITAMBAR, SIMALPHANTA, SHANTIPUR, BHAMAR DHOJ, JHANDA BHOJ, PARI PHATA, SISAIYA",
+      "d2d_price": 220,
+      "d2b_price": 170
+    },
+    {
+      "name": "JHAPA BAZAR",
+      "code": "JHAP1",
+      "district": "JHAPA",
+      "phone": "9701010618",
+      "covered_areas": "KUWADI,PANTHAPADA,SIMALBADI,KUMARKHOD, KAMATOLI,FULGACHI",
+      "d2d_price": 220,
+      "d2b_price": 170
+    },
+    {
+      "name": "JHILJHILE",
+      "code": "JHIL1",
+      "district": "JHAPA",
+      "phone": "9701010346",
+      "covered_areas": "DUDHE, SAMJHANA CHOWK, BUDDHA CHOWK, DHARAMPUR CHOWK, DUNDAMARI CHOWK, FULBARI CHOWK, BYANGDANDA, NARCHOWK,AAITABARE, MILANCHOWK, SANGAMCHOWK,CHANDRADANGI, SUKRABARE,MANGALABARE BAZZER, DHOULE CHOKE,LALJHODA",
+      "d2d_price": 220,
+      "d2b_price": 170
+    },
+    {
+      "name": "JHUMKA",
+      "code": "JHUM1",
+      "district": "SUNSARI",
+      "phone": "9701003772",
+      "covered_areas": "JHUMKA BAZAR, LALPUR, MANPUR, EKRAI, TITRIBAN, UGDI",
+      "d2d_price": 220,
+      "d2b_price": 170
+    },
+    {
+      "name": "JHYALBAS",
+      "code": "JHYA1",
+      "district": "NAWALPARASI EAST",
+      "phone": "9701010473",
+      "covered_areas": "JHYALBAS",
+      "d2d_price": 195,
+      "d2b_price": 145
+    },
+    {
+      "name": "JIRI",
+      "code": "JIRI1",
+      "district": "DOLAKHA",
+      "phone": "9801984461",
+      "covered_areas": "JIRI, NIGALE, BODALE, BULDANDA, YELUNG, ROSHI, HAT DANDA, TALLO SIKRI, PURANO GAUN",
+      "d2d_price": 245,
+      "d2b_price": 195
+    },
+    {
+      "name": "JITPUR CHARNUMBER",
+      "code": "JITP1",
+      "district": "KAPILBASTU",
+      "phone": "9701010396",
+      "covered_areas": "PIPARA, BAIRIYA, BANGAI,SHANTICHOK, TRILOKMARGA,LAUGAI CHOK, LAXMANGHAT, MANOHARAPUR, JHANDA, MADHAULI, LOVE PARK, SEAUTI, CHAPPARGAU, BODGAU, BUNGCHEE, DARSHANCHOK, THAKURAPUR, GAJEDA, KOPUWA, 4 NUMBER JITPUR",
+      "d2d_price": 220,
+      "d2b_price": 170
+    },
+    {
+      "name": "JIWAKHOLA",
+      "code": "JIWA1",
+      "district": "BAGLUNG",
+      "phone": "9843215856",
+      "covered_areas": "JUGAKHOLA, JHIWAKHOLA DHUKAKHOR, KHADU, KANABAGAR, NISHI, VALKOT, BHUDATHOK, SHIPA, BADANKHOLA",
+      "d2d_price": 245,
+      "d2b_price": 195
+    },
+    {
+      "name": "JOGBUDA",
+      "code": "JOGB1",
+      "district": "DADELDHURA",
+      "phone": "9701010652",
+      "covered_areas": "JOGBUDA",
+      "d2d_price": 245,
+      "d2b_price": 195
+    },
+    {
+      "name": "JOGIKUTI",
+      "code": "JOGI1",
+      "district": "RUPANDEHI",
+      "phone": "9701002443",
+      "covered_areas": "JOGIKUTI, SHANTICHOWK, JANAKINAGAR, SHANKARNAGAR, DINGERKUWA, DRIVERTOLL, MAGARGHAT, RANIGUNJ, DEVINAGAR,YOGIKUTI",
+      "d2d_price": 170,
+      "d2b_price": 120
+    },
+    {
+      "name": "JOMSOM",
+      "code": "JOMS1",
+      "district": "MUSTANG",
+      "phone": "9801984369",
+      "covered_areas": "JOMSOM, THINI, SYANG, KAGBENI",
+      "d2d_price": 270,
+      "d2b_price": 220
+    },
+    {
+      "name": "JOSHIPUR",
+      "code": "JOSH1",
+      "district": "KAILALI",
+      "phone": "9801984443",
+      "covered_areas": "JOSHIPUR",
+      "d2d_price": 220,
+      "d2b_price": 170
+    },
+    {
+      "name": "JUGEDA KAILALI",
+      "code": "JUGE1",
+      "district": "KAILALI",
+      "phone": "9701010216",
+      "covered_areas": "JUGEDA",
+      "d2d_price": 220,
+      "d2b_price": 170
+    },
+    {
+      "name": "JUGEDI CHITWAN",
+      "code": "JUGE2",
+      "district": "CHITWAN",
+      "phone": "9701010208",
+      "covered_areas": "JUGEDI, BHATERI, MILAN CHOWK, KHAHARE, DAS DHUNGA, 14 KILO, 17KILO, KABILAS RESORT HIGHWAY OFFICE",
+      "d2d_price": 170,
+      "d2b_price": 120
+    },
+    {
+      "name": "JUGLE",
+      "code": "JUGL1",
+      "district": "SYANGJA",
+      "phone": "9846788035",
+      "covered_areas": "SETIDHOVAN, RANGHATATI, KRISHI, JUGLE, PHULWARI, KAPHALTARI, OHIYA, RANGUWA",
+      "d2d_price": 220,
+      "d2b_price": 170
+    },
+    {
+      "name": "JUMLA",
+      "code": "JUML1",
+      "district": "JUMLA",
+      "phone": "9801984397",
+      "covered_areas": "JUMLA, CHANDANNATH",
+      "d2d_price": 270,
+      "d2b_price": 220
+    },
+    {
+      "name": "KADMAHA",
+      "code": "KADM1",
+      "district": "SAPTARI",
+      "phone": "9701003960",
+      "covered_areas": "KUSHA, KADARBONA, DHATI, LAXMIPUR CHOWK, KARHARBA, VEDIYA, HARDIYA",
+      "d2d_price": 220,
+      "d2b_price": 170
+    },
+    {
+      "name": "KAKARBHITTA",
+      "code": "KAKA1",
+      "district": "JHAPA",
+      "phone": "9801984450",
+      "covered_areas": "JORSIMAL, ITABHATTA CHOWK, AAIABARI, AAMDANGI, NAKALBANDA, SATIGHATTA, JAMERGADI, BARMELITOL, PYARIVITTA,RAMAILO TOL,BHATTARAI CHOWK,SIRJANA CHOWK",
+      "d2d_price": 220,
+      "d2b_price": 170
+    },
+    {
+      "name": "KALABANJAR",
+      "code": "KALA3",
+      "district": "SUNSARI",
+      "phone": "9701010470",
+      "covered_areas": "KALABANJAR",
+      "d2d_price": 220,
+      "d2b_price": 170
+    },
+    {
+      "name": "KALAGAUDI",
+      "code": "KALA4",
+      "district": "KANCHANPUR",
+      "phone": "9801984343",
+      "covered_areas": "BANSAHA, BASANTPUR, KALAGAUDI BAJAR, DUBAHA, JAI, ITAHA, KHAJUWA CHOCK, GANESHPUR, GAURA CHOCK, PANITANKI",
+      "d2d_price": 220,
+      "d2b_price": 170
+    },
+    {
+      "name": "KALAIYA",
+      "code": "KALA2",
+      "district": "BARA",
+      "phone": "9801984325",
+      "covered_areas": "SISAHANIYA, MOTISAR, BALIRAMPUR, PURAINIYA, MAHAGADHIMAI, INARWA, BAREWA, KHUSUKPUR, MOTIBAG, BHAWANI PUR, RAMPUR, BAERIYA, RANGPUR, DEVIGUNJ, SITALPUR",
+      "d2d_price": 220,
+      "d2b_price": 170
+    },
+    {
+      "name": "KALANKI",
+      "code": "KALA1",
+      "district": "KATHMANDU",
+      "phone": "9801984017",
+      "covered_areas": "KALANKI, BISHNUDEVI MANDIR AREA, LRI SCHOOL AREA, KHASIBAZAR, MADANNAGAR, SYUCHATAR, KIRTIPUR BAZAR, KIRTIPUR TU AREA, TYANGLAPHAT, MAITRINAGAR, SHIVANAGAR, PANGA, NAGAUN, BHATKEPATI, SALYANTHAN, CHAMPADEVI BUSPARK AREA, NAYABATO, KUMARI CLUB, BALKHU, KALIMATI, KULESHWOR, SOLTIMODE, PURANO NAIKAP, NAYA NAIKAP, DHUNGEADDA, TINTHANA, RAVI BHAWAN",
+      "d2d_price": 120,
+      "d2b_price": 70
+    },
+    {
+      "name": "KALIKAMAI",
+      "code": "KALI1",
+      "district": "PARSA",
+      "phone": "9701003226",
+      "covered_areas": "HARIHARPUR, MUDALI, VEDIYARI, PARSHURAMPUR, KATTI, TINDOBIYA, SAMARA TOL, BALUWA, BIRANCHI BARWA",
+      "d2d_price": 220,
+      "d2b_price": 170
+    },
+    {
+      "name": "KALYANPUR",
+      "code": "KALY1",
+      "district": "SAPTARI",
+      "phone": "9701003128",
+      "covered_areas": "RUPANI, KATHAUNA, BISANPUR, BANAUTA, ANAHA, BODEBARSAIN, SHAMBHUNATH TRAFFIC CHOWK",
+      "d2d_price": 220,
+      "d2b_price": 170
+    },
+    {
+      "name": "KAMAL BAZAR",
+      "code": "KAMA1",
+      "district": "ACHHAM",
+      "phone": "9707085515",
+      "covered_areas": null,
+      "d2d_price": 245,
+      "d2b_price": 195
+    },
+    {
+      "name": "KANCHIBAJAR",
+      "code": "KANC1",
+      "district": "RUPANDEHI",
+      "phone": "9801984346",
+      "covered_areas": "KANCHIBAJAR, SEMARA",
+      "d2d_price": 220,
+      "d2b_price": 170
+    },
+    {
+      "name": "KANYAM",
+      "code": "KANY1",
+      "district": "ILAM",
+      "phone": "9701010308",
+      "covered_areas": null,
+      "d2d_price": 245,
+      "d2b_price": 195
+    },
+    {
+      "name": "KAPAN",
+      "code": "KAPA1",
+      "district": "KATHMANDU",
+      "phone": "9701003742",
+      "covered_areas": "KAPAN, TENJING CHOWK, NILOPUL, SIMALTAR, PAIYUTAR, KAPAN GUMBA, AAKASHDHARA, NILOPOOL, SUKEDHARA, DURGA MANDIR, KAPAN MILAN CHOWK, CHUNIKHEL AREA, RAM MANDIR, BALUWAKHANI, KARUNA HOSPITAL AREA, TALLO BHANGAL, SUNDARBASTI, WARD 13 AREA, KAUDOL, SAPATAR, VALLEY PUBLIC SCHOOL, FAIKA, SAPREDHUNGA, JYOTINAGAR, MANDIKHATAR AREA, SATTALE, BHANDARI GARMENT, RUDRAMATI CHOWK, MILAN CHOWK, PANCHYAKANYA MANDIR, SHIVAPURI CHOWK, BIBEK CHOWK, NARAYAN CHOWK, DURGA MANDIR, MUSKAN CHOWK, SIMALTAAR",
+      "d2d_price": 120,
+      "d2b_price": 70
+    },
+    {
+      "name": "KARAIYAMAI",
+      "code": "KARA1",
+      "district": "BARA",
+      "phone": "9801984188",
+      "covered_areas": "KARAIYAMAI",
+      "d2d_price": 195,
+      "d2b_price": 145
+    },
+    {
+      "name": "KARSIYA",
+      "code": "KARS1",
+      "district": "MORANG",
+      "phone": "9701010409",
+      "covered_areas": "KARSIYA",
+      "d2d_price": 195,
+      "d2b_price": 145
+    },
+    {
+      "name": "KATAHARI MORANG",
+      "code": "KATA2",
+      "district": "MORANG",
+      "phone": "9701010235",
+      "covered_areas": "MAHESHPUR, KHORIYA, NAYABAZAR, KATAHARI CHOWK, CHAMRAHI CHOWK, THALAHA BARRACK, JEEVAN BIKAS, RAMCHOWK, JUDI KHOLA, HALDIBARI, ADARSHA TOLE, SUDHAMA CHOWK, BANGEY CHOWK, BHOUDAHA, KATAHARI JAMUNGACHHI, CELLO FACTORY, THALAHA CHOWK, TAMTOKI CHOWK, RAILWAY",
+      "d2d_price": 220,
+      "d2b_price": 170
+    },
+    {
+      "name": "KATAHARIYA",
+      "code": "KATA3",
+      "district": "RAUTAHAT",
+      "phone": "9801984486",
+      "covered_areas": "KATAHARIYA",
+      "d2d_price": 195,
+      "d2b_price": 145
+    },
+    {
+      "name": "KATARI",
+      "code": "KATA1",
+      "district": "UDAYAPUR",
+      "phone": "9701010365",
+      "covered_areas": "SIMLE, KATARI, GOLPARK, TARAGHARI, DEBIDHAP, KATARI HOSPITAL",
+      "d2d_price": 220,
+      "d2b_price": 170
+    },
+    {
+      "name": "KAUDENA",
+      "code": "KAUD1",
+      "district": "SARLAHI",
+      "phone": "9701003107",
+      "covered_areas": "KAUDENA",
+      "d2d_price": 195,
+      "d2b_price": 145
+    },
+    {
+      "name": "KAVRESTHALI",
+      "code": "KAVR1",
+      "district": "KATHMANDU",
+      "phone": "9801984434",
+      "covered_areas": "BYPASS GUMBA AREA, NEPALTAR, MANMAIJU, JARANKU, KAVRESTHALI BUSPARK, DHARMASTHALI, SHESHMATI, LOLANG, SANOPOOL, PURANO GUHESHWORI, GOLDHUNGA, TARKESHWOR, PHUTUNG, CHISAPANI, OSHO TAPOBAN, MACHAPOKHARI",
+      "d2d_price": 120,
+      "d2b_price": 70
+    },
+    {
+      "name": "KAWASOTI",
+      "code": "KAWA1",
+      "district": "NAWALPARASI EAST",
+      "phone": "9801472185",
+      "covered_areas": "B.P CHOWK,FALFUL CHOWK ,THANA CHOWK, INDRA CHOWK ,SAVAPATI CHOWK , HALL CHOWK, THAKALI CHOWK, PURANO KAWASOTI ; DANDA BAZAR ALL AREA ,PANCHAKANYA CHOWK, ATHAIS BIGA , PACHA KATTA, LUMBINI COLLAGE ROAD , MAGARKOT, NEURYA CHOWK, MILAN CHOWK,KALIGANDAKI HOSPITAL , AADALAT CHOWK, BISNUNAGAR , GUMBA CHOWK, SAMABESI CHOWK, RAMNAGAR CHOWK,RETTHE PANI , HASAURA , KALIKA SCHOOL, HELATHPOST CHOWK , MILAN CHOWK, MILAN CHOWK, SITAL CHOWK, SANGAM CHOWK, AADARSHA CHOWK, DHUWAKOTE CHOWK, AKALA CHOWK",
+      "d2d_price": 220,
+      "d2b_price": 170
+    },
+    {
+      "name": "KERABARI MORANG",
+      "code": "KERA1",
+      "district": "MORANG",
+      "phone": "9701010483",
+      "covered_areas": "BAGAICHHA,AMJUNGI,ARMY CAMP,SATISALE",
+      "d2d_price": 220,
+      "d2b_price": 170
+    },
+    {
+      "name": "KERKHA BAZAR",
+      "code": "KERK1",
+      "district": "JHAPA",
+      "phone": "9801984107",
+      "covered_areas": "KERKHA BAZAR, KYAMPA BAZAR, KERADHAP, MILAN CHOWK, SAMAYAGADH, JYOTI CHOWK, AMALDANGI CHWOK, KIRANT CHOWK, MURTI CHOWK, CHALFAL CHOWK, CHAATA CHOWK, GURUNG TOLE, SHIIVALAYA MANDIR, PRAGATI CHOWK, BOHORA TOLE, SANO KERKHA, CHULACHULI MODE, ARNAKHADI, HATTILEDA KIRANT MANDIR, PARUHANG CHOWK, SAHID GATE,ARMY CAMP,HIGHWAY SITAPURI,NAMUNA CHOWK,SABITRA CHOWK,APF CAMP PADAJUNGI, BARAKOTHE SCHOOL",
+      "d2d_price": 220,
+      "d2b_price": 170
+    },
+    {
+      "name": "KHADADEVI",
+      "code": "KHAD1",
+      "district": "RAMECHHAP",
+      "phone": "9844173097",
+      "covered_areas": "KHADADEVI",
+      "d2d_price": 220,
+      "d2b_price": 170
+    },
+    {
+      "name": "KHAIRAHANI",
+      "code": "KHAI2",
+      "district": "CHITWAN",
+      "phone": "9801984241",
+      "covered_areas": "PARSA CHOWK, PURANO PARSA, KHARAHANI CHOWK, HOLY LAND ROAD, SAINIK SCHOOL, KHANEPANI CHOWK, MAGANI CHOWK, NAMUNA PETROL PUMP, DHUSARI, DISNEY PARK, PHASERA, TARAULI, BUDAULI, SALAULI, SURTANI, LALTIN BAZAR, SIMALGHARI CHOWK, PANCH MAHANE CHOWK, POKHRELI TOLE , SULTANA, BADAGAUN, GAUCHARAN(DURGA MANDIR), CHAINPUR, BRINDABASINI, ARNA BEER, SHIVALAYA CHOWK, MAURI CHOWK, GAIDA AAL, RAI CHOWK, TIME PASS CHOWK, GOTHSUR, DHUSARI, TUNGARA CHOWK, TILAKE CHOWK, KAPIYA, KANKALI SPORT, LEKALI CHOWK",
+      "d2d_price": 220,
+      "d2b_price": 170
+    },
+    {
+      "name": "KHAIRENI RUPANDEHI",
+      "code": "KHAI1",
+      "district": "RUPANDEHI",
+      "phone": "9701003673",
+      "covered_areas": "KHAIRENI, BHALUHI",
+      "d2d_price": 220,
+      "d2b_price": 170
+    },
+    {
+      "name": "KHAJURA",
+      "code": "KHAJ1",
+      "district": "BANKE",
+      "phone": "9701010585",
+      "covered_areas": "A GAUN, B GAUN, C GAUN, D GAUN, E GAUN,K-GAUN,L-GAUN,KA-GAUN, DHAULAGIRI,GAUGHAT,GAURINAGAR,RIMJHIMCHWOK,SYANIGAUN,SAINIK,CHANDRANAGAR,BIRPUR,BAHADURPUR",
+      "d2d_price": 220,
+      "d2b_price": 170
+    },
+    {
+      "name": "KHAJURI CHANHA",
+      "code": "KHAJ2",
+      "district": "DHANUSHA",
+      "phone": "9701003590",
+      "covered_areas": "KHAJURI CHANHA",
+      "d2d_price": 195,
+      "d2b_price": 145
+    },
+    {
+      "name": "KHANDANDA",
+      "code": "KHAN2",
+      "district": "KAILALI",
+      "phone": "9801984259",
+      "covered_areas": "KHANDANDA",
+      "d2d_price": 195,
+      "d2b_price": 145
+    },
+    {
+      "name": "KHANDBARI",
+      "code": "KHAN1",
+      "district": "SANKHUWASABHA",
+      "phone": "9801984264",
+      "covered_areas": "POKHARI BAZAR, MILAN CHOWK, DEVKOTA CHOWK",
+      "d2d_price": 245,
+      "d2b_price": 195
+    },
+    {
+      "name": "KHAYARMARA",
+      "code": "KHAY1",
+      "district": "MAHOTTARI",
+      "phone": "9701010655",
+      "covered_areas": "KHAYARMARA",
+      "d2d_price": 195,
+      "d2b_price": 145
+    },
+    {
+      "name": "KHIMTI",
+      "code": "KHIM1",
+      "district": "RAMECHHAP",
+      "phone": "9844246198",
+      "covered_areas": "KHIMTI",
+      "d2d_price": 220,
+      "d2b_price": 170
+    },
+    {
+      "name": "KHUDI BAZAR",
+      "code": "KHUD2",
+      "district": "LAMJUNG",
+      "phone": "9701003436",
+      "covered_areas": "BELAUTIBESAUNA, BHOLAMKHOLA, BAJAICHA, KHUDI BAZAR AREA, BHULBHULE, NAGDI, CHANAUTE",
+      "d2d_price": 220,
+      "d2b_price": 170
+    },
+    {
+      "name": "KHUDUNABARI",
+      "code": "KHUD1",
+      "district": "JHAPA",
+      "phone": "9801984062",
+      "covered_areas": "NARAYANCHOEK, MADANPUR, BHANGBAARI, MILDANDA,GADI, SISNE CHOWK, GARUWA CHOWK, SUKHANI KHOLA,NEPALDANDA,JHELENI, SANTI CHOWK, FALGUNANDA CHOWK, JUKE KHADI, BELTAR CHOWK, KUMVITAR",
+      "d2d_price": 220,
+      "d2b_price": 170
+    },
+    {
+      "name": "KHURKOT",
+      "code": "KHUR1",
+      "district": "SINDHULI",
+      "phone": "9701010547",
+      "covered_areas": "KHURKOT",
+      "d2d_price": 220,
+      "d2b_price": 170
+    },
+    {
+      "name": "KOHALPUR",
+      "code": "KOHA1",
+      "district": "BANKE",
+      "phone": "9801984435",
+      "covered_areas": "KOHAKPUR CHOWK/CHAURAHA , SAAL KO BUTA , MANKAMANA CHOWK , KAUSILANAGAR , BANIYABAAR, GAVAR VALLEY, CHISAPANI , PITMAARI, ILAKA, CHOWK, NTV, HSEB, SAJHA CHOWK, PIPAL CHAUTARA, BIDHUT ROAD, HIGH SCHOOL CHOWK, RAMNAGAR, PIPIRI, HAWALDARPUR, CHAPPARGAURDI, RAINI KHOLA , DHAKERI , BUSPARK, DASBIGHA, KIRSHI CHOWK, NCCN, KIRANKHOLA, MADANCHOWK, MAITAWA, BANKATUWA, NEW CITY, SANGAM CHOWK, GARRAI, SAMJHANA CHOWK , CHADANI CHOWK, WESTERN SCHOOL, GOLCHA, JHANDAWA CHOWK.",
+      "d2d_price": 220,
+      "d2b_price": 170
+    },
+    {
+      "name": "KOLHABI",
+      "code": "KOLH1",
+      "district": "BARA",
+      "phone": "9701010377",
+      "covered_areas": "BIJAYAPUR, NIKAS, DUDHIYA, BHALAIKHOR, SAFAI, ADHANUWA BAJAR, KOLHABI BAJAR, KHAIRA , HIMALIBAS, PURANO KATA.",
+      "d2d_price": 220,
+      "d2b_price": 170
+    },
+    {
+      "name": "KOLTI",
+      "code": "KOLT1",
+      "district": "BAJURA",
+      "phone": "9742212121",
+      "covered_areas": "MATELA, SYALKATIYA, KOTILA, PIPALDALI, JAMSAL, NUWAGHAR, DAANASHAUN PULL, BIRSHAIN, LALTIN BAZAR",
+      "d2d_price": 270,
+      "d2b_price": 220
+    },
+    {
+      "name": "KOTIHAWA",
+      "code": "KOTI1",
+      "district": "RUPANDEHI",
+      "phone": "9801984358",
+      "covered_areas": "KOTIHAWA, MADAULIYA, KATAIYA, THUTIPIPAL, LAKHANCHOWK",
+      "d2d_price": 220,
+      "d2b_price": 170
+    },
+    {
+      "name": "KRISHNANAGAR",
+      "code": "KRIS1",
+      "district": "KAPILBASTU",
+      "phone": "9801984142",
+      "covered_areas": "JAWABHARI,NIBIHAWA,JUMILA,BAHADURGUNJ,DABRA CHOWK,KRISHNANAGAR BAZAR",
+      "d2d_price": 220,
+      "d2b_price": 170
+    },
+    {
+      "name": "KRISHNANAGAR MADI",
+      "code": "KRIS3",
+      "district": "CHITWAN",
+      "phone": "9701010688",
+      "covered_areas": "GHAGAR, SHIVADWAR, TOWER CHWOK, TAMTA BAZAR, KRISHNANAGAR, KANTIPUR, AYODHYAPUR, INDRABASTI, CHAUKIDADA",
+      "d2d_price": 220,
+      "d2b_price": 170
+    },
+    {
+      "name": "KRISHNAPUR",
+      "code": "KRIS2",
+      "district": "KANCHANPUR",
+      "phone": "9801984445",
+      "covered_areas": "KRISHNAPUR, GULARIYA, BANI, BANKA",
+      "d2d_price": 220,
+      "d2b_price": 170
+    },
+    {
+      "name": "KRISTI NACHNECHAUR",
+      "code": "KRIS4",
+      "district": "KASKI",
+      "phone": "9701003196",
+      "covered_areas": "NACHNECHAUR, DOPAHARE, ARAN DANDA, EKATTEY, KRISTI DANDA",
+      "d2d_price": 220,
+      "d2b_price": 170
+    },
+    {
+      "name": "KUNTABESI",
+      "code": "KUNT1",
+      "district": "KAVREPALANCHOK",
+      "phone": "9701010495",
+      "covered_areas": "KUNTABESI",
+      "d2d_price": 220,
+      "d2b_price": 170
+    },
+    {
+      "name": "KURINTAR",
+      "code": "KURI1",
+      "district": "CHITWAN",
+      "phone": "9701003221",
+      "covered_areas": "MAWAKHOLA,FISHLING,CHUMLINGTAR,CHUMKHOLA,BUTTAR,ICHCHHAKAMANA-4 TRUISULI HYDRO,KURINGHAT,RAINAS,KURINTAR,LEWATAR, RAMAILODADA, CABULCAR",
+      "d2d_price": 170,
+      "d2b_price": 120
+    },
+    {
+      "name": "KUSHMA",
+      "code": "KUSH1",
+      "district": "PARBAT",
+      "phone": "9801984668",
+      "covered_areas": "KHARIYA, CHUWA, DOBILLA, AAMBOT, CHHAMARKE, ARMADI, NAYAPOOL, SASRADHARA, GYADI",
+      "d2d_price": 220,
+      "d2b_price": 170
+    },
+    {
+      "name": "KUSHMISHERA",
+      "code": "KUSH2",
+      "district": "BAGLUNG",
+      "phone": "9748762840",
+      "covered_areas": "KUSMISHERA, DAMEK2, DAMEK3, RANGKHANI, CHISTI, PAIYUTHANTHAP, JAIDI, ARJEWA, BINAMARE, SARKUWA",
+      "d2d_price": 220,
+      "d2b_price": 170
+    },
+    {
+      "name": "LABANI",
+      "code": "LABA1",
+      "district": "KAPILBASTU",
+      "phone": "9701003306",
+      "covered_areas": "LABANI",
+      "d2d_price": 195,
+      "d2b_price": 145
+    },
+    {
+      "name": "LAGMA",
+      "code": "LAGM1",
+      "district": "DHANUSHA",
+      "phone": "9701003590",
+      "covered_areas": "LAGMA",
+      "d2d_price": 195,
+      "d2b_price": 145
+    },
+    {
+      "name": "LAHAN",
+      "code": "LAHA1",
+      "district": "SIRAHA",
+      "phone": "9801984201",
+      "covered_areas": "PADEYA, BHOTIA TOLE, CHAPARARI, RADHA KRISHNA CHOWK, GARMANI CHOWK, BATIKA , HOSPITAL CHOWK",
+      "d2d_price": 220,
+      "d2b_price": 170
+    },
+    {
+      "name": "LALBANDI",
+      "code": "LALB1",
+      "district": "SARLAHI",
+      "phone": "9712001318",
+      "covered_areas": "NAWALPUR, BAGMATI, HARIPUR, PATHARKOT, BHAKTIPUR, PARWANIPUR, RANIGUNJ",
+      "d2d_price": 220,
+      "d2b_price": 170
+    },
+    {
+      "name": "LALJHADI",
+      "code": "LALJ1",
+      "district": "KANCHANPUR",
+      "phone": "9801984195",
+      "covered_areas": "LALJHADI",
+      "d2d_price": 220,
+      "d2b_price": 170
+    },
+    {
+      "name": "LAMAHI",
+      "code": "LAMA1",
+      "district": "DANG",
+      "phone": "9701010632",
+      "covered_areas": "SISAHANIYA, LATTWA, MAJGAU, BANGAU, GADAWA, NARTI, BALAMAPUR, KOLAHI, SATBARIYA, HASNAPUR, BANGHUSRI, KAPTANGUNJ, KAMANPUR, MADHENAGAR, LANGDI",
+      "d2d_price": 220,
+      "d2b_price": 170
+    },
+    {
+      "name": "LAMKI",
+      "code": "LAMK1",
+      "district": "KAILALI",
+      "phone": "9801984457",
+      "covered_areas": "LAMKI BAZAR AREA, PARTAPUR, BAGHMARA,  BACHELA, CHAKABADHI, KHARAULA, CHAINAPUR, KAUWAPUR, MALBHANGA, TIGRI, SUTAIYA, TORIPUR, MURGIYA, DAMMARIYA,  LAMKI BUS PARK, LMC CAMPUS, MOTIPUR, RAJIPUR, BHURUWA,  GANESHPUR, BHALKA, BALIYA, SYAULE, LUHARPUR, GULARA, GIDHINIYA, GAPKA, CHUHA, TILKHA, CHORIPUR, PIPRAWA, AMAURI, BASULIN SUGAR MILL, LAMKI CHUHA WARD NO. 1,3,4,5,6,7,8,9,10",
+      "d2d_price": 220,
+      "d2b_price": 170
+    },
+    {
+      "name": "LATINATH",
+      "code": "LATI1",
+      "district": "DARCHULA",
+      "phone": "9743938110",
+      "covered_areas": null,
+      "d2d_price": 245,
+      "d2b_price": 195
+    },
+    {
+      "name": "LAUKAHI",
+      "code": "LAUK1",
+      "district": "SUNSARI",
+      "phone": "9801984227",
+      "covered_areas": "MADHUBAN,LAUKHI BAZZAR,CHIRAULI,AAKHA BAZAAR,BHOKHRAHA,JAMUWA,KOSHI TAPU,KOSHI KATAN,FULCHOWK",
+      "d2d_price": 220,
+      "d2b_price": 170
+    },
+    {
+      "name": "LAXMIPUR PATARI",
+      "code": "LAXM1",
+      "district": "SIRAHA",
+      "phone": "9701010403",
+      "covered_areas": "RAMPUR PIPRA, MAHESHPUR, BIDYANAGARCHOWK,",
+      "d2d_price": 220,
+      "d2b_price": 170
+    },
+    {
+      "name": "LEKHNATH",
+      "code": "LEKH1",
+      "district": "KASKI",
+      "phone": "9801472190",
+      "covered_areas": "KHUDI KHOLA POOL AREA , KHOLAKO CHEU  , KHUDI , DHUNGEPATAN , MAJUWA , LAMEAHAL , GHOTGHOTE , BHANDARDHIK , RITHEPANI ,NAHARCHWOK , SUKEDADA , RADHE RADHE , HAMALCHWOK ,BADALCHWOK , KALIKACHWOK , BIJAYAPUR , BUDIBAZAR ,ARGAUCHWOK ,LEKHNATHCHWOK ,TALCHWOK ,SISUWA ,BEGNAS TAL , POWERHOUSE , GAGANGAUDA ,TALLO GAGANGAUDA , SAINIK BASTI ,POKHARA UNIVERCITY CHWOK , PU CHWOK ,RAJCHAUTARA ,MOHARIYA ,ADARSHACHWOK ,KHARANEFAT , DADAKONAK , TAGAKOMUKH , MYAGDITOLE",
+      "d2d_price": 170,
+      "d2b_price": 120
+    },
+    {
+      "name": "LETANG",
+      "code": "LETA1",
+      "district": "MORANG",
+      "phone": "9701010651",
+      "covered_areas": "JATE,MADAN CHOWK,LEGWA,SUMNIMA CHOWK,BUDHABARE,BP CHOWK,KAMAL POKHARI,DHANPAL CHOWK,LETANG BAZAAR,FADANI CHOWK,LOKHARA,KHERUWA,GANGE CHOWK,TRISHULI CHOWK,",
+      "d2d_price": 220,
+      "d2b_price": 170
+    },
+    {
+      "name": "LIKHU DHOBI",
+      "code": "DHOB2",
+      "district": "RAMECHHAP",
+      "phone": "9869192975",
+      "covered_areas": "LIKHU DHOBI",
+      "d2d_price": 220,
+      "d2b_price": 170
+    },
+    {
+      "name": "LIWANG",
+      "code": "LIWA1",
+      "district": "ROLPA",
+      "phone": "9801984196",
+      "covered_areas": "LIWANG BAZAR, SATDOBATO, BAMRUK, MEWANG, MULPANI, DHANMUDA, REUGHA",
+      "d2d_price": 270,
+      "d2b_price": 220
+    },
+    {
+      "name": "LOHARPATTI",
+      "code": "LOHA1",
+      "district": "MAHOTTARI",
+      "phone": "9701010378",
+      "covered_areas": "LOHARPATTI",
+      "d2d_price": 220,
+      "d2b_price": 170
+    },
+    {
+      "name": "LOKAHA",
+      "code": "LOKA1",
+      "district": "RAUTAHAT",
+      "phone": "9701010681",
+      "covered_areas": "LOKAHA, NAMNAGARA, VEDIYAHI, NARKATIYA, TEJAPAKAR, JINGADAWA, DAMAAR POKHARIYA, RAMPUR, KHAAP",
+      "d2d_price": 220,
+      "d2b_price": 170
+    },
+    {
+      "name": "LOTHAR",
+      "code": "LOTH1",
+      "district": "CHITWAN",
+      "phone": "9801472112",
+      "covered_areas": "LOTHAR, SUNACHURI, BHOOL CHOWK, PAREWAKOT, MAHADEVTAAR, MILAN CHOWK, DEURALI CHOWK, DEPART, DUBICHAUR, JHYAL CHAUR, PIPLE, GHALAN CHOWK, SUNACHURI ARMY BARACK",
+      "d2d_price": 220,
+      "d2b_price": 170
+    },
+    {
+      "name": "LUBHU",
+      "code": "LUBH1",
+      "district": "LALITPUR",
+      "phone": "9701010343",
+      "covered_areas": "LUBHU, SANAGAUN, TIKATHALI, CHANGATHALI, LAMATAR, DHUNGIN, SIDDHIPUR, SIRUTAR, SANKHADEVI, DHARACHAUR, BIRUWA, CHASIDOL, BISHNUDOL",
+      "d2d_price": 120,
+      "d2b_price": 70
+    },
+    {
+      "name": "LUHAM",
+      "code": "LUHA1",
+      "district": "SALYAN",
+      "phone": "9764643056",
+      "covered_areas": "SHANKHAMUL, SHITALBAZAR, SALLEKHOLA",
+      "d2d_price": 245,
+      "d2b_price": 195
+    },
+    {
+      "name": "LUKLA",
+      "code": "LUKL1",
+      "district": "SOLUKHUMBU",
+      "phone": "9852850515",
+      "covered_areas": "LUKLA BAZAR, MUSE, SURKE, CHAURIKHARKA, GHAt , TOKTOK , THAKDIN , BANKAR",
+      "d2d_price": 270,
+      "d2b_price": 220
+    },
+    {
+      "name": "LUMBINI",
+      "code": "LUMB1",
+      "district": "RUPANDEHI",
+      "phone": "9701003306",
+      "covered_areas": "LUMBINI BAZAR, SUNDI,GUNDI,JHUNARIPUL,MAJIDIYACHOWK,PARSACHOWK,MAILAWARCHOWK",
+      "d2d_price": 220,
+      "d2b_price": 170
+    },
+    {
+      "name": "MADHOPUR",
+      "code": "MADH2",
+      "district": "RAUTAHAT",
+      "phone": "9801984486",
+      "covered_areas": "MADHOPUR",
+      "d2d_price": 195,
+      "d2b_price": 145
+    },
+    {
+      "name": "MADHUMALLA",
+      "code": "MADH1",
+      "district": "MORANG",
+      "phone": "9701004717",
+      "covered_areas": "HIMABI SCHOOL, PANGMI CHOWK, MILDADA, AAMCHOWK, DIPJYOTI CHOWK, MILCHOWK, MAWAPOOL, MADHUMALLA CHOWK",
+      "d2d_price": 220,
+      "d2b_price": 170
+    },
+    {
+      "name": "MADI PALPA",
+      "code": "MADI1",
+      "district": "PALPA",
+      "phone": "9801984382",
+      "covered_areas": "MADI PALPA",
+      "d2d_price": 220,
+      "d2b_price": 170
+    },
+    {
+      "name": "MAHADEVA",
+      "code": "MAHA2",
+      "district": "SAPTARI",
+      "phone": "9701010245",
+      "covered_areas": "MAHADEVA",
+      "d2d_price": 220,
+      "d2b_price": 170
+    },
+    {
+      "name": "MAHARAJGUNJ KAPILBAS",
+      "code": "MAHA1",
+      "district": "KAPILBASTU",
+      "phone": "9801984521",
+      "covered_areas": "MAHARAJGUNJ KAPILBASTU",
+      "d2d_price": 220,
+      "d2b_price": 170
+    },
+    {
+      "name": "MAHASHILA LUNKHU",
+      "code": "MAHA3",
+      "district": "PARBAT",
+      "phone": "9864389589",
+      "covered_areas": "LUNKHU BAZAR, MILANCHOWK, BALAKOT DAHA, KAPHAL DANDA, DIYAL DANDA, AALE",
+      "d2d_price": 220,
+      "d2b_price": 170
+    },
+    {
+      "name": "MAHENDRANAGAR",
+      "code": "MAHE1",
+      "district": "KANCHANPUR",
+      "phone": "9801984436",
+      "covered_areas": "GOBIRIYA, BHASI, KHAIRENI, SUDA, BHAGARPUR, NIMUKHEDA, BAGPATHA, LALPUR, SISAIYA, ULTAKHAM, KATAN, GADDACHAUKI, AITHPUR, BANGAAU, GAILNADI,SUNDARPUR, BAGWANI, AIRY, BASANTAPUR, GAUJI, SUKASHAL, JHASPURA, CHAMPHAPUR, HALDUKHAL, KHAIRBHATTI, MAJGAU AIRPORT, BHUJELA, SAJHA CHAURAI, NAYAGAU, BANKATTI, BANKHET, BIJPURI, DAIJI CHOWK, SAMA DAIJI, TILACHAUR HIGHWAY, MAHENDRANAGAR BAZAR, NAULAKHET PRAHARI BIT, TILAKPUR, AIRY CHOWK, TINTARA,  GAJJAR, JIMUWA CHOWK, BHASI PARAHARI BIT, MAHULIYA, JANJYOTI",
+      "d2d_price": 245,
+      "d2b_price": 195
+    },
+    {
+      "name": "MAHESHPUR THUTHIBARI",
+      "code": "MAHE3",
+      "district": "NAWALPARASI WEST",
+      "phone": "9701010441",
+      "covered_areas": "MAHESHPUR THUTHIBARI",
+      "d2d_price": 195,
+      "d2b_price": 145
+    },
+    {
+      "name": "MAHESHWORI",
+      "code": "MAHE2",
+      "district": "SIRAHA",
+      "phone": "9801984686",
+      "covered_areas": "BATHNAHA, BARIYARPUR, KHARBANA, MAHESHWARI CHOWK",
+      "d2d_price": 220,
+      "d2b_price": 170
+    },
+    {
+      "name": "MAHOTTARI",
+      "code": "MAHO1",
+      "district": "MAHOTTARI",
+      "phone": "9801984160",
+      "covered_areas": null,
+      "d2d_price": 195,
+      "d2b_price": 145
+    },
+    {
+      "name": "MAHULI",
+      "code": "MAHU1",
+      "district": "SAPTARI",
+      "phone": "9701010245",
+      "covered_areas": "JANDOL, GHOGHIDAHA, BHURKI, SITAPUR, BELHI, MOHANPUR",
+      "d2d_price": 220,
+      "d2b_price": 170
+    },
+    {
+      "name": "MAINAPOKHARI",
+      "code": "MAIN1",
+      "district": "DOLAKHA",
+      "phone": "9701003217",
+      "covered_areas": "MAINAPOKHARI",
+      "d2d_price": 245,
+      "d2b_price": 195
+    },
+    {
+      "name": "MAJHAGAWA",
+      "code": "MAJH2",
+      "district": "RUPANDEHI",
+      "phone": "9701003371",
+      "covered_areas": "MAJHAGAWA",
+      "d2d_price": 195,
+      "d2b_price": 145
+    },
+    {
+      "name": "MAJHGAUN KAMAHARIYA",
+      "code": "MAJH1",
+      "district": "RUPANDEHI",
+      "phone": "9701003371",
+      "covered_areas": "MAJHGAUN KAMAHARIYA",
+      "d2d_price": 195,
+      "d2b_price": 145
+    },
+    {
+      "name": "MAJUWA",
+      "code": "MAJU1",
+      "district": "GULMI",
+      "phone": "9801869343",
+      "covered_areas": "MAJUWA BAZAR, TURANG, DAMARA, SOTA, TARI, RAMPUR, BALITHUM, DUMKA, PIPALPATA, BADIGHAT",
+      "d2d_price": 245,
+      "d2b_price": 195
+    },
+    {
+      "name": "MAKWANPURGADHI",
+      "code": "MAKW1",
+      "district": "MAKWANPUR",
+      "phone": "9801984687",
+      "covered_areas": "SIKHARKATERI",
+      "d2d_price": 245,
+      "d2b_price": 195
+    },
+    {
+      "name": "MALANGWA",
+      "code": "MALA1",
+      "district": "SARLAHI",
+      "phone": "9801984415",
+      "covered_areas": "BISHNUPUR SARLAHI,  BRAHAMPURI, AURAHI, GAMAHARIYA, KHUTAUNA, SALIMPUR, GODETA, BRAHAMPURI",
+      "d2d_price": 220,
+      "d2b_price": 170
+    },
+    {
+      "name": "MALEKHU",
+      "code": "MALE1",
+      "district": "DHADING",
+      "phone": "9701003699",
+      "covered_areas": "MALEKHU BAZAR, GAJURI BAZAR, PHURKEKHOLA BAZAR, FISTAR,  PETROLPUMP MALEKHU, AMILTAR, SITAL BAZAR, SALANGHAT BAZAR , BENIGHAT BAZAR",
+      "d2d_price": 220,
+      "d2b_price": 170
+    },
+    {
+      "name": "MANAHARI",
+      "code": "MANA1",
+      "district": "MAKWANPUR",
+      "phone": "9801984665",
+      "covered_areas": "SUNACHURI, CHAUKITOL, BHULCHOWK, RURU BHAIRAV GATE, RAM DADA, DIPAD, NAYABASTI, LACHKA, APF GATE, RAMAULI, PARTAPUR, RAMANTAR, BIJAUNA, NIRMAL BASTI, MANAHARI BAZAR, VIP CHOWK, SIMPANI, JYAMIRE",
+      "d2d_price": 220,
+      "d2b_price": 170
+    },
+    {
+      "name": "MANAKAMANA",
+      "code": "MANA2",
+      "district": "GORKHA",
+      "phone": "9801472189",
+      "covered_areas": "MANAKAMANA BAZAR, BETAR, DHARBARI, KURPANI, SLING LAMOCHAP",
+      "d2d_price": 245,
+      "d2b_price": 195
+    },
+    {
+      "name": "MANARA",
+      "code": "MANA3",
+      "district": "MAHOTTARI",
+      "phone": "9801984655",
+      "covered_areas": "MANARA",
+      "d2d_price": 220,
+      "d2b_price": 170
+    },
+    {
+      "name": "MANEBHANJYANG SANK",
+      "code": "MANE1",
+      "district": "SANKHUWASABHA",
+      "phone": "9701003726",
+      "covered_areas": "LAHARE BAR, MARUWA, THULO DHUNGA, PANGMA",
+      "d2d_price": 245,
+      "d2b_price": 195
+    },
+    {
+      "name": "MANGALBARE ILAM",
+      "code": "MANG2",
+      "district": "ILAM",
+      "phone": "9801472175",
+      "covered_areas": "MANGALBARE,GAGRE BHANJYANG,PAHIRE BHANJYANG,PANITAR,TALLO BUDHABARE, YAKSI",
+      "d2d_price": 220,
+      "d2b_price": 170
+    },
+    {
+      "name": "MANGALSEN",
+      "code": "MANG1",
+      "district": "ACHHAM",
+      "phone": "9801984140",
+      "covered_areas": "MANGALSEN",
+      "d2d_price": 270,
+      "d2b_price": 220
+    },
+    {
+      "name": "MANIGRAM",
+      "code": "MANI1",
+      "district": "RUPANDEHI",
+      "phone": "9801984346",
+      "covered_areas": "MANIGRAM, COFFE COMPANY, SHANKARPUR, NAYAMIL, CHAR NUMBER, MANGLAPUR, PATHARDADA, BHALWARI, GORKATTA, SHIVAPUR, 12 NUMBER, KOTIHAWA, PATTHARDADA, PREMNAGAR, PRADIPNAGAR, SHANTINAGAR, GANESHNAGAR, 10 NUMBER, PURANO SADAK, DEEPNAGAR,MAUWARI",
+      "d2d_price": 170,
+      "d2b_price": 120
+    },
+    {
+      "name": "MANJHARIYA",
+      "code": "MANJ1",
+      "district": "RUPANDEHI",
+      "phone": "9701003371",
+      "covered_areas": "MANJHARIYA",
+      "d2d_price": 195,
+      "d2b_price": 145
+    },
+    {
+      "name": "MANMA",
+      "code": "MANM1",
+      "district": "KALIKOT",
+      "phone": "9848151890",
+      "covered_areas": "TADI, HOSPITAL, ZERO POINT, PRA, TIMA CHOWK, KOT DURBAR, PURANO BUSPARK",
+      "d2d_price": 270,
+      "d2b_price": 220
+    },
+    {
+      "name": "MANPUR MAINAPOKHAR",
+      "code": "MANP1",
+      "district": "BARDIYA",
+      "phone": "9801984257",
+      "covered_areas": "MAINAPOKHAR",
+      "d2d_price": 195,
+      "d2b_price": 145
+    },
+    {
+      "name": "MANTHALI",
+      "code": "MANT1",
+      "district": "RAMECHHAP",
+      "phone": "9801984491",
+      "covered_areas": "KATHJOR, JAKHANITAR, BITAR PARK, KUNAURI, BINITA CHOK, CARRAMBOT BAJAR, MACHHEDANDI, SANIMADAU",
+      "d2d_price": 245,
+      "d2b_price": 195
+    },
+    {
+      "name": "MARPHA MUSTANG",
+      "code": "MARP1",
+      "district": "MUSTANG",
+      "phone": "9801984369",
+      "covered_areas": null,
+      "d2d_price": 270,
+      "d2b_price": 220
+    },
+    {
+      "name": "MARTADI",
+      "code": "MART1",
+      "district": "BAJURA",
+      "phone": "9764643059",
+      "covered_areas": "BAJURA, BADIMALIKA, TUFAN DANDA, JIULA, CHAURATHI KHET, ARMY BARRACK, RAPKA",
+      "d2d_price": 270,
+      "d2b_price": 220
+    },
+    {
+      "name": "MASURIYA",
+      "code": "MASU1",
+      "district": "KAILALI",
+      "phone": "9801869358",
+      "covered_areas": "MASURIYA BAZAR, BADAIPUR, SAJHA BAZAR, AAMKHOIYA, SANKARPUR, MASURIYA BAZAR AREA, BADAIPUR BARRACK",
+      "d2d_price": 220,
+      "d2b_price": 170
+    },
+    {
+      "name": "MATIHANI",
+      "code": "MATI1",
+      "district": "MAHOTTARI",
+      "phone": "9801984160",
+      "covered_areas": "MATIHANI",
+      "d2d_price": 220,
+      "d2b_price": 170
+    },
+    {
+      "name": "MATSARI",
+      "code": "MATS1",
+      "district": "RAUTAHAT",
+      "phone": "9801984337",
+      "covered_areas": "PIPRA, BADHADWA, PACHRUKHI, BHOLAIYA, MATSARI",
+      "d2d_price": 220,
+      "d2b_price": 170
+    },
+    {
+      "name": "MAULAPUR",
+      "code": "MAUL1",
+      "district": "RAUTAHAT",
+      "phone": "9701003475",
+      "covered_areas": "MAULAPUR, BAUDHA, PATAURA, PARJATPUR, CHIRCHIRYA, GAMHARIYA, SONARNIYA, PATHARA",
+      "d2d_price": 195,
+      "d2b_price": 145
+    },
+    {
+      "name": "MEGHAULI",
+      "code": "MEGH1",
+      "district": "CHITWAN",
+      "phone": "9701010368",
+      "covered_areas": "MEGHAULI, SAJAPUR, KHAYARGHARI, GOLAGHAT, BHAGA, DHURBA, BHUDHHA NAGAR,JABKA, LEBANAGAR, ANDRAULI, BALUWA, SALBAS, MAGANI, BHAGADI, CHHATA CHOWK, NIM CHOWK, BAYARGHARI, DHUMPUS, SHANTI CHOWK, PIPARA, JOTI TOLL, DHARMAPUR, BHARATPUR-27, BHARATPUR-28",
+      "d2d_price": 170,
+      "d2b_price": 120
+    },
+    {
+      "name": "MEHELKUNA",
+      "code": "MEHE1",
+      "district": "SURKHET",
+      "phone": "9701003135",
+      "covered_areas": "JAHARE, LEKHFARSA, MEHELKUNA, BOTECHAUR BAZAAR",
+      "d2d_price": 245,
+      "d2b_price": 195
+    },
+    {
+      "name": "MELAMCHI",
+      "code": "MELA1",
+      "district": "SINDHUPALCHOK",
+      "phone": "9801984319",
+      "covered_areas": "MELAMCHI BAZAR, BAHUNEPATI, TALAMARANG BAZAR, LAMO POOL",
+      "d2d_price": 245,
+      "d2b_price": 195
+    },
+    {
+      "name": "MIRCHAIYA",
+      "code": "MIRC1",
+      "district": "SIRAHA",
+      "phone": "9801984439",
+      "covered_areas": "MIRCHAIYA, THANA CHOWK, KATARI CHOWK, KALYANPUR, GHURAMI, BANDIPUR, SANASTHA CHOWK, MALHANNIYA CHOWK, BASTIPUR, BANDIPUR",
+      "d2d_price": 220,
+      "d2b_price": 170
+    },
+    {
+      "name": "MIRMIPHAT",
+      "code": "MIRM1",
+      "district": "SYANGJA",
+      "phone": "9847099810",
+      "covered_areas": "JAIPATE, DAKCHYE, MIRMI, BIRGHA, LASARGHA BESI, KALI GANDAKI",
+      "d2d_price": 220,
+      "d2b_price": 170
+    },
+    {
+      "name": "MOTIPUR",
+      "code": "MOTI1",
+      "district": "RUPANDEHI",
+      "phone": "9801984357",
+      "covered_areas": "MOTIPUR,RANI GUNJ, PHARSATIKAR BAZAR",
+      "d2d_price": 220,
+      "d2b_price": 170
+    },
+    {
+      "name": "MUKTINATH MUSTANG",
+      "code": "MUKT1",
+      "district": "MUSTANG",
+      "phone": "9867974307",
+      "covered_areas": null,
+      "d2d_price": 245,
+      "d2b_price": 195
+    },
+    {
+      "name": "MUNGLING",
+      "code": "MUNG1",
+      "district": "CHITWAN",
+      "phone": "9701003221",
+      "covered_areas": "MUNGLING,SANTIBAZAR,PULZIP,5 KILO,JALBIRE,KALIKHOLA,TRIBANI",
+      "d2d_price": 170,
+      "d2b_price": 120
+    },
+    {
+      "name": "MURGIYA",
+      "code": "MURG1",
+      "district": "RUPANDEHI",
+      "phone": "9801472135",
+      "covered_areas": "SAALJHANDI , BASGADI , UJELAPUR , KOLONI , RAMAPUR , BUDDANAGAR , PIPAL DADA , SORAULI , RANIBAGIYAA , BRAMACHOWK,JHARBAIRA , DEVI CHOWK ,LAUSA , JHIMJHIME, BANKATTA",
+      "d2d_price": 220,
+      "d2b_price": 170
+    },
+    {
+      "name": "MUSIKOT",
+      "code": "MUSI1",
+      "district": "RUKUM WEST",
+      "phone": "9801984469",
+      "covered_areas": "KHALANGA, BAGBAZZAR, PATUKHOLA, SAHID MAIDAN, SERIGAUN, RAHULBARA, BARA TAKURA, PIPALNETA, SHIKSHA KARYELAYA, KOLTAKURA, SALLE, RATAMATA, SISNEKHOLA, DIGRE, SITAL POKHARI, CHAPA, BORAGAUN, MATHA, SAULIBAZZAR, AIRPORT, ARMY BARRACK, CHANDANATH TOL, BHANDARI KADA, GUJEL DHUNGA",
+      "d2d_price": 270,
+      "d2b_price": 220
+    },
+    {
+      "name": "MYANGLUNG",
+      "code": "MYAN1",
+      "district": "TERHATHUM",
+      "phone": "9701010474",
+      "covered_areas": "JIRIKHIMTI BAZAR, HALIMELA BAZAR",
+      "d2d_price": 245,
+      "d2b_price": 195
+    },
+    {
+      "name": "NADHIMAN",
+      "code": "NADH1",
+      "district": "SARLAHI",
+      "phone": "9701003205",
+      "covered_areas": "NADHIMAN",
+      "d2d_price": 194.99,
+      "d2b_price": 144.99
+    },
+    {
+      "name": "NAGARAIN",
+      "code": "NAGA1",
+      "district": "DHANUSHA",
+      "phone": "9823396693",
+      "covered_areas": "NAGARAIN, JATAHI, RUPAITHA, GONGALI, HANUMAN NAGAR,",
+      "d2d_price": 220,
+      "d2b_price": 170
+    },
+    {
+      "name": "NAGARKOT",
+      "code": "NAGA2",
+      "district": "BHAKTAPUR",
+      "phone": "9701776072",
+      "covered_areas": "KHARPATI, TELKOT, NAGARKOT, CHARELI, KALAMACI, GHIMIRE GAU, BASTOLA GAU, BHATTARI GAU",
+      "d2d_price": 170,
+      "d2b_price": 120
+    },
+    {
+      "name": "NALAGAD KALIMATI",
+      "code": "NALA1",
+      "district": "JAJARKOT",
+      "phone": "9766927280",
+      "covered_areas": null,
+      "d2d_price": 245,
+      "d2b_price": 195
+    },
+    {
+      "name": "NAMCHE BAZAR",
+      "code": "NAMC1",
+      "district": "SOLUKHUMBU",
+      "phone": "9764643067",
+      "covered_areas": "NAMCHE BAZAR AREA, JORSELA, MONJU",
+      "d2d_price": 270,
+      "d2b_price": 220
+    },
+    {
+      "name": "NARAHA",
+      "code": "NARA2",
+      "district": "SIRAHA",
+      "phone": "9801984334",
+      "covered_areas": "PANWARI, HANUMAN CHOWK, BALWA, DEVIPUR,",
+      "d2d_price": 220,
+      "d2b_price": 170
+    },
+    {
+      "name": "NARAINAPUR BANKE",
+      "code": "NARA4",
+      "district": "BANKE",
+      "phone": "9801984226",
+      "covered_areas": "NARAINAPUR BANKE",
+      "d2d_price": 195,
+      "d2b_price": 145
+    },
+    {
+      "name": "NARAYANGHAT",
+      "code": "NARA1",
+      "district": "CHITWAN",
+      "phone": "9801984252",
+      "covered_areas": "TRI CHOWK, DHARMA CHOWK, PENSION CAMP, YAGYAPURI, NAVA DURGA CHOWK, ANANDAPUR CHOWK, LANKU, KALYANPUR, JAGGANNATH CHOWK, HOSPITAL ROAD, CMC, CMS, BHATBHATENI, CHAUBISKOTHI, NAHAR CHOWK, BYPASS ROAD, DURSANCHAR ROAD, CHOWK BAZAR, PEACE ZONE, PEEPAL CHOWK, AAPTARI, GANESTHAN, BASENI, SIMALDHAP, GORKHALI TOLL, LAMA TOLL, JAKHADIMAI, HAKIMCHOWK, GAURIGANJ, RIJAL CHOWK, LALTIN CAFE, SOS, MILAN CHOWK, BASANTA CHOWK, AASTHA CHOWK, AIRPORT, BEER FACTORY, COKE FACTORY, GONDRYANG, MACHHAPUCHHRE CHOWK",
+      "d2d_price": 170,
+      "d2b_price": 120
+    },
+    {
+      "name": "NARAYANPUR DANG",
+      "code": "NARA3",
+      "district": "DANG",
+      "phone": "9801984412",
+      "covered_areas": "KHAIRA CHOWK, SAUDIKULA CHOWK",
+      "d2d_price": 220,
+      "d2b_price": 170
+    },
+    {
+      "name": "NAUDANDA KASKI",
+      "code": "NAUD1",
+      "district": "KASKI",
+      "phone": "9764643063",
+      "covered_areas": "Kande, Paudurkot, Bhir Muni, Ghumti, Paudur, Dhikurpokhari, Naudada, Lewade ,  Ghattekhola, Serachaur, Phedi, Kaskikot, Adhikari Danda",
+      "d2d_price": 220,
+      "d2b_price": 170
+    },
+    {
+      "name": "NAWARAJPUR",
+      "code": "NAWA1",
+      "district": "SIRAHA",
+      "phone": "9801984686",
+      "covered_areas": "BHAGWATIPUR, GAMHARIYA, FULBARIY CHOWK",
+      "d2d_price": 220,
+      "d2b_price": 170
+    },
+    {
+      "name": "NAYA BUSPARK",
+      "code": "NAYA1",
+      "district": "KATHMANDU",
+      "phone": "9801984100",
+      "covered_areas": "BALAJU, KUMARITHAN, JALPA CHOWK AREA, GANESHTHAN, BOHARATAR, RANIBAN, DHUNGEDHARA, BANIYATAR, BANASTHALI HEIGHT, SAMAKHUSI, MITRANAGAR, PABITRANAGAR, NAYABUSPARK, SURYADARSHAN, RANIBARI, KAPURDHARA, GONGABU, MHEPI",
+      "d2d_price": 120,
+      "d2b_price": 70
+    },
+    {
+      "name": "NAYA THIMI",
+      "code": "NAYA2",
+      "district": "BHAKTAPUR",
+      "phone": "9701010429",
+      "covered_areas": "BODE, NILBARAHI, DUWAKOT, SWORNESHWOR MANDIR AREA, HARSHCHOWK AREA, MADHYAPUR THIMI, BALKOT, GATTHAGHAR, BIRUWA, DADHIKOT, GAMCHHA, RADHE RADHE, SIRUTAR, NEPAL ENGINEERING COLLEGE, NIKOSERA, KAMETAR, SIRJANANAGAR",
+      "d2d_price": 120,
+      "d2b_price": 70
+    },
+    {
+      "name": "NEPALGUNJ",
+      "code": "NEPA1",
+      "district": "BANKE",
+      "phone": "9801984398",
+      "covered_areas": "RUPAIDIHA, JAISAPUR, PIPARHAWA, BHAWANIYAPUR, UDAYPUR, ADARSH NAGAR, PARSAPUR, BELSAPUR, DHAMBOJHI, INDRAPUR, KHAJURA, BAGESWARI, SONAPUR, RANIYAPUR, UDRAPUR, GUNHANA. JAMUNI, RADHAPUR, SAIGAUN, BHADA KHOLA, BELHARI, MANIKPUR, BASUDEVPUR, GANAPUR, PURAINI, BANKATTI, BHATBHATENI, BP CHOWK, GANESHMAN CHOWK, PUSPALAL CHOWK, FULTEKRA, MUKTIPUR, KARKANDO, RAJHA AIRPORT",
+      "d2d_price": 220,
+      "d2b_price": 170
+    },
+    {
+      "name": "NEPALTAR ILAM",
+      "code": "NEPA2",
+      "district": "ILAM",
+      "phone": "9801984691",
+      "covered_areas": "NEPALTAR BAZAR, NEPALTAR, TRIVENI ILAM",
+      "d2d_price": 245,
+      "d2b_price": 195
+    },
+    {
+      "name": "NEPALTAR UDAYAPUR",
+      "code": "NEPA3",
+      "district": "UDAYAPUR",
+      "phone": "9764643068",
+      "covered_areas": "KAMAN, RATMATE, FAT, KHATRITAR, NEPALTAR BAZAR",
+      "d2d_price": 220,
+      "d2b_price": 170
+    },
+    {
+      "name": "NETACHOWK",
+      "code": "NETA1",
+      "district": "MORANG",
+      "phone": "9801984135",
+      "covered_areas": "MIRGULIYA,DHATI TOLE,BELEPUR,HARAICHA,TETARIYA,BANGE,MOTIPUR,GIDHANIYA",
+      "d2d_price": 170,
+      "d2b_price": 120
+    },
+    {
+      "name": "NEWROAD",
+      "code": "NEWR1",
+      "district": "KATHMANDU",
+      "phone": "9701010255",
+      "covered_areas": "NEWROAD, SUNDHARA, CHAKSIBARI, BHADRAKALI, BAGBAZAR, BASANTAPUR, KHICHAPOKHARI, BISHAL BAZAR, NARDEVI, TAHACHAL, SORAKHUTTE, TRIPURESHWOR, TEKU, DHALKU, INDRACHOK, ASAN, MAHABOUDDHA, THAMEL, LAINCHAUR, LAZIMPAT, NARAYANHITI DURBAR, DARBAR MARGA, UTTARDHOKA, NAGPOKHARI, RANIPOKHARI, JAMAL, KANTIPATH, BHOTAHITI, CHHETRAPATI, CHIGAMUGAL, KHURSANITAR, BANGEMUNDA, KHUSIBU, BHADRAKALI, PUTALISADAK",
+      "d2d_price": 120,
+      "d2b_price": 70
+    },
+    {
+      "name": "NIJGADH",
+      "code": "NIJG1",
+      "district": "BARA",
+      "phone": "9801984451",
+      "covered_areas": "NIJGADH, BAGDEV, TAMAGADHI, SINGOL, MOHARI SADAK TOL",
+      "d2d_price": 220,
+      "d2b_price": 170
+    },
+    {
+      "name": "ODARI",
+      "code": "ODAR1",
+      "district": "KAPILBASTU",
+      "phone": "9801984092",
+      "covered_areas": "ODARI",
+      "d2d_price": 220,
+      "d2b_price": 170
+    },
+    {
+      "name": "OKHALDHUNGA",
+      "code": "OKHA1",
+      "district": "OKHALDHUNGA",
+      "phone": "9765010525",
+      "covered_areas": "GBS RAMAILO DANDA , MILAN CHOWK , RAM BAZAR , GANESH MANDIR , HULAK DANDA , MISSION HOSPITAL , POLICE OFFICE, YATAYAT OFFICE",
+      "d2d_price": 270,
+      "d2b_price": 220
+    },
+    {
+      "name": "PACHARAUTA",
+      "code": "PACH2",
+      "district": "BARA",
+      "phone": "9801984188",
+      "covered_areas": "PANHARAUTA",
+      "d2d_price": 195,
+      "d2b_price": 145
+    },
+    {
+      "name": "PADAMPOKHARI",
+      "code": "PADA2",
+      "district": "MAKWANPUR",
+      "phone": "9801984342",
+      "covered_areas": "BANSPATI, BUDDHACHOK, PADAMPOKHARICHOK, BELDADA, HATTIGAUDA, RAMESHCHOK, GHARELIDADADA, KALOPANI, SIGRENI, TUTEPANI, SIMPANI, MAJUWA, GOGANPANI BHORLEDADA, BADHALDHAP MAYURDHAP,",
+      "d2d_price": 220,
+      "d2b_price": 170
+    },
+    {
+      "name": "PADAMPUR",
+      "code": "PADA1",
+      "district": "CHITWAN",
+      "phone": "9712001295",
+      "covered_areas": "KALIKA 1 - KHUKURI CHOWK, GADUWA, LANKALINE, BASTOLA CHOWK, KALIKA 2 , LAMA CHOWK, VIRAL GHAR, KALIKA 3, PRAKASH MEDICAL, 200 BIGHA, MILAN CHOWK, KALIKA 4 , BHIMODAYA SCHOOL, KALIKA 5, BHIMWALI MANDIR, TRANSMITTER CHOWK, NAMUNA CHOWK, KHOLESIMAL, GAUCHARAN, KAMAL CHOWK, BHATENI, LAURE CHOWK, CLIB CHOWK, TIWARI CHOWK, MITHU CHOWK, GAIDA KHOLA, BHATENI, KALIKA 6, KALIKA 7, SYAULI BAZAR",
+      "d2d_price": 220,
+      "d2b_price": 170
+    },
+    {
+      "name": "PAHALMANPUR",
+      "code": "PAHA1",
+      "district": "KAILALI",
+      "phone": "9801869358",
+      "covered_areas": "PAHALMANPUR",
+      "d2d_price": 220,
+      "d2b_price": 170
+    },
+    {
+      "name": "PAKADI",
+      "code": "PAKA1",
+      "district": "KAPILBASTU",
+      "phone": "9801472137",
+      "covered_areas": "PAKADI BAZAR, BIJUWA, PICHURKHI, BIMEHA, TITIHARIA, LABANI, PIPARAHAWA, FULIKA",
+      "d2d_price": 220,
+      "d2b_price": 170
+    },
+    {
+      "name": "PAKAHA MAINPUR",
+      "code": "PAKA2",
+      "district": "PARSA",
+      "phone": "9701003226",
+      "covered_areas": "PAKAHA-POKHARA, DHORE, MADUBANI, MANIPUR, SAPUR-VELHA, KHESARAHA, SABAITHWA TOL, LAXMIPUR TOL, POKHARIYA TOL",
+      "d2d_price": 220,
+      "d2b_price": 170
+    },
+    {
+      "name": "PAKHRIBAS",
+      "code": "PAKH1",
+      "district": "DHANKUTA",
+      "phone": "9801984272",
+      "covered_areas": "PAKHRIBAS",
+      "d2d_price": 220,
+      "d2b_price": 170
+    },
+    {
+      "name": "PALUNGTAR",
+      "code": "PALU1",
+      "district": "GORKHA",
+      "phone": "9801984303",
+      "covered_areas": "RADHAKRISHNA, THATIPOKHARI, XAPTHOK, BAAD DADA, HAWAI GROUND, KALAMATA, KADALI, BARAPARKE, CTVT COLLEGE, MAJTAAR, LUITEL, MAGAR GAUN, HATTIGAUDA (PALUNGTAR), TURTURE.",
+      "d2d_price": 220,
+      "d2b_price": 170
+    },
+    {
+      "name": "PAME",
+      "code": "PAME1",
+      "district": "KASKI",
+      "phone": "9701010412",
+      "covered_areas": "PAME BAZAR, BASKOT, LAURUK, KARKITAGARA, THULAKHET, GHATICHHINA, BAMDI, CHANKHAPUR",
+      "d2d_price": 170,
+      "d2b_price": 120
+    },
+    {
+      "name": "PANAUTI",
+      "code": "PANA1",
+      "district": "KAVREPALANCHOK",
+      "phone": "9701010526",
+      "covered_areas": "SAMAUDAIK CHOK, RADHAKRISHNA CHOCK, CHALISE, SETOPATI, CHAMRE BAZAR, KUSHADEVI MANDIR, KUSHADEVI BAZAR, KHOPASI PULL, FIRFIRE DADA, MALPI, BHANDARI GAUN, RESHAM KHETI, MIRMIRE CHOCK, GANESHTHAN, TRIBENI GHAT CHOCK, RATMATE, OM DADA, SHARADHA CHOCK, SUNTHAN CHOCK, SHARADA DEVI SCHOOL, VIRAL ROAD, PANAUTI BUSPARK, JYALAPATI CHOCK, PUSHPANJALI CHOCK, AIRI GAUN PULL, PANAUTI NAGARPALIKA, KHADPU CHOCK, NAIKINTAR, DHALMALE, SUBAGAUN CHOCK, BASGHARI, MUKTINATH MANDIR,",
+      "d2d_price": 170,
+      "d2b_price": 120
+    },
+    {
+      "name": "PANCHKHAL",
+      "code": "PANC1",
+      "district": "KAVREPALANCHOK",
+      "phone": "9701010495",
+      "covered_areas": "PANCHKHAL BAZAR, TAMAGHAT, SHREERAM PATI, ANIKOT JORPATI, JIRO KILO, DULAL CHOWK",
+      "d2d_price": 245,
+      "d2b_price": 195
+    },
+    {
+      "name": "PANMARA",
+      "code": "PANM1",
+      "district": "SUNSARI",
+      "phone": "9801984132",
+      "covered_areas": "PANMARA",
+      "d2d_price": 195,
+      "d2b_price": 145
+    },
+    {
+      "name": "PARASI",
+      "code": "PARA1",
+      "district": "NAWALPARASI WEST",
+      "phone": "9701010441",
+      "covered_areas": "PARASI, RAMRAM, BUDDHACHOWK, BY PASS ROAD, BARTAULI, SHANTIPUR CHOWK, MANJARIYA CHOWK",
+      "d2d_price": 220,
+      "d2b_price": 170
+    },
+    {
+      "name": "PARSA SARLAHI",
+      "code": "PARS2",
+      "district": "SARLAHI",
+      "phone": "9701003107",
+      "covered_areas": "PARSA SARLAHI",
+      "d2d_price": 195,
+      "d2b_price": 145
+    },
+    {
+      "name": "PARWANIPUR",
+      "code": "PARW1",
+      "district": "PARSA",
+      "phone": "9801984370",
+      "covered_areas": "PARWANIPUR",
+      "d2d_price": 195,
+      "d2b_price": 145
+    },
+    {
+      "name": "PASHUPATINAGAR",
+      "code": "PASH1",
+      "district": "ILAM",
+      "phone": "9801984485",
+      "covered_areas": "PASHUPATI,KAJI PHATAK,BAUDHADHAM,BAUDHA-PARK,PASUPATI PHATAK, TINKHUTTE, RUNSUNG CHOOK, SUNDERPANI",
+      "d2d_price": 245,
+      "d2b_price": 195
+    },
+    {
+      "name": "PATAN BAITADI",
+      "code": "PATA1",
+      "district": "BAITADI",
+      "phone": "9701010330",
+      "covered_areas": "PATAN",
+      "d2d_price": 270,
+      "d2b_price": 220
+    },
+    {
+      "name": "PATERWA SUGAULI",
+      "code": "PATE1",
+      "district": "PARSA",
+      "phone": "9701003226",
+      "covered_areas": "PATERWA, SUGAULI, KANCHANPUR, GADIYANI, BHATHA, SONBARSA, DEKHULI, RAMPUR, BELWA, BAJINATHPUR, MANIHARWA, NICHUTA",
+      "d2d_price": 220,
+      "d2b_price": 170
+    },
+    {
+      "name": "PATHARI",
+      "code": "PATH1",
+      "district": "MORANG",
+      "phone": "9801984104",
+      "covered_areas": "PATHARI,   KIRTIPUR, BUDDHA CHOWK, SANISCHARE, AAITABARE, SOMBARE, BOKRE CHOWK, 46 BIGHE, LAMATOLI, SUBEDI CHOWK, PIPAL CHOWK, DEVIGUNJ, PRAGATI TOLE, RATNA CHOWK, SHIKHAR CHOWK, JANAYUDDHA CHOWK, RIGWA SHCOOL, POOLCHOWK. KALYAN CHOWK, GORKHA DEPARTMENT,BP CHOWK,MANGALBARE DADA,SIBIR DADA,BASECHAURI",
+      "d2d_price": 220,
+      "d2b_price": 170
+    },
+    {
+      "name": "PATICHAUR",
+      "code": "PATI1",
+      "district": "PARBAT",
+      "phone": "9801984209",
+      "covered_areas": "Pathichaur,  Ambod,  Dobilla,  Dimuwa,  Pradhi, Chauki Dimbuwa,  Nayapool",
+      "d2d_price": 250,
+      "d2b_price": 200
+    },
+    {
+      "name": "PATO",
+      "code": "PATO1",
+      "district": "SAPTARI",
+      "phone": "9701003407",
+      "covered_areas": "AMARLATI, PATO BAZAR",
+      "d2d_price": 220,
+      "d2b_price": 170
+    },
+    {
+      "name": "PHALEBAS",
+      "code": "PHAL1",
+      "district": "PARBAT",
+      "phone": "9746276922",
+      "covered_areas": "PHALEBAS",
+      "d2d_price": 245,
+      "d2b_price": 195
+    },
+    {
+      "name": "PHALEBISAUNE",
+      "code": "PHAL2",
+      "district": "KAILALI",
+      "phone": "9801984443",
+      "covered_areas": "PHALEBISAUNE",
+      "d2d_price": 195,
+      "d2b_price": 145
+    },
+    {
+      "name": "PHAPARBARI",
+      "code": "PHAP1",
+      "district": "MAKWANPUR",
+      "phone": "9801984687",
+      "covered_areas": "BAKAIYA, HATTISUDE, TINTALE, JURELI",
+      "d2d_price": 220,
+      "d2b_price": 170
+    },
+    {
+      "name": "PHARPING",
+      "code": "PHAR1",
+      "district": "KATHMANDU",
+      "phone": "9701010511",
+      "covered_areas": "CHOBHAR, TAUDAHA, PHARPING, DAKHSINKALI MANDIR AREA, SHESHNARAYAN, SETO GUMBA, CHALNAKHEL, WHOOPILAND, JALBINAYAK, KHAHARE, DOLLU-PHARPING, BHANJYANG",
+      "d2d_price": 120,
+      "d2b_price": 70
+    },
+    {
+      "name": "PHARSATIKAR",
+      "code": "PHAR2",
+      "district": "RUPANDEHI",
+      "phone": "9701003271",
+      "covered_areas": "MOTIPUR, DOGANA, KEWALPUR, KHAJURIYA, MANPAKADI, MANMATERIYA, BISUNPURA, DUBAULI, MAINIYA, BUDDHA CHOWK",
+      "d2d_price": 220,
+      "d2b_price": 170
+    },
+    {
+      "name": "PHEDIKHOLA",
+      "code": "PHED1",
+      "district": "SYANGJA",
+      "phone": "9701010352",
+      "covered_areas": "PHEDIKHOLA BAZAR, ZERO, BHALUPAHAD, KHARKETARI, SERKETARI, KUBINDE",
+      "d2d_price": 220,
+      "d2b_price": 170
+    },
+    {
+      "name": "PHETA BAZAR",
+      "code": "PHET1",
+      "district": "BARA",
+      "phone": "9801984197",
+      "covered_areas": "PHETA BAZAR",
+      "d2d_price": 195,
+      "d2b_price": 145
+    },
+    {
+      "name": "PHIDIM",
+      "code": "PHID1",
+      "district": "PANCHTHAR",
+      "phone": "9801984460",
+      "covered_areas": "PHIDIM, HEWA KHOLA, JORSAL, PALLO TAR, MATHLO GAAUN, RAMITE, FEWADIN, BHARAPA, SAMDIN, TEA STATE, DADI, SANIBARE, THADO LINE, BUS PARK, CHAUTARE,BARDANDA,MUSKAN CHOWK,S TRUNNING,PURANO BANK LINE, SIKSHYA LINE, GOSHLINE, GHANTAGHAR, AAHAlGAIRY, PUTALI CHOWK, VETNARY SICHAIOFFICE, WELFARE, SANTY MARGA",
+      "d2d_price": 245,
+      "d2b_price": 195
+    },
+    {
+      "name": "PHULBARI KAILALI",
+      "code": "PHUL1",
+      "district": "KAILALI",
+      "phone": "9801472196",
+      "covered_areas": "PHULBARI, KANARI, SAYULI BAZAR, DEPU BAZAR, PACHHIS GHAR, I GAU, BISMETER",
+      "d2d_price": 220,
+      "d2b_price": 170
+    },
+    {
+      "name": "PHUNGLING",
+      "code": "PHUN1",
+      "district": "TAPLEJUNG",
+      "phone": "9801984096",
+      "covered_areas": "HELIPAD, BIRENDRA CHOWK, KOPCHE, BHETNARI CHOWK,  BUDHA CHOWK, TUKRE, PATHIVARA CHOWK, TOKME DANDA, BUSPARK AREA, BOJHE CHOWK, HOSPITAL LINE, BIHIBARE,UKALI PAANI,PARAJULI CHOWK,KANCHANJUNGA CHOWK,SHERPA TOL,RIJAL LINE, TAMU CHOWK, DOBATO , SANTI SCHOOL, SHIVALAYA CHOWK , VETNARY, BHANU SCHOOL XEU, COFFEE HOUSE , JAUBARI , CAMPUS LINE",
+      "d2d_price": 245,
+      "d2b_price": 195
+    },
+    {
+      "name": "PILUWA",
+      "code": "PILU1",
+      "district": "BARA",
+      "phone": "9801984173",
+      "covered_areas": "MAHENDANAGAR PILUWA, SAKHUWAGHAT SCHOOL, LAMIDADA PILUWA, SHANKAR CHOWK, JAITAPUR, UCHITI, BADARWA, KATARWA, BHADRAKALI BARAYAK, ADARSHNAGAR PILUWA, DAKAHA, PASHAHA TOLE, MOTICHOCK",
+      "d2d_price": 245,
+      "d2b_price": 195
+    },
+    {
+      "name": "PIPRA",
+      "code": "PIPR1",
+      "district": "MAHOTTARI",
+      "phone": "9801984160",
+      "covered_areas": "PIPRA",
+      "d2d_price": 220,
+      "d2b_price": 170
+    },
+    {
+      "name": "PIPRAHAWA",
+      "code": "PIPR2",
+      "district": "BANKE",
+      "phone": "971010666",
+      "covered_areas": "PIPRAHAWA",
+      "d2d_price": 195,
+      "d2b_price": 145
+    },
+    {
+      "name": "POKHARA",
+      "code": "POKH1",
+      "district": "KASKI",
+      "phone": "9801984277",
+      "covered_areas": "GAIRAPATAN, MAHENDRAPOOL, MALEPATAN, PARSYANG, BINDABASINI, ARCHALBOT, HARICHOWK, SIMPANI, JAREBAR, MAASBAR, JAIMURE, DIGOPATAN, HALANCHOWK, KHAHARE, SEDI, KALIMATI, RAMBAZAR, NAYA GAU, VEDIPHARAM, CHINEDADA, GALESHWOR, BOTECHAUTARA, FULBARI, MANIPAL, RANIPUAUWA, MATEPANI, TUSLI GHAT, MAHENDRA GUFA, LAMACHAUR, BAGAR, NADIPUR, DEEP, CHOREPATAN, BIRAUTA, MATGAUDA, GHARIPATAN, DAMSIDE, NAGDHUNGA, DAMSIDE, TERSAPATTI, PALIKHECHOK, NEWROAD, CHIPLEDHUNGA, PRITHIVICHOK, BHADRAKALI, MIYAPATAN, CHAUTHE",
+      "d2d_price": 170,
+      "d2b_price": 120
+    },
+    {
+      "name": "POKHARIYA",
+      "code": "POKH2",
+      "district": "PARSA",
+      "phone": "9701003226",
+      "covered_areas": "Pokhairya, Sirsiya, Sembari, Gardaul, Bahuharwa, Ramnagari, Bairiya, Bahuhari",
+      "d2d_price": 220,
+      "d2b_price": 170
+    },
+    {
+      "name": "PRAKASHPUR",
+      "code": "PRAK1",
+      "district": "SUNSARI",
+      "phone": "9701010470",
+      "covered_areas": "PRAKASHPUR",
+      "d2d_price": 195,
+      "d2b_price": 145
+    },
+    {
+      "name": "PRASAUNI",
+      "code": "PRAS1",
+      "district": "BARA",
+      "phone": "9801984197",
+      "covered_areas": "PRASAUNI",
+      "d2d_price": 195,
+      "d2b_price": 145
+    },
+    {
+      "name": "PUMDI POKHARA",
+      "code": "PUMD1",
+      "district": "KASKI",
+      "phone": "9801472101",
+      "covered_areas": null,
+      "d2d_price": 245,
+      "d2b_price": 195
+    },
+    {
+      "name": "PUNARBAS",
+      "code": "PUNA1",
+      "district": "KANCHANPUR",
+      "phone": "9801984189",
+      "covered_areas": "PUNARBAS, IBRD, TOWN BAZAR, KA GAAU, RAM BASTI, ARUN BASTI, BIKASH BASTI, MILAN CHOWK, KALIKA CHOWK, BUDDHA BASTI, HERONI CHOWK, LALJHADI WARD NO. 1 & 2,CHA GAU ,MOTI BASTI,DHAKKA,KOTI GAU, ANSUBARMA, KHA GAU",
+      "d2d_price": 245,
+      "d2b_price": 195
+    },
+    {
+      "name": "PURANCHAUR",
+      "code": "PURA1",
+      "district": "KASKI",
+      "phone": "9810320763",
+      "covered_areas": "PURANCHAUR, HUMDI, KHORAMUKHA, BHEDA BARI, LUMRE, TATO PANI",
+      "d2d_price": 170,
+      "d2b_price": 120
+    },
+    {
+      "name": "PUTALI CHOWK",
+      "code": "PUTA2",
+      "district": "SARLAHI",
+      "phone": "9801984232",
+      "covered_areas": "PUTALI CHOWK, SOLTI ,JIYARAT, RAJGHAT, RAMPUR, BAGMATI BHARAT TAAL, TEKANI, DABARI",
+      "d2d_price": 220,
+      "d2b_price": 170
+    },
+    {
+      "name": "PUTALIBAZAR",
+      "code": "PUTA1",
+      "district": "SYANGJA",
+      "phone": "9801984296",
+      "covered_areas": "BADKHOLA, GAIRIKHET, SAHUTAR, LATRE PIPAL, TORADI, THULADIHI, PARSAYNG, GINCHAUR, PAUWEGAUDE, RANISWARA, RANGKOSH, HARIPALA, BARBOT, THULI BESI, PHAPARTHUM, SATAUN, RANGKHOLA, RANGBHANG, SUMREKHOLA, PELKACHOUR, KARAN DADA, AARUKHARKA, BHATKHOLA, BADACHAUR, SARKETARI, KUBINDE, NAGDANDA",
+      "d2d_price": 220,
+      "d2b_price": 170
+    },
+    {
+      "name": "PYUTHAN KHALANGA",
+      "code": "PYUT1",
+      "district": "PYUTHAN",
+      "phone": "9860074421",
+      "covered_areas": "PYUTHAN KHALANGA",
+      "d2d_price": 220,
+      "d2b_price": 170
+    },
+    {
+      "name": "RAGAICHA",
+      "code": "RAGA1",
+      "district": "DANG",
+      "phone": "9701003409",
+      "covered_areas": "RAGAICHA",
+      "d2d_price": 195,
+      "d2b_price": 145
+    },
+    {
+      "name": "RAJAHAR",
+      "code": "RAJA2",
+      "district": "NAWALPARASI EAST",
+      "phone": "9701010578",
+      "covered_areas": "KEURENI , CG TEMPLE , CG INDUSTERY AREA , HAMAL CHOWK, DUMKAULI , RAHAJAR BAZAR ALL AREA, KHANIPANI CHOWK, SAHAKARI CHOWK, RAKSHI FACTORY , KADAMPUR, DHOKHAN CHOWK, RANA CHOWK , THAPA CHOWK, SIVAMANDIR CHOWK , DHUSERI, BHOGTAGHARI , CHEPENI, KUJAULI , TAIKOT ,FARAM ,JHAREKHOLA, KULENI , GAURIPUR",
+      "d2d_price": 220,
+      "d2b_price": 170
+    },
+    {
+      "name": "RAJAPUR",
+      "code": "RAJA1",
+      "district": "BARDIYA",
+      "phone": "9801984275",
+      "covered_areas": "SHANTIPUR, GANESHTHAN, TADEYA, RAJAPUR GAU, SANGHARSHANAGAR, TAPARA, GHUMNA GAU, JUMMAPUR, THAKHAPUR, ANANDAPUR, DALAI GAU, DHOBIPUR",
+      "d2d_price": 245,
+      "d2b_price": 195
+    },
+    {
+      "name": "RAJARANI",
+      "code": "RAJA3",
+      "district": "DHANKUTA",
+      "phone": "9701010406",
+      "covered_areas": "DADA BAZAR, MAUNA, BUDUK, RARARANI, DHARACHOWK, BASANTA TARA",
+      "d2d_price": 220,
+      "d2b_price": 170
+    },
+    {
+      "name": "RAJBIRAJ",
+      "code": "RAJB1",
+      "district": "SAPTARI",
+      "phone": "9801984192",
+      "covered_areas": "PATHARGHARA, TITRI GACHI, RAJBIRAJ,  MALETH, PARARIYA, PUMP NAHAR, SHASASTRA CAMP, NAHAR CHOWK, RAJBIRAJ BISHNUPUR",
+      "d2d_price": 220,
+      "d2b_price": 170
+    },
+    {
+      "name": "RAJDEVI",
+      "code": "RAJD1",
+      "district": "RAUTAHAT",
+      "phone": "9701010681",
+      "covered_areas": "RAJDEVI, BELBICHWA, MUDELWA, CHANDIYA, BASATAPUR, HAJMINIYA, BHRAHAMPURI, PATHRA, MOTIPUR",
+      "d2d_price": 220,
+      "d2b_price": 170
+    },
+    {
+      "name": "RAJGADH",
+      "code": "RAJG1",
+      "district": "JHAPA",
+      "phone": "9701004734",
+      "covered_areas": "RAJAGADH, CHAKCHAKI, FULBARI, GOALDHAP, SAINIK BAZAR, GHAILADUBBA, BARADASHI, CHAITUBARI,SIMALCHOWK,SUNDARPUR,BIRATPOKHAR, BUTTABARI RAJGADH, JANTA SCHOOL, JALDHAR",
+      "d2d_price": 220,
+      "d2b_price": 170
+    },
+    {
+      "name": "RAMAILO",
+      "code": "RAMA1",
+      "district": "MORANG",
+      "phone": "9801984104",
+      "covered_areas": "RAMAILO,KALISTHAN,HARKPUR,JAYNEPAL CHOWK,BAYERBAN,BIHIBARE,AAITABARE,KANEPOKHARI,BAHUNI,DANGIHAT,DALELI,SUKRABARE,HOKLABARI,DIPU CHOWK,SANGNINAR,KERWON,JCY CHOWK,BUDDHA CHOWK,BHAUSABARI",
+      "d2d_price": 219.98,
+      "d2b_price": 169.98
+    },
+    {
+      "name": "RAMECHHAP BAZAR",
+      "code": "RAME1",
+      "district": "RAMECHHAP",
+      "phone": "9844066011",
+      "covered_areas": "RAMECHHAP BAZAR",
+      "d2d_price": 245,
+      "d2b_price": 195
+    },
+    {
+      "name": "RAMGOPALPUR",
+      "code": "RAMG1",
+      "district": "MAHOTTARI",
+      "phone": "9707085526",
+      "covered_areas": "BISHWAMBHARPUR, KANCHANPUR, RAUJA, SARPALLO, SHREEPUR, RAMGOPALPUR",
+      "d2d_price": 220,
+      "d2b_price": 170
+    },
+    {
+      "name": "RAMNAGAR",
+      "code": "RAMN1",
+      "district": "CHITWAN",
+      "phone": "9701010208",
+      "covered_areas": "RAMNAGAR, THIMURA, MAHESH CHOWK, RAHARGHARI CHOWK, BAN KARYALAYA",
+      "d2d_price": 170,
+      "d2b_price": 120
+    },
+    {
+      "name": "RAMNAGAR KHAIRAWA",
+      "code": "RAMN2",
+      "district": "SARLAHI",
+      "phone": "9701003403",
+      "covered_areas": "RAMNAGAR KHAIRAWA",
+      "d2d_price": 220,
+      "d2b_price": 170
+    },
+    {
+      "name": "RAMPUR PALPA",
+      "code": "RAMP1",
+      "district": "PALPA",
+      "phone": "9701010620",
+      "covered_areas": "BEJHAND BAZAR,KISANBARI,SANIAMRAI,BIJAYAPUR,MATERI,ISLAMPUR,SADABARTA,KHAPTAR, DEBISTHAN,BANGE PASAL",
+      "d2d_price": 245,
+      "d2b_price": 195
+    },
+    {
+      "name": "RANGELI",
+      "code": "RANG1",
+      "district": "MORANG",
+      "phone": "9801984126",
+      "covered_areas": "DAINIYA, KARSIYA, KHARSADANG",
+      "d2d_price": 220,
+      "d2b_price": 170
+    },
+    {
+      "name": "RANKE",
+      "code": "RANK1",
+      "district": "ILAM",
+      "phone": "9701010229",
+      "covered_areas": "RANKE BAZAR, PASANGTAR,DEURAI BAZAR, CHIMFULA, MAIDANE 1, CHAMAITA ,DEUMI KHOP, PANCHAMI, RANKETAR, FALATE, DEURALI, DHAPATAR, MAIDANE, KHAMBANG",
+      "d2d_price": 245,
+      "d2b_price": 195
+    },
+    {
+      "name": "RATANPUR",
+      "code": "RATA1",
+      "district": "BARA",
+      "phone": "9701003343",
+      "covered_areas": null,
+      "d2d_price": 245,
+      "d2b_price": 195
+    },
+    {
+      "name": "RIDI",
+      "code": "RIDI1",
+      "district": "GULMI",
+      "phone": "9701004712",
+      "covered_areas": "RIDI, RURU, THORGA, PANI TANKI, RATAMATA, BHODUKA, KUSHENI",
+      "d2d_price": 245,
+      "d2b_price": 195
+    },
+    {
+      "name": "RUKUMKOT",
+      "code": "RUKU1",
+      "district": "RUKUM EAST",
+      "phone": "9764643051",
+      "covered_areas": "RUKUMKOT BAZAR AREA",
+      "d2d_price": 270,
+      "d2b_price": 220
+    },
+    {
+      "name": "RUPANI",
+      "code": "RUPA1",
+      "district": "SAPTARI",
+      "phone": "9701003407",
+      "covered_areas": "RUPNI BAZAR, GOBIND CHOWK, KATHAUNA",
+      "d2d_price": 220,
+      "d2b_price": 170
+    },
+    {
+      "name": "RUPNAGAR",
+      "code": "RUPN1",
+      "district": "SAPTARI",
+      "phone": "9801869450",
+      "covered_areas": "JAGMOHAN, BIRENDRA BAZAR, SITAPUR, MAHULI, KANCHANRUP, BARMAJHIYA, HANUMAN NAGAR, BHARDAHA",
+      "d2d_price": 220,
+      "d2b_price": 170
+    },
+    {
+      "name": "SABAILA",
+      "code": "SABA1",
+      "district": "DHANUSHA",
+      "phone": "9701010527",
+      "covered_areas": "SABAILA, RAGHUNATHPUR, SATOKHAR, KHARIYANI, BHATHIYAN, THILLA,",
+      "d2d_price": 220,
+      "d2b_price": 170
+    },
+    {
+      "name": "SAKHADA CHHINNAMASTA",
+      "code": "SAKH2",
+      "district": "SAPTARI",
+      "phone": "9801984191",
+      "covered_areas": "SAKHADA CHHINNAMASTA",
+      "d2d_price": 195,
+      "d2b_price": 145
+    },
+    {
+      "name": "SAKHUWA PRASAUNI",
+      "code": "SAKH1",
+      "district": "PARSA",
+      "phone": "9701003226",
+      "covered_areas": "SAKHUWA PRASAUNI",
+      "d2d_price": 195,
+      "d2b_price": 145
+    },
+    {
+      "name": "SAKUWA MAHENDRANAGAR",
+      "code": "SAKU1",
+      "district": "DHANUSHA",
+      "phone": "9701003499",
+      "covered_areas": "SAKUWA MAHENDRANAGAR, NAYA BAZAAR,BELACHAPI,BATESWOR,HARIHARPUR",
+      "d2d_price": 245,
+      "d2b_price": 195
+    },
+    {
+      "name": "SALLERI",
+      "code": "SALL1",
+      "district": "SOLUKHUMBU",
+      "phone": "9765010522",
+      "covered_areas": "SALLERI, FAPLU, DORPU",
+      "d2d_price": 270,
+      "d2b_price": 220
+    },
+    {
+      "name": "SALLI BAZAR",
+      "code": "SALL2",
+      "district": "SALYAN",
+      "phone": "9761645223",
+      "covered_areas": "AAMAR, BALUWA SHANGAHI, JAMUNE BAZAR, RAKAM, AAMA KHAOLI, LISIDADA, GOGI BAZAR, SUNAULI BAZAR, JAMI CHAU, DEVSTHAL",
+      "d2d_price": 270,
+      "d2b_price": 220
+    },
+    {
+      "name": "SALYAN KHALANGA",
+      "code": "SALY1",
+      "district": "SALYAN",
+      "phone": "9801984089",
+      "covered_areas": "KHALANGA BAZAR, SHREENAGAR, PIPALNETA BAZAR, SHAHITOL",
+      "d2d_price": 245,
+      "d2b_price": 195
+    },
+    {
+      "name": "SAMANPUR",
+      "code": "SAMA1",
+      "district": "RAUTAHAT",
+      "phone": "9801984086",
+      "covered_areas": "SAMANPUR, HARAIYA-PALTUWA, PARSA, SHAGRAMPUR, INARUWA, BINGANRA, PAKAHA, DHARAMPUR, SHINGARAMAN",
+      "d2d_price": 220,
+      "d2b_price": 170
+    },
+    {
+      "name": "SAMSHERGUNJ",
+      "code": "SAMS1",
+      "district": "BANKE",
+      "phone": "9701010466",
+      "covered_areas": "SAMSHERGUNJ",
+      "d2d_price": 220,
+      "d2b_price": 170
+    },
+    {
+      "name": "SAMSI",
+      "code": "SAMS2",
+      "district": "MAHOTTARI",
+      "phone": "9801984239",
+      "covered_areas": "RAGHUNATHPUR, SAMSI, KHAYARBANNI, GOTH BANAULI, PARSA, BARIYA",
+      "d2d_price": 220,
+      "d2b_price": 170
+    },
+    {
+      "name": "SANDHIKHARKA",
+      "code": "SAND1",
+      "district": "ARGHAKHANCHI",
+      "phone": "9801984481",
+      "covered_areas": "SANDHIKHARKA BAJAR, RUBDI, PANINICHOK, MASHAL BAJAR, CHUTRABESI, SANKHETARI, SHANTI BAGAINCHA, AATIKA PATA, SWALE BAJAR, MYALPOKHARI, RATAHALE, GUNTIKHOLA",
+      "d2d_price": 245,
+      "d2b_price": 195
+    },
+    {
+      "name": "SANFEBAGAR",
+      "code": "SANF1",
+      "district": "ACHHAM",
+      "phone": "9801984496",
+      "covered_areas": "HATBAZAR, CHIPEKHOLA, JANAKALYAN, THATI, BAHELPATA, AIRPORT BAZAR",
+      "d2d_price": 270,
+      "d2b_price": 220
+    },
+    {
+      "name": "SANGRAMPUR",
+      "code": "SANG1",
+      "district": "SARLAHI",
+      "phone": "9701002298",
+      "covered_areas": "SANGRAMPUR",
+      "d2d_price": 220,
+      "d2b_price": 170
+    },
+    {
+      "name": "SANISCHARE",
+      "code": "SANI1",
+      "district": "JHAPA",
+      "phone": "9801472176",
+      "covered_areas": "PADNAMI MANDIR,KANCHNBARI,KAPTANBARI,TUTBARI,, ARJUNDHARA MADIR,KADAMGACHI,PUSPALAL CHOWK",
+      "d2d_price": 220,
+      "d2b_price": 170
+    },
+    {
+      "name": "SANKHU",
+      "code": "SANK1",
+      "district": "KATHMANDU",
+      "phone": "9701003682",
+      "covered_areas": "SANKHU, THALI DANCHI, HARIYALI HEIGHT, BHADRABAS ALAPOT, GAGALPHEDI, SANAGHAU, INDRAYENI, BRAMAKHEL, KHULALTAR, SALAMBUTAR, BAJRAYOGINI TEMPLE AREA, SUKEKHOLA, BHUBLU, JARSING PAUWA PALUBARI, BISAMBARA, KATTIKE, PHEDI",
+      "d2d_price": 120,
+      "d2b_price": 70
+    },
+    {
+      "name": "SAPAHI",
+      "code": "SAPA1",
+      "district": "DHANUSHA",
+      "phone": "9701003220",
+      "covered_areas": "SAPAHI",
+      "d2d_price": 220,
+      "d2b_price": 170
+    },
+    {
+      "name": "SARANGKOT",
+      "code": "SARA",
+      "district": "KASKI",
+      "phone": "9801869344",
+      "covered_areas": "Sarangkot, Padheli, Methlang, Silingbot, Toripani, Ward 18 area",
+      "d2d_price": 220,
+      "d2b_price": 170
+    },
+    {
+      "name": "SARDI",
+      "code": "SARD1",
+      "district": "NAWALPARASI EAST",
+      "phone": "9701010313",
+      "covered_areas": "SARDI, DEURALI, KATUSHGHARI, BAGAICHA, DADAJOR, SIDHRE, CHUKAHA, PAKHAPANI, CHISHAPANI, SURYAJYOTI SCHOOL, MATHILO TANDI, PIDHARI, BHARTUNG, SUNAHI, HONGSHI AREA, MAJUWA",
+      "d2d_price": 220,
+      "d2b_price": 170
+    },
+    {
+      "name": "SARUWATHA",
+      "code": "SARU1",
+      "district": "RAUTAHAT",
+      "phone": "9801984337",
+      "covered_areas": "SARUWATHA, HAJMANIYA, RAJPUR-TULSI, MALANIYA, VEDEYAHI",
+      "d2d_price": 220,
+      "d2b_price": 170
+    },
+    {
+      "name": "SATDOBATO",
+      "code": "SATD1",
+      "district": "LALITPUR",
+      "phone": "9701003474",
+      "covered_areas": "SATDOBATO, IMADOL, KHUMALTAR, DHAPAKHEL, KUSUNTHI, SANEPA, JHAMSIKHEL, PULCHOWK, KUPANDOLE, JWALAKHEL, JUWAGAL, PATAN, MAHALAXMISTHAN, NAKKHU, EKANTAKUNA, BHAISEPATI AREA, BUNGMATI, KOKHANA, CHUNIKHEL, CHHAMPI, LAGANKHEL, GWARKO, KUMARIPATI, GABAHAL, LABIM MALL, DAMKAL CHOK, MANGALBAZAR, MEDICITY HOSPITAL, TALCHIKHEL, TIKHIDEWAL, NAKHIPOT, BOJEPOKHARI, GWARKO, CHASYAL, DHOLAHITY, MAGARGHAU, DHOBIGHAT",
+      "d2d_price": 120,
+      "d2b_price": 70
+    },
+    {
+      "name": "SATTI",
+      "code": "SATT1",
+      "district": "KAILALI",
+      "phone": "9701010214",
+      "covered_areas": "SURYAPUR, PADAMPUR, KHAIRIPUR, JHUNGABAUNIYA, KHAKRAULA, BAIDI, BELUWA, NARAYANPUR, BATANPUR, SIMRENI, BALWATAR, BIBYAPUR, DADABOJHI",
+      "d2d_price": 220,
+      "d2b_price": 170
+    },
+    {
+      "name": "SAURAHA",
+      "code": "SAUR1",
+      "district": "CHITWAN",
+      "phone": "9701010490",
+      "covered_areas": "SAURAHA, BACHHAULI, JHUWANI, JANAKAULI, TARAULI, GAWAHI, HARNARI-BAIRIYA, MAINAHA, GOTHAULI, GHANTGHAR, MALPUR, BAGH CHOWK, CHARA CHOWK, HATTI CHOWK, BADRENI, GAIDA CHOWK, MALLU, DHORANGI, GAWA, KUMROJ",
+      "d2d_price": 220,
+      "d2b_price": 170
+    },
+    {
+      "name": "SEDHAWA",
+      "code": "SEDH1",
+      "district": "PARSA",
+      "phone": "9701003226",
+      "covered_areas": "SEDHWA BAJAR, KATHMANDAU TOL, BALUWA, SHANTI TOL, JITPUR, SUPAULI, KODAULI, SADHI, SAJAYNPUR, BHAWANIPUR, GAMARIYA",
+      "d2d_price": 220,
+      "d2b_price": 170
+    },
+    {
+      "name": "SHAKTIKHOR",
+      "code": "SHAK1",
+      "district": "CHITWAN",
+      "phone": "9801984247",
+      "covered_areas": "JUTPANI, KALIKA MANDIR, CHISAPANI, GAIRIBARI CHOWK, AANANDA CHOWK, HEALTHPOST CHOWK, SHAKTIKHOR, KAMANA CHOWK, NYURENI, DEVITAR, BAGARPUL , BHARLAGHARI, MUNAL TOLE,DORANGI PUL",
+      "d2d_price": 220,
+      "d2b_price": 170
+    },
+    {
+      "name": "SHANTINAGAR JHAPA",
+      "code": "SHAN2",
+      "district": "JHAPA",
+      "phone": "9701776171",
+      "covered_areas": null,
+      "d2d_price": 220,
+      "d2b_price": 170
+    },
+    {
+      "name": "SHANTIPUR",
+      "code": "SHAN1",
+      "district": "GULMI",
+      "phone": "9801869343",
+      "covered_areas": "SHANTIPUR BAZAR AREA",
+      "d2d_price": 270,
+      "d2b_price": 220
+    },
+    {
+      "name": "SHARANAMATI",
+      "code": "SHAR1",
+      "district": "JHAPA",
+      "phone": "9801984068",
+      "covered_areas": "SHARNAMATI- CHAKRAMARI, CHAMAPUR, LALPANI, CHAPRAMARI KIRATCHOWK, TULSIBARI,MADARGACH, PURANO SHARNAMATI",
+      "d2d_price": 220,
+      "d2b_price": 170
+    },
+    {
+      "name": "SHIVAGUNJ",
+      "code": "SHIV1",
+      "district": "JHAPA",
+      "phone": "9701472184",
+      "covered_areas": "SHIVAGUNJ, HAWALDAR CHOWK, THAGBASTI, BOLOCHOWK, ODARICHOWK,PARABARI, MANGALBARE,MAHABHARA, JANANTACHOKE, PACHGACHHI BAZAR, SADHUCHOKE, BISHWADUWA,BHELAMUNI,BISHNUCHOKE,SHYALMARA ,MAHAVARA",
+      "d2d_price": 220,
+      "d2b_price": 170
+    },
+    {
+      "name": "SHREE ANTU",
+      "code": "SHRE1",
+      "district": "ILAM",
+      "phone": "9707085513",
+      "covered_areas": "ANTU DANDA,ANTU-POKHARI,XIRUWA,TAKPAT,ANTU-CHEKPOINT,SIDDHI KHOLA BAZZAR, BARAL CHOOK",
+      "d2d_price": 245,
+      "d2b_price": 195
+    },
+    {
+      "name": "SIDHUWA",
+      "code": "SIDH1",
+      "district": "DHANKUTA",
+      "phone": "9801984164",
+      "covered_areas": "SIDHUWA",
+      "d2d_price": 245,
+      "d2b_price": 195
+    },
+    {
+      "name": "SILGADHI",
+      "code": "SILG1",
+      "district": "DOTI",
+      "phone": "9701003531",
+      "covered_areas": null,
+      "d2d_price": 270,
+      "d2b_price": 220
+    },
+    {
+      "name": "SIMALTARI",
+      "code": "SIMA2",
+      "district": "GULMI",
+      "phone": "9801984214",
+      "covered_areas": "SIMALTARI BAZAR AREA, FULBARI BAZAR, DAGHAS, THANAPATI, HULKHOLA",
+      "d2d_price": 245,
+      "d2b_price": 195
+    },
+    {
+      "name": "SIMARA",
+      "code": "SIMA1",
+      "district": "BARA",
+      "phone": "9801984185",
+      "covered_areas": "PATHLAIYA, SANO GADIMAI, JITPUR, CHHATA PIPRA,CHORNI, SOLAKHPUR, BAKULIYA, DUMARWANA, AADHABAR, AAURAHA, NITANPUR, RAMBAN, MUSARNIMAI, RAJGHATTA, AIRPORT, BAJINI, BHARATI CHWOK, SYAULI CHWOK, SUNDARBASTI, KERADHOKA",
+      "d2d_price": 245,
+      "d2b_price": 195
+    },
+    {
+      "name": "SIMIKOT",
+      "code": "SIMI1",
+      "district": "HUMLA",
+      "phone": "9868370513",
+      "covered_areas": "HUMLA, BURAUSYA, THEHE, DANDAFAYA",
+      "d2d_price": 270,
+      "d2b_price": 220
+    },
+    {
+      "name": "SIMRANGADH",
+      "code": "SIMR2",
+      "district": "BARA",
+      "phone": "9801984188",
+      "covered_areas": "KANKALI MANDIR, TELKUWA, PIPARDADI, KUDWA, PIPARABIRTA, LAXMIPUR-KOTWALI, ITAWAL",
+      "d2d_price": 220,
+      "d2b_price": 170
+    },
+    {
+      "name": "SINDHULI",
+      "code": "SIND1",
+      "district": "SINDHULI",
+      "phone": "9801984086",
+      "covered_areas": "SINDHULI MADI BAZAR, RATAMATA, DHUNGREBAS, CHIYABARI, SANTINAGAR CHOWK, SHIVANAGAR, DHURABAZAR, MADHUTAR, MILANCHOK, KARKARE, SILAME,MAJHITAR,",
+      "d2d_price": 220,
+      "d2b_price": 170
+    },
+    {
+      "name": "SINGA TATOPANI",
+      "code": "TATO2",
+      "district": "MYAGDI",
+      "phone": "9764643060",
+      "covered_areas": "SINGA, TATOPANI BAJAR, RAKSHE, SIMALCHAUR, TARAKHOLA, BABIYACHAUR BAJAR, SINGA TATOPANI",
+      "d2d_price": 220,
+      "d2b_price": 170
+    },
+    {
+      "name": "SINGATI",
+      "code": "SING1",
+      "district": "DOLAKHA",
+      "phone": "9765010515",
+      "covered_areas": "SINGATI",
+      "d2d_price": 245,
+      "d2b_price": 195
+    },
+    {
+      "name": "SIRAHA",
+      "code": "SIRA1",
+      "district": "SIRAHA",
+      "phone": "9801984079",
+      "covered_areas": "BISHNUPUR, LAXMIPUR, BHALWAHI, HEMNARAYAN CHOWK, MAHABIR CHOWK, IMLI CHOWK",
+      "d2d_price": 220,
+      "d2b_price": 170
+    },
+    {
+      "name": "SISANIYA",
+      "code": "SISA1",
+      "district": "DANG",
+      "phone": "9701010732",
+      "covered_areas": "SISANIYA",
+      "d2d_price": 195,
+      "d2b_price": 145
+    },
+    {
+      "name": "SONAMA",
+      "code": "SONA1",
+      "district": "MAHOTTARI",
+      "phone": "9701003765",
+      "covered_areas": "SONAMA",
+      "d2d_price": 195,
+      "d2b_price": 145
+    },
+    {
+      "name": "SUBARNA",
+      "code": "SUBA1",
+      "district": "BARA",
+      "phone": "9801984188",
+      "covered_areas": "SUBARNA",
+      "d2d_price": 195,
+      "d2b_price": 145
+    },
+    {
+      "name": "SUKHIPUR",
+      "code": "SUKH1",
+      "district": "SIRAHA",
+      "phone": "9801984516",
+      "covered_areas": "SHUKHIPUR, DAHIPAUDI, CHHAJANA, LAXMIPUR PATARI",
+      "d2d_price": 220,
+      "d2b_price": 170
+    },
+    {
+      "name": "SUKKHAD",
+      "code": "SUKK1",
+      "district": "KAILALI",
+      "phone": "9801984443",
+      "covered_areas": "SADEPANI, SUKKHAD BAZAR,  PAHALMANPUR, BHALUPHATA, DOKE BAZAR, GHODAGHODI MANDIR AND LAKE AREA, JANAKPUR, DEBNAGAR, SIMTADI, BELAR",
+      "d2d_price": 220,
+      "d2b_price": 170
+    },
+    {
+      "name": "SULICHAUR",
+      "code": "SULI1",
+      "district": "ROLPA",
+      "phone": "9701010304",
+      "covered_areas": "RUINIBANG BAZAR, HOSPITAL CHOWK, PIPAL CHOWK",
+      "d2d_price": 270,
+      "d2b_price": 220
+    },
+    {
+      "name": "SUNAWAL",
+      "code": "SUNA1",
+      "district": "NAWALPARASI WEST",
+      "phone": "9801984341",
+      "covered_areas": "CHAPI, KIRTIPUR, BADERA, MINI BADERA, PIPALDADA, RAMAWAPUR, SWATHI, KHAIRENI",
+      "d2d_price": 220,
+      "d2b_price": 170
+    },
+    {
+      "name": "SUNDARBAZAR",
+      "code": "SUND1",
+      "district": "LAMJUNG",
+      "phone": "9801984373",
+      "covered_areas": "PAUDI, BHOTEWODAR, SIUDIBAAR, SUNDARBAZAR, KHATRI THATI, BAGAICHA, BALUNI, FEDIKUNA, SAKALEY, TALLOBAZAR, FHULABARI, BHOTEWODAR, SIUDIBAAR, SUNDARBAZAR, TALLO SUNDARBAZAR AREA.KHATRI THATI, BAGAICHA, BALUNI,  TALLOBAZAR,BELGHARI,AKALA,RAMDI,KRISHI CAMPUS AREA GATE,BHIMSEN CHOWK,MANECHOUKA POOL,SAINIK TOLE,SAPKOTA TOLE,THANTI CHAUR,PANCHANABBE TOLE,DHARAPANI, KHATRI THANTI, UDIPUR",
+      "d2d_price": 220,
+      "d2b_price": 170
+    },
+    {
+      "name": "SUNDARIJAL",
+      "code": "SUND2",
+      "district": "KATHMANDU",
+      "phone": "9801472162",
+      "covered_areas": "GOKARNESWOR TEMPLE, BHAGAWATITHAN, HANUMAN CHOWK, BASNET GAU, SUNTAKHAN (BALSUDHAR SCHOOL SAMMA), JAGDOL, JAGDOL JHANDA PARK, NAMUNA BASTI, TALIN CHOWK, UTTARBAHINI SCHOOL, CHANDIKASHWORI SCHOOL, NAYAPATI PIPAL BOT, SUNDARIJAL BUSPARK, NAMGEL, AALABOT (KRISHNACHAUR SAMMA), BHAIRABCHAUR, SUNDARIJAL DOBATO, MAITINEPAL AREA (KIDS SANGRILA, MAMAGHAR HOME STAY), GOKARNESHWOR BANQUET, BHAIRABCHAUR",
+      "d2d_price": 120,
+      "d2b_price": 70
+    },
+    {
+      "name": "SUNJHODA",
+      "code": "SUNJ1",
+      "district": "MORANG",
+      "phone": "9701003119",
+      "covered_areas": "BASE CHOUR, NAYA MANGALBARE, MADAN BANDARI HOSPITAL, COLLAGE, THAPA CHOWK KERKHALI CHOWK, BETANI SIMSAR SEUPAKHA CHOWK",
+      "d2d_price": 220,
+      "d2b_price": 170
+    },
+    {
+      "name": "SURKHET",
+      "code": "SURK1",
+      "district": "SURKHET",
+      "phone": "9801984420",
+      "covered_areas": "SUBBAKUNA, DHULAIBIT, GAGRETAAL, PIPIRA, AIRPORT, NEWARE, KHAJURA, MANGALGADI, LATIKOILI, ITTRAM, YERICHOK, DHOODEKHALI, BHAIRABSTHAN, BANGESIMAL, GANESH CHOK, SANO SURKHET, UTTARGANGA, CHISAPANI, KALINCHOK, MULPANI, FALAATE, BHURELI, GHUSRAA, PADAMPUR, DIPNAGAR, ALAYACHAUR, BUDDHAPATH, GHANTAGHAR",
+      "d2d_price": 220,
+      "d2b_price": 170
+    },
+    {
+      "name": "SURUNGA",
+      "code": "SURU1",
+      "district": "JHAPA",
+      "phone": "9801984068",
+      "covered_areas": "DURGAPUR, JAMUNBAARI, NAYABASTI, SUKEDANGI, CHAMPAPUR, MAIDHAR, JUKEKALPOT, SELFIDANDA, LOTUS AREA,KANKAII AREA, KOTIHOM, MILANCHOOWK, PINGDADHA, DOMUKHA.SAINIKCHOWK,KIRATCHOWK, YALAMBAR CHOWK, DOMUKHA, KALIMUDA",
+      "d2d_price": 220,
+      "d2b_price": 170
+    },
+    {
+      "name": "SURYABINAYAK",
+      "code": "SURY1",
+      "district": "BHAKTAPUR",
+      "phone": "9801984244",
+      "covered_areas": "SRIJANANAGAR, SALLAGHARI, PANDU BAZAR, SURYABINAYAK, BYASI, CHYAMASING, DEKOCHA, DOLESHWOR, SWORNESHWOR MANDIR AREA, CHUNDEVI, SIDDHAPOKHARI, DUDHPATI, KALOPATI, BHAKTAPUR DURBAR SQUARE, BHAKTAPUR CANCER HOSPITAL, PALASE, SANGA, JAGATE, KAMALBINAYAK, LANCHAPHALCHA, CHANGUNARAYAN, JHOUKHEL, SUDAL, TATHALI, CHHALING, BAGESHWORI, SIPADOL, SANGA JORPATI, KHARIPATI, LIWALI, DATATRAYE, DEKOCHA, PIKHEL, GUNDU, KATUNGE, CHUNDEVI, GHALATE, JITPUR, NEPAL ENGINEERING COLLAGE",
+      "d2d_price": 120,
+      "d2b_price": 70
+    },
+    {
+      "name": "SURYAPURA",
+      "code": "SURY2",
+      "district": "RUPANDEHI",
+      "phone": "9801869367",
+      "covered_areas": "SURYAPURA",
+      "d2d_price": 195,
+      "d2b_price": 145
+    },
+    {
+      "name": "SWOYAMBHU",
+      "code": "SWOY1",
+      "district": "KATHMANDU",
+      "phone": "9701003235",
+      "covered_areas": "SWOYAMBHU, SANO BHARYANG, THULO BHARYANG, WHITE GUMBA, SINGLE TREE, HALLCHOK, BHAGWAN PAU, KARKHANA CHOK, CHHAUNI, DALLU, PANCHDHARA, BAFAL, SOLTIDOBATO, RAMKOT, YELLOW GUMBA, SITAPAILA, TACHAL, CHAMATI",
+      "d2d_price": 120,
+      "d2b_price": 70
+    },
+    {
+      "name": "SYAULE BAZAR KAILALI",
+      "code": "SYAU1",
+      "district": "KAILALI",
+      "phone": "9701003579",
+      "covered_areas": "SYAULE BAZAR KAILALI",
+      "d2d_price": 195,
+      "d2b_price": 145
+    },
+    {
+      "name": "TAMGHAS",
+      "code": "TAMG1",
+      "district": "GULMI",
+      "phone": "9801984156",
+      "covered_areas": "DEURALI, ARKHALE , BHUJEL KHARKA, DHAGITHUM , PANCHRATE , NAYA BAJAR , PURANO BAJAR, THUMKA , GAJURA, UPALLO TAMGHAS , BIDHUIT CHOCK , BAYRIYAL , ARGHAKHANCHI JEEP PARK , PANCH DOBATO, BAKHRECHHEDA , PARALMI ROAD, URLENI MOD, PUTALI BAJAR ,BHAGWATI STHAN, NETA ROAD, BHAD GAU CHOCK, ASPATAL ROAD, CAMPUS ROAD.",
+      "d2d_price": 245,
+      "d2b_price": 195
+    },
+    {
+      "name": "TAMNAGAR",
+      "code": "TAMN1",
+      "district": "RUPANDEHI",
+      "phone": "9801472135",
+      "covered_areas": "NAYAA GAAU , DHABAHA , SEMALAAR , UJELAPUR , BELBAAS , BEL BHARIYAA , SHANTICHOWK ,IMILI CHOWK, KEDALI, MADHAIYA CHAURAHA",
+      "d2d_price": 220,
+      "d2b_price": 170
+    },
+    {
+      "name": "TANDI",
+      "code": "TAND1",
+      "district": "CHITWAN",
+      "phone": "9701003415",
+      "covered_areas": "TIKAULI, KRISHNA MANDIR, BHANU CHOWK, NIPANI, GHEGHAULI, HARIHAR MANDIR, BAKULLAHAR, BHAKTINI BAGAICHA, DEBAULI, CHITRASARI, BACHHEULI, BHOKAHA, SERI, HIGH SCHOOL ROAD, 2 NO ROAD, SUBBA CHOWK, LAURIGHOL, CHAUCHAU FACTORY, DUMRI CHOWK, DOBATO, KHANAL TOLE, GUNJAMAN HOSPITAL, PARSAUNI, BAIRIYA, JAYAMANGALA, SALGHARI, JIRAUNA, PITHUWA, MADHAVPUR, SHANTI CHOWK, BELSI,  BISCUIT FACTORY, TAKARI CHOWK, AADARSHA CHOWK, BAHERA, NEPAL CHOWK, GANESH CHOWK, SAHI CHOWK, BAKULLAHAR, SINCHAAI GATE,  LAAL PARSA",
+      "d2d_price": 170,
+      "d2b_price": 120
+    },
+    {
+      "name": "TANSEN",
+      "code": "TANS1",
+      "district": "PALPA",
+      "phone": "9801984382",
+      "covered_areas": "TANSEN BAZAR , MISSION HOSPITAL , BATASE DADA , KILASNAGAR, BASANTAPUR , BISALBAZAR , HULUNGDI, BARTUNG , PRAVAS , LUMINI MEDICAL COLLEGE, BASTARI",
+      "d2d_price": 220,
+      "d2b_price": 170
+    },
+    {
+      "name": "TARAKHOLA BAGLUNG",
+      "code": "TARA2",
+      "district": "BAGLUNG",
+      "phone": "9764643061",
+      "covered_areas": "MAJKHARKA, BUKENI DADA, SILLA AARGAL, KHALDADA, KUILTA, HILLA, GHUSMELI, DOGADI, TARA GAU, NAGBELI KHOLA, TARA, SIIPA, KARMILAE, BHATKHANE DANDA, TARAKHOLA WARD AREA",
+      "d2d_price": 245,
+      "d2b_price": 195
+    },
+    {
+      "name": "TARAPATTI SIRSIYA",
+      "code": "TARA3",
+      "district": "DHANUSHA",
+      "phone": "9707085528",
+      "covered_areas": "TARAPATTI SIRSIYA",
+      "d2d_price": 195,
+      "d2b_price": 145
+    },
+    {
+      "name": "TARATAL",
+      "code": "TARA1",
+      "district": "BARDIYA",
+      "phone": "9801984080",
+      "covered_areas": "TARATAL",
+      "d2d_price": 220,
+      "d2b_price": 170
+    },
+    {
+      "name": "TAULIHAWA",
+      "code": "TAUL1",
+      "district": "KAPILBASTU",
+      "phone": "9801984521",
+      "covered_areas": "ODARI, PACHERA, GOBARI, JAHADI, JADISHPUR TAL, THUMUWA,SADAWA, MAHETA, BHICHHUCHOK, CAMPUS TOLE, RAMGHAT, GAUDICHOK, NAYATOLE, GOPALPUR, BARGATIGHAT, JAMUWARPUL, MAHENEHAWA, DOHONI,BAROHEYA, PAKDI, MARJATPUR, KUDAN, DAGARI CHECKPOST, LAXMINAGAR, BARGADAWA, TAULIHAWA BAZAR",
+      "d2d_price": 220,
+      "d2b_price": 170
+    },
+    {
+      "name": "TERHATHUM BASANTAPUR",
+      "code": "TERH1",
+      "district": "TERHATHUM",
+      "phone": "9801984228",
+      "covered_areas": "LASUNE, THUTE DEURALI, CHITRE, SIDUWA",
+      "d2d_price": 245,
+      "d2b_price": 195
+    },
+    {
+      "name": "THANKOT",
+      "code": "THAN1",
+      "district": "KATHMANDU",
+      "phone": "9701003621",
+      "covered_areas": "MACHHEGAU BUSPARK AREA, TAUKHEL, FIRFIRE CHAUR, AAYATAR CHEUBARI, GAMCHA CHAUR (KIRTIPUR), KHUSIKHUSI, BAUTHALI CHOWK, MATATIRTHA BUSPARK AREA, GURJUDHARA, SATUNGAL, CHAPPAL FACTORY, TOTI TOL, JAMUNAPATI CHOWK, BALAMBU, HARYALI SATUNGAL, BISHNUDEVI CAMPUS AREA, PIPLAMOD, GHATTEDADA, NAGDHUNGA, MASHINE, BAAD BHANJYANG, THANKOT, MAHADEVTHAN, PANIGHAT, CHECKPOST, GODAM, HIGHVISION, DAHACHOWK, BALAMBU, KANCHANBASTI",
+      "d2d_price": 120,
+      "d2b_price": 70
+    },
+    {
+      "name": "THARMARE",
+      "code": "THAR1",
+      "district": "SALYAN",
+      "phone": "9764643053",
+      "covered_areas": "BAGCHAUR, SYAULIBAZAR",
+      "d2d_price": 220,
+      "d2b_price": 170
+    },
+    {
+      "name": "THARPU TANAHUN",
+      "code": "THAR2",
+      "district": "TANAHU",
+      "phone": "9801984306",
+      "covered_areas": null,
+      "d2d_price": 245,
+      "d2b_price": 195
+    },
+    {
+      "name": "THORI",
+      "code": "THOR1",
+      "district": "PARSA",
+      "phone": "9701003461",
+      "covered_areas": "THORI",
+      "d2d_price": 195,
+      "d2b_price": 145
+    },
+    {
+      "name": "THUTIPIPAL",
+      "code": "THUT1",
+      "district": "RUPANDEHI",
+      "phone": "9701003567",
+      "covered_areas": "THUTIPIPAL BAZAR AREA, PADSARI,CHILHIYA,KATAIYA, HATI PHARSATIKAR",
+      "d2d_price": 170,
+      "d2b_price": 120
+    },
+    {
+      "name": "TIGER TOP HILL",
+      "code": "TIGE1",
+      "district": "KASKI",
+      "phone": "9801984284",
+      "covered_areas": "PANI TANKI, GANESH CHOWK, SILINGE, TIGER TOP RESORT AREA",
+      "d2d_price": 170,
+      "d2b_price": 120
+    },
+    {
+      "name": "TIKAPUR",
+      "code": "TIKA1",
+      "district": "KAILALI",
+      "phone": "9801984057",
+      "covered_areas": "SITAPUR, RAJIPUR, BIJAYANAGAR, TIKAPUR BUSPARK, KHADAK CHOWK, NAYABASTI, ASNERI, JHUNGA, NARAYANPUR, BAIDI, SATTI, KHAKRAULA, MUNUWA, GHIYAPUCHRI, BANGAU, CHILAMCHAURAHA, JYOTINAGAR, SATGHARUWA, DURGAULI, JANAKALI GAU PALIKA, TORAIYAPUR, PATHARAIYA, KANCHANPUR, BELASHPUR, PARK ROAD , LAIKPUR, SUBARNAPUR, PASHU HAATBAZAR, TELECOM, BLOCK NO 14, 15, 16, 17, 18, 19, 23, A, B, C.",
+      "d2d_price": 220,
+      "d2b_price": 170
+    },
+    {
+      "name": "TINKORIYA",
+      "code": "TINK2",
+      "district": "DHANUSHA",
+      "phone": "9701003590",
+      "covered_areas": "MAHINATHPUR, LAGMA CHOWK, AURAHI, EKRAHI, BAFAI, DUHABI, TINKORIYA CHOWK",
+      "d2d_price": 220,
+      "d2b_price": 170
+    },
+    {
+      "name": "TINKUNE",
+      "code": "TINK1",
+      "district": "KATHMANDU",
+      "phone": "9801984403",
+      "covered_areas": "TINKUNE, KOTESHWOR, MAHADEVSTHAN, SUBIDHANAGAR, BANESHWOR SHANTINAGAR, SINAMANGAL, BATTISPUTALI, GHATTEKULO, SANKHAMUL, MAITIDEVI, BHIMSENGOLA, DILLIBAZAR, NAXAL, KAMALPOKHARI, CHANDOL, ANAMNAGAR, LAZIMPAT, GAIRIGAUN, PEPSIKOLA, KADAGHARI, JADIBUTI, NAREPHAT, LOKANTHALI, KAUSALTAR, GOTHATAR, ALOKNAGAR, MAITIGHAR, THAPATHALI, SINGHADURBAR, BABARMAHAL, BUDDHANAGAR, BIJULIBAJAR, BALKUMARI, UN PARK",
+      "d2d_price": 120,
+      "d2b_price": 70
+    },
+    {
+      "name": "TINPIPLE",
+      "code": "TINP1",
+      "district": "LAMJUNG",
+      "phone": "9701010407",
+      "covered_areas": "PACH VAI , HARRABOT, DHAMILIKUWA BAZAR, TINPIPLE BAZAR,SHYAULI,KAINTAR,SAALPHEDA,BHABYA DANDA,GHORETARI,PANGRE,HARABOT, ALKATAAR, CHITIKHOLA, DEURALITAR PANCHSAYAPHAT, TURTURE, PATTAL, JUNGEPHAT, BADAHARE, ARCHALDHARA, DUMRIKHARKA, KAURETAR, BAGALEPHAT",
+      "d2d_price": 220,
+      "d2b_price": 170
+    },
+    {
+      "name": "TOKHA",
+      "code": "TOKH1",
+      "district": "KATHMANDU",
+      "phone": "9801869458",
+      "covered_areas": "GRANDE HOSPITAL, GRANDE HEIGHT, TOKHA, JHOR, CHANDESHWORI",
+      "d2d_price": 120,
+      "d2b_price": 70
+    },
+    {
+      "name": "TOPA BAZAR",
+      "code": "TOPA1",
+      "district": "SAPTARI",
+      "phone": "9801984191",
+      "covered_areas": "TOPA BAZAR",
+      "d2d_price": 195,
+      "d2b_price": 145
+    },
+    {
+      "name": "TRISHULI",
+      "code": "TRIS1",
+      "district": "NUWAKOT",
+      "phone": "9801984266",
+      "covered_areas": "INARPATI, MAJHITAR, PETROL PUMP, COLONY, BAGHTAR, BIDUR, BATTAR, DHIKURE BAZAR, PIPALTAR, BETRAWATI, DEVIGHAT BAZAR",
+      "d2d_price": 245,
+      "d2b_price": 195
+    },
+    {
+      "name": "TULSIPUR",
+      "code": "TULS1",
+      "district": "DANG",
+      "phone": "9801984416",
+      "covered_areas": "URAHARI CHOWK, HEKULI CHOWK, POTALI,BHAMAKE SCHOOL, HATTIKHAUWA, PERSENI, BIJAURI, BELJHUNDI, DUDHRASH, MOTIPUR, MANPUR, DADAPATU, SHREEGAI, GANESHPUR, EYE HOSPITAL, GOTIKHOLA PUL, DOGHAREA, DUDENA, KRISHNA MANDIR, BALAPUR, BHAMKE, JASPUR CHOWK, GUMRA CHOWK",
+      "d2d_price": 220,
+      "d2b_price": 170
+    },
+    {
+      "name": "TULSIYAHI",
+      "code": "TULS2",
+      "district": "DHANUSHA",
+      "phone": "9801984160",
+      "covered_areas": "TULSIYAHI",
+      "d2d_price": 220,
+      "d2b_price": 170
+    },
+    {
+      "name": "TUMLINGTAR",
+      "code": "TUML1",
+      "district": "SANKHUWASABHA",
+      "phone": "9801984264",
+      "covered_areas": "TUMLINGTAR",
+      "d2d_price": 270,
+      "d2b_price": 220
+    },
+    {
+      "name": "URLABARI",
+      "code": "URLA1",
+      "district": "MORANG",
+      "phone": "9701010390",
+      "covered_areas": "TARUN CHOWK, SOMBARE, MANGALBARE, ITAHARA, DAMRAVITTA, SIMANA BASTI, KULUNG CHOWK, THAPA CHOWK, SURYA CHOWK, BIHANI MARGA, SISAULI, TALIVATTA, SUGA PURBA JHORLONGE POOL",
+      "d2d_price": 220,
+      "d2b_price": 170
+    },
+    {
+      "name": "WALING",
+      "code": "WALI1",
+      "district": "SYANGJA",
+      "phone": "9801984490",
+      "covered_areas": "BAYATARI, KADARI, RAMBACCHA, BHAKUNDE, MIRDI, BHAKUNDE, BHUMRE, AMALE, KEDARNATH MARGA, HEALTH POST LINE WALING, EKLEPIPAL, KATAUJE, MADIKHOLA, DAUWA, TRIYASHI, BP CHOK, BHIMTARI, PATHKHOLA, SURKAUDI,",
+      "d2d_price": 220,
+      "d2b_price": 170
+    },
+    {
+      "name": "WAMITAKSAR",
+      "code": "WAMI1",
+      "district": "GULMI",
+      "phone": "9701010608",
+      "covered_areas": "WAMITAKSAR",
+      "d2d_price": 245,
+      "d2b_price": 195
+    },
+    {
+      "name": "YADUKUSH",
+      "code": "YADU1",
+      "district": "DHANUSHA",
+      "phone": "9701003590",
+      "covered_areas": "YADUKOHA,BALGANGA CHOWK, NATHPATTI, HATTIPUR, MANGRAHA, DHABAULI,HALUWAHI CHOWK",
+      "d2d_price": 220,
+      "d2b_price": 170
+    }
+  ]
+}

@@ -276,6 +276,16 @@ export const receiveSupply = asyncHandler(async (req, res) => {
  * SECURITY: Admin only - Staff cannot make payments
  */
 export const recordPayment = asyncHandler(async (req, res) => {
+  // DEBUG: Log incoming payment request for troubleshooting
+  logger.info('💰 Payment Request Body:', { 
+    body: req.body,
+    bodyKeys: Object.keys(req.body),
+  });
+  logger.info('🆔 Payment Vendor Params:', { 
+    params: req.params,
+    vendorIdFromBody: req.body.vendor_id,
+  });
+
   // Authorization check is done via route middleware authorize('admin')
   const transaction = await vendorService.recordPayment(req.body, req.user?.id);
 
@@ -499,14 +509,29 @@ export const getVendorTransactions = asyncHandler(async (req, res) => {
     });
   }
 
-  // Build summary from denormalized columns (instant!) - fallback to 0 if columns don't exist
+  // Calculate summary from ledger data for accuracy (denormalized columns may be stale)
+  const ledgerData = ledger.data || [];
+  
+  // Calculate totals from ledger entries
+  const calculatedPurchases = ledgerData
+    .filter(entry => entry.entry_type === 'purchase')
+    .reduce((sum, entry) => sum + Math.abs(parseFloat(entry.debit) || 0), 0);
+  
+  const calculatedPayments = ledgerData
+    .filter(entry => entry.entry_type === 'payment')
+    .reduce((sum, entry) => sum + Math.abs(parseFloat(entry.credit) || 0), 0);
+  
+  const calculatedReturns = ledgerData
+    .filter(entry => entry.entry_type === 'purchase_return')
+    .reduce((sum, entry) => sum + Math.abs(parseFloat(entry.credit) || 0), 0);
+
   const summary = {
-    total_purchases: vendor.total_purchases || 0,
-    total_payments: vendor.total_payments || 0,
-    total_returns: vendor.total_returns || 0,
+    total_purchases: calculatedPurchases || vendor.total_purchases || 0,
+    total_payments: calculatedPayments || vendor.total_payments || 0,
+    total_returns: calculatedReturns || vendor.total_returns || 0,
     current_balance: vendor.balance || 0,
-    purchase_count: vendor.purchase_count || 0,
-    payment_count: vendor.payment_count || 0,
+    purchase_count: ledgerData.filter(e => e.entry_type === 'purchase').length || vendor.purchase_count || 0,
+    payment_count: ledgerData.filter(e => e.entry_type === 'payment').length || vendor.payment_count || 0,
     last_purchase_date: vendor.last_purchase_date || null,
     last_payment_date: vendor.last_payment_date || null,
   };

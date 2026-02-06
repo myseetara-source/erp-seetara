@@ -37,25 +37,33 @@ interface OrderFiltersProps {
 }
 
 const TABS = [
-  { id: 'all', label: 'All', icon: Package },
-  { id: 'inside', label: 'Inside', icon: Truck },
-  { id: 'outside', label: 'Outside', icon: Building2 },
-  { id: 'store', label: 'Store', icon: Store },
+  { id: 'all', label: 'All Orders', icon: Package },
+  { id: 'inside', label: 'Inside Valley', icon: Truck },
+  { id: 'outside', label: 'Outside Valley', icon: Building2 },
+  { id: 'store', label: 'Store POS', icon: Store },
 ]
 
-// MUST MATCH: Backend/database/000_schema_final.sql order_status enum
+// STATUS OPTIONS - Organized by workflow phase
+// Primary (shown directly): New, Follow Up, Converted, Delivered
+// Secondary (in dropdown): Processing, In Transit, Returns
 const STATUS_OPTIONS = [
-  { id: 'intake', label: 'Intake', icon: Clock, color: 'bg-blue-100 text-blue-700' },
-  { id: 'follow_up', label: 'Follow Up', icon: Clock, color: 'bg-yellow-100 text-yellow-700' },
-  { id: 'converted', label: 'Converted', icon: CheckCircle, color: 'bg-green-100 text-green-700' },
-  { id: 'hold', label: 'On Hold', icon: Clock, color: 'bg-gray-100 text-gray-700' },
-  { id: 'packed', label: 'Packed', icon: Package, color: 'bg-indigo-100 text-indigo-700' },
-  { id: 'assigned', label: 'Assigned', icon: Truck, color: 'bg-blue-100 text-blue-700' },
-  { id: 'out_for_delivery', label: 'Out for Delivery', icon: Truck, color: 'bg-orange-100 text-orange-700' },
-  { id: 'delivered', label: 'Delivered', icon: CheckCircle, color: 'bg-emerald-100 text-emerald-700' },
-  { id: 'cancelled', label: 'Cancelled', icon: X, color: 'bg-red-100 text-red-700' },
-  { id: 'returned', label: 'Returned', icon: RefreshCw, color: 'bg-pink-100 text-pink-700' },
+  // === PRIMARY: ORDERS PAGE (Sales) ===
+  { id: 'intake', label: 'New', icon: Clock, color: 'bg-blue-100 text-blue-700', primary: true },
+  { id: 'follow_up', label: 'Follow Up', icon: Clock, color: 'bg-yellow-100 text-yellow-700', primary: true },
+  { id: 'converted', label: 'Converted', icon: CheckCircle, color: 'bg-green-100 text-green-700', primary: true },
+  { id: 'delivered', label: 'Delivered', icon: CheckCircle, color: 'bg-emerald-100 text-emerald-700', primary: true },
+  // === SECONDARY: DISPATCH/FULFILLMENT (Operations) ===
+  { id: 'packed', label: 'Packed', icon: Package, color: 'bg-indigo-100 text-indigo-700', primary: false },
+  { id: 'out_for_delivery', label: 'Out for Delivery', icon: Truck, color: 'bg-orange-100 text-orange-700', primary: false },
+  { id: 'in_transit', label: 'In Transit', icon: Truck, color: 'bg-teal-100 text-teal-700', primary: false },
+  { id: 'cancelled', label: 'Cancelled', icon: X, color: 'bg-red-100 text-red-700', primary: false },
+  { id: 'rejected', label: 'Rejected', icon: X, color: 'bg-red-100 text-red-700', primary: false },
+  { id: 'returned', label: 'Returned', icon: RefreshCw, color: 'bg-pink-100 text-pink-700', primary: false },
 ]
+
+// Get primary and secondary status options
+const PRIMARY_STATUS_OPTIONS = STATUS_OPTIONS.filter(s => s.primary)
+const SECONDARY_STATUS_OPTIONS = STATUS_OPTIONS.filter(s => !s.primary)
 
 const DATE_OPTIONS = [
   { id: 'today', label: 'Today' },
@@ -200,9 +208,9 @@ export default function OrderFilters({
         </div>
       </div>
 
-      {/* Row 2: Status Filters */}
+      {/* Row 2: Status Filters - Primary statuses shown directly */}
       <div className="flex items-center gap-2 flex-wrap">
-        {STATUS_OPTIONS.slice(0, 4).map((status) => {
+        {PRIMARY_STATUS_OPTIONS.map((status) => {
           const Icon = status.icon
           const isSelected = selectedStatuses.has(status.id)
           const count = statusCounts[status.id] || 0
@@ -231,7 +239,7 @@ export default function OrderFilters({
           )
         })}
 
-        {/* More Filters */}
+        {/* More Filters - Secondary statuses (Dispatch/Operations) */}
         <div className="relative">
           <button
             onClick={() => setShowMoreFilters(!showMoreFilters)}
@@ -245,36 +253,41 @@ export default function OrderFilters({
             `}
           >
             <Filter className="w-3 h-3" />
-            <span>+{STATUS_OPTIONS.length - 4}</span>
+            <span>More</span>
           </button>
 
           {showMoreFilters && (
             <>
               <div className="fixed inset-0 z-40" onClick={() => setShowMoreFilters(false)} />
-              <div className="absolute top-full left-0 mt-1.5 p-2 bg-white rounded-xl shadow-xl border border-gray-100 z-50 flex flex-wrap gap-1.5 min-w-[200px] animate-fade-in-scale">
-                {STATUS_OPTIONS.slice(4).map((status) => {
-                  const Icon = status.icon
-                  const isSelected = selectedStatuses.has(status.id)
-                  const count = statusCounts[status.id] || 0
-                  return (
-                    <button
-                      key={status.id}
-                      onClick={() => onStatusToggle(status.id)}
-                      className={`
-                        inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium
-                        transition-all border active:scale-95
-                        ${isSelected
-                          ? `${status.color} border-current`
-                          : 'bg-white border-gray-200 text-gray-600 hover:bg-gray-50'
-                        }
-                      `}
-                    >
-                      <Icon className="w-3 h-3" />
-                      <span>{status.label}</span>
-                      <span className="text-[10px] font-bold">{count}</span>
-                    </button>
-                  )
-                })}
+              <div className="absolute top-full left-0 mt-1.5 bg-white rounded-xl shadow-xl border border-gray-100 z-50 min-w-[220px] animate-fade-in-scale overflow-hidden">
+                <div className="px-3 py-2 bg-gray-50 border-b border-gray-100">
+                  <p className="text-[10px] font-semibold text-gray-500 uppercase">Operations / Dispatch</p>
+                </div>
+                <div className="p-2 flex flex-wrap gap-1.5">
+                  {SECONDARY_STATUS_OPTIONS.map((status) => {
+                    const Icon = status.icon
+                    const isSelected = selectedStatuses.has(status.id)
+                    const count = statusCounts[status.id] || 0
+                    return (
+                      <button
+                        key={status.id}
+                        onClick={() => onStatusToggle(status.id)}
+                        className={`
+                          inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium
+                          transition-all border active:scale-95
+                          ${isSelected
+                            ? `${status.color} border-current`
+                            : 'bg-white border-gray-200 text-gray-600 hover:bg-gray-50'
+                          }
+                        `}
+                      >
+                        <Icon className="w-3 h-3" />
+                        <span>{status.label}</span>
+                        <span className="text-[10px] font-bold">{count}</span>
+                      </button>
+                    )
+                  })}
+                </div>
               </div>
             </>
           )}

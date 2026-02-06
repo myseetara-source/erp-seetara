@@ -47,28 +47,60 @@ export const authenticate = async (req, res, next) => {
         .eq('id', user.id)
         .single();
 
+      // P0 FIX: app_metadata.role is set by admin and is the SOURCE OF TRUTH
+      // It should ALWAYS take priority over public.users.role
+      const appMetadataRole = user.app_metadata?.role;
+      
+      // P0 DEBUG: Log what we receive from Supabase Auth
+      logger.info('Auth user metadata', {
+        userId: user.id,
+        email: user.email,
+        app_metadata: user.app_metadata,
+        user_metadata: user.user_metadata,
+        appMetadataRole,
+      });
+      
       if (userError || !userData) {
         // User exists in auth.users but not in public.users
-        // Create a basic entry or use auth data
-        logger.warn('User not found in public.users, using auth data', { userId: user.id });
+        const role = appMetadataRole || user.user_metadata?.role || 'operator';
+        logger.warn('User not found in public.users, using auth data', { 
+          userId: user.id, 
+          role,
+          app_metadata: user.app_metadata,
+          user_metadata: user.user_metadata 
+        });
         
         req.user = {
           id: user.id,
           email: user.email,
-          name: user.user_metadata?.name || user.email?.split('@')[0] || 'Unknown',
-          role: user.user_metadata?.role || 'operator',
-          vendorId: null,
+          name: user.user_metadata?.name || user.app_metadata?.name || user.email?.split('@')[0] || 'Unknown',
+          role: role,
+          vendorId: user.app_metadata?.vendor_id || null,
         };
       } else {
         if (!userData.is_active) {
           throw new AuthenticationError('Account is deactivated');
         }
 
+        // P0 FIX: Prioritize app_metadata.role over public.users.role
+        // app_metadata is set by admin and should be the authoritative source
+        const effectiveRole = appMetadataRole || userData.role;
+        
+        // Log if there's a mismatch (for debugging)
+        if (appMetadataRole && appMetadataRole !== userData.role) {
+          logger.info('Role mismatch detected, using app_metadata.role', {
+            userId: user.id,
+            appMetadataRole,
+            publicUsersRole: userData.role,
+            effectiveRole,
+          });
+        }
+
         req.user = {
           id: userData.id,
           email: userData.email,
           name: userData.name,
-          role: userData.role,
+          role: effectiveRole,
           vendorId: userData.vendor_id,
         };
       }

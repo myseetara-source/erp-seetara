@@ -622,7 +622,7 @@ export default function TransactionDetailPanel({
     );
   }
 
-  // Desktop: Inline panel
+  // Desktop: Inline panel - FIXED: Added flex-shrink-0 to prevent compression
   return (
     <>
       <motion.div
@@ -630,7 +630,7 @@ export default function TransactionDetailPanel({
         animate={{ width: 380, opacity: 1 }}
         exit={{ width: 0, opacity: 0 }}
         transition={{ type: 'spring', damping: 25, stiffness: 200 }}
-        className="h-full bg-white border-l border-gray-200 flex flex-col overflow-hidden"
+        className="h-full bg-white border-l border-gray-200 flex flex-col overflow-hidden flex-shrink-0"
       >
         {/* Header */}
         <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100 bg-gray-50">

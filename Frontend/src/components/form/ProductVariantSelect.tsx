@@ -106,14 +106,23 @@ export function ProductVariantSelect({
   const containerRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
-  // Debounce timer
+  // Debounce timer and abort controller for request cancellation
   const debounceRef = useRef<NodeJS.Timeout | null>(null);
+  const abortControllerRef = useRef<AbortController | null>(null);
 
   // ==========================================================================
   // SEARCH FUNCTION
   // ==========================================================================
 
   const searchVariants = useCallback(async (searchQuery: string) => {
+    // Cancel any pending request
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+    }
+    
+    // Create new abort controller
+    abortControllerRef.current = new AbortController();
+    
     setIsLoading(true);
     try {
       // Use FULL mode to get complete variant data
@@ -123,6 +132,7 @@ export function ProductVariantSelect({
           limit: 15,
           mode: 'FULL', // Always use FULL to get variants
         },
+        signal: abortControllerRef.current.signal,
       });
 
       if (response.data.success) {
@@ -165,7 +175,10 @@ export function ProductVariantSelect({
         setHighlightIndex(0);
       }
     } catch (err) {
-      console.error('Product search failed:', err);
+      // Ignore abort errors (expected when cancelling)
+      if ((err as Error).name !== 'AbortError' && (err as Error).name !== 'CanceledError') {
+        console.error('Product search failed:', err);
+      }
       setResults([]);
     } finally {
       setIsLoading(false);
@@ -186,14 +199,14 @@ export function ProductVariantSelect({
       clearTimeout(debounceRef.current);
     }
 
-    // Debounce search
+    // Debounce search (500ms to prevent 429 errors)
     debounceRef.current = setTimeout(() => {
       if (newQuery.length >= 1) {
         searchVariants(newQuery);
       } else {
         searchVariants(''); // Fetch default items
       }
-    }, 200);
+    }, 500);
   };
 
   // Handle focus - AUTO OPEN with default items

@@ -25,9 +25,9 @@ class ApprovalWorkflowService {
       .select(`
         id, invoice_no, transaction_type, transaction_date, total_cost, notes, created_at,
         vendor:vendors(id, name),
-        created_by_user:users!created_by(id, name),
+        performed_by_user:users!performed_by(id, name),
         items:inventory_transaction_items(
-          id, variant_id, quantity_fresh, quantity_damaged, unit_cost,
+          id, variant_id, quantity, unit_cost, source_type,
           variant:product_variants(id, sku, product:products(id, name))
         )
       `)
@@ -120,7 +120,7 @@ class ApprovalWorkflowService {
       .gte('created_at', new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString());
 
     if (userId) {
-      query = query.eq('created_by', userId);
+      query = query.eq('performed_by', userId);
     }
 
     const { data, error } = await query;
@@ -148,57 +148,138 @@ class ApprovalWorkflowService {
   }
 
   /**
-   * Update vendor balance when transaction is approved
+   * Update vendor balance AND create ledger entry when transaction is approved
+   * 
+   * SECURITY: Uses atomic RPC with row-level locking to prevent race conditions.
+   * CRITICAL FIX: Now properly creates vendor_ledger entry with total_cost from inventory_transactions
    */
   async _updateVendorBalanceOnApproval(transaction) {
     const items = transaction.items || [];
-    const totalAmount = items.reduce(
-      (sum, item) => sum + ((item.quantity_fresh || 0) + (item.quantity_damaged || 0)) * (item.unit_cost || 0),
-      0
-    );
+    
+    // Calculate total amount from items
+    // Use quantity field (combines fresh + damaged) or fall back to separate fields
+    const calculatedAmount = items.reduce((sum, item) => {
+      // Use 'quantity' column (schema uses quantity + source_type, not quantity_fresh/damaged)
+      const qty = item.quantity || 0;
+      return sum + qty * (item.unit_cost || 0);
+    }, 0);
+    
+    // Use total_cost from transaction if available (more accurate), else use calculated
+    const totalAmount = transaction.total_cost || calculatedAmount;
 
-    if (totalAmount <= 0) return;
-
-    const { data: vendor, error: fetchError } = await supabaseAdmin
-      .from('vendors')
-      .select('balance, total_purchases')
-      .eq('id', transaction.vendor_id)
-      .single();
-
-    if (fetchError || !vendor) {
-      logger.warn('Vendor not found for approval balance update', { vendorId: transaction.vendor_id });
+    if (totalAmount <= 0) {
+      logger.warn('Transaction has zero amount, skipping vendor balance update', {
+        transactionId: transaction.id,
+        totalCost: transaction.total_cost,
+        calculatedAmount,
+      });
       return;
     }
 
-    let updates = {};
+    // Map transaction type to RPC type
+    let rpcType;
+    let entryType;
+    let isDebit;
+
     switch (transaction.transaction_type) {
       case TRANSACTION_TYPES.PURCHASE:
-        updates = {
-          balance: (vendor.balance || 0) + totalAmount,
-          total_purchases: (vendor.total_purchases || 0) + totalAmount,
-        };
+        rpcType = 'PURCHASE';
+        entryType = 'purchase';
+        isDebit = true;
         break;
       case TRANSACTION_TYPES.PURCHASE_RETURN:
-        updates = {
-          balance: (vendor.balance || 0) - totalAmount,
-          total_purchases: Math.max(0, (vendor.total_purchases || 0) - totalAmount),
-        };
+        rpcType = 'PURCHASE_RETURN';
+        entryType = 'purchase_return';
+        isDebit = false;
         break;
       default:
+        logger.debug('Transaction type does not affect vendor balance', { 
+          type: transaction.transaction_type 
+        });
         return;
     }
 
-    const { error: updateError } = await supabaseAdmin
-      .from('vendors')
-      .update(updates)
-      .eq('id', transaction.vendor_id);
+    // ATOMIC: Update vendor balance using RPC with row-level locking
+    // This prevents race conditions where concurrent transactions corrupt the balance
+    const { data: rpcResult, error: rpcError } = await supabaseAdmin.rpc('update_vendor_balance_atomic', {
+      p_vendor_id: transaction.vendor_id,
+      p_amount: totalAmount,
+      p_type: rpcType,
+    });
 
-    if (updateError) {
-      logger.error('Failed to update vendor balance on approval', { 
+    // P0 FIX: THROW errors instead of swallowing them to ensure financial data integrity
+    if (rpcError) {
+      logger.error('Failed to update vendor balance on approval (RPC error)', { 
         vendorId: transaction.vendor_id, 
-        error: updateError 
+        transactionId: transaction.id,
+        error: rpcError.message,
+      });
+      throw new AppError(
+        `Failed to update vendor balance: ${rpcError.message}`,
+        500,
+        'VENDOR_BALANCE_UPDATE_FAILED'
+      );
+    }
+
+    if (rpcResult && !rpcResult.success) {
+      logger.error('Vendor balance update failed on approval', { 
+        vendorId: transaction.vendor_id, 
+        transactionId: transaction.id,
+        rpcError: rpcResult.error,
+      });
+      throw new AppError(
+        `Vendor balance update failed: ${rpcResult.error}`,
+        400,
+        'VENDOR_BALANCE_UPDATE_FAILED'
+      );
+    }
+
+    const previousBalance = rpcResult?.previous_balance || 0;
+    const newBalance = rpcResult?.new_balance || 0;
+
+    // Create ledger entry - CRITICAL for रु.0 bug fix
+    // Use the new balance from the atomic RPC for accuracy
+    const ledgerEntry = {
+      vendor_id: transaction.vendor_id,
+      entry_type: entryType,
+      reference_id: transaction.id,
+      reference_no: transaction.invoice_no,
+      debit: isDebit ? totalAmount : 0,
+      credit: isDebit ? 0 : totalAmount,
+      running_balance: newBalance,
+      description: `${isDebit ? 'Purchase' : 'Purchase Return'} - ${transaction.invoice_no}`,
+      transaction_date: transaction.transaction_date || new Date().toISOString().split('T')[0],
+      performed_by: transaction.approved_by || transaction.performed_by,
+    };
+
+    const { error: ledgerError } = await supabaseAdmin
+      .from('vendor_ledger')
+      .insert(ledgerEntry);
+
+    if (ledgerError) {
+      logger.error('Failed to create vendor ledger entry on approval', {
+        transactionId: transaction.id,
+        error: ledgerError,
+      });
+      // Note: Don't throw here as the vendor balance was already updated atomically
+      // The ledger entry can be reconciled manually if needed
+    } else {
+      logger.info('Vendor ledger entry created on approval', {
+        transactionId: transaction.id,
+        invoiceNo: transaction.invoice_no,
+        amount: totalAmount,
+        entryType: ledgerEntry.entry_type,
       });
     }
+
+    logger.info('Vendor balance updated atomically on approval', {
+      vendorId: transaction.vendor_id,
+      transactionId: transaction.id,
+      transactionType: transaction.transaction_type,
+      amount: totalAmount,
+      previousBalance,
+      newBalance,
+    });
   }
 }
 

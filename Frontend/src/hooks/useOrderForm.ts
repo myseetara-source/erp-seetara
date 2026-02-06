@@ -11,7 +11,7 @@
  * AUTO-INJECTION: Quick mode automatically fills hidden fields to pass validation.
  */
 
-import { useState, useCallback, useEffect, useMemo } from 'react';
+import { useState, useCallback, useEffect, useMemo, useRef } from 'react';
 import { useForm, useFieldArray, UseFormReturn } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -31,12 +31,22 @@ import type {
 // =============================================================================
 
 // Quick Order Schema (minimal fields)
+// NOTE: Status enum includes 'store_sale' for POS orders (auto-set when fulfillment_type='store')
 export const QuickOrderSchema = z.object({
   customer_name: z.string().min(2, 'Name is required'),
   customer_phone: z.string().min(10, 'Valid phone required').regex(/^[0-9]{10}$/, 'Phone must be 10 digits'),
   customer_address: z.string().optional().default(''),
   fulfillment_type: z.enum(['inside_valley', 'outside_valley', 'store']).default('inside_valley'),
-  status: z.enum(['intake', 'converted']).default('intake'),
+  status: z.enum(['intake', 'converted', 'store_sale']).default('intake'),
+  payment_status: z.enum(['pending', 'paid', 'partial']).optional().default('pending'),
+  // P0: Zone for inside_valley delivery
+  zone: z.string().optional().nullable(),
+  // P0: NCM Branch for outside_valley delivery
+  destination_branch: z.string().optional().nullable(),
+  // P0 FIX: Courier partner for outside_valley orders
+  courier_partner: z.string().optional().nullable(),
+  // P0 FIX: NCM delivery type (D2D = Home Delivery, D2B = Branch Pickup)
+  delivery_type: z.enum(['D2D', 'D2B']).optional().nullable(),
   items: z.array(z.object({
     variant_id: z.string().min(1, 'Select a product'),
     product_name: z.string().optional(),
@@ -111,8 +121,13 @@ export const quickOrderDefaults: QuickOrderFormData = {
   customer_address: '',
   fulfillment_type: 'inside_valley',
   status: 'intake',
+  payment_status: 'pending',
+  zone: null,  // P0: Delivery zone for inside_valley
+  destination_branch: null,  // P0: NCM branch for outside_valley
+  courier_partner: null,  // P0 FIX: Courier partner for outside_valley
+  delivery_type: null,  // P0 FIX: NCM delivery type (D2D/D2B)
   items: [],
-  delivery_charge: 0,
+  delivery_charge: 100,  // Default shipping for inside_valley
   discount_amount: 0,
   prepaid_amount: 0,
   notes: '',
@@ -176,6 +191,11 @@ function transformToPayload(data: QuickOrderFormData | FullOrderFormData, mode: 
   const quickData = data as QuickOrderFormData;
   const fullData = data as FullOrderFormData;
   
+  // DEBUG: Log zone value
+  if (isQuick) {
+    console.log('[DEBUG] Quick Order Zone:', quickData.zone, 'Fulfillment:', quickData.fulfillment_type);
+  }
+  
   // Clean phone number
   const cleanPhone = data.customer_phone.replace(/[\s\-+]/g, '');
   
@@ -184,7 +204,18 @@ function transformToPayload(data: QuickOrderFormData | FullOrderFormData, mode: 
     ? (quickData.customer_address || 'To be confirmed') 
     : fullData.shipping_address;
   
-  const city = isQuick ? 'Kathmandu' : (fullData.shipping_city || 'Kathmandu');
+  // Determine city based on fulfillment type for quick mode
+  // For inside_valley, default to Kathmandu; for outside_valley, use 'Other District'
+  let city = 'Kathmandu';
+  if (isQuick) {
+    if (data.fulfillment_type === 'outside_valley') {
+      city = 'Outside Valley';
+    } else if (data.fulfillment_type === 'store') {
+      city = 'Store Pickup';
+    }
+  } else {
+    city = fullData.shipping_city || 'Kathmandu';
+  }
   
   return {
     // Customer - MUST match Backend orderCustomerSchema
@@ -213,20 +244,51 @@ function transformToPayload(data: QuickOrderFormData | FullOrderFormData, mode: 
     source: 'manual',
     source_order_id: null,
     
+    // CRITICAL: Include fulfillment_type and status from form selection
+    // This makes Inside/Outside/Store and New/Converted buttons functional
+    fulfillment_type: data.fulfillment_type || 'inside_valley',
+    status: data.status || 'intake',
+    
     // Pricing
-    discount_amount: Number(data.discount_amount) || 0,
+    // P0 FIX: Use nullish coalescing to properly handle 0 values
+    discount_amount: Number(data.discount_amount ?? 0),
     discount_code: null,
-    shipping_charges: Number(data.delivery_charge) || 100,
+    shipping_charges: data.delivery_charge != null ? Number(data.delivery_charge) : 100,
     cod_charges: 0,
     
     // Payment
-    payment_method: isQuick ? 'cod' : (fullData.payment_method || 'cod'),
+    payment_method: isQuick 
+      ? (quickData.fulfillment_type === 'store' ? 'cash' : 'cod') 
+      : (fullData.payment_method || 'cod'),
     paid_amount: Number(data.prepaid_amount) || 0,
+    // For store POS, mark as paid
+    payment_status: isQuick && quickData.fulfillment_type === 'store' ? 'paid' : undefined,
     
     // Priority & Notes
     priority: 0,
     internal_notes: isQuick ? (quickData.notes || null) : (fullData.internal_notes || null),
     customer_notes: isQuick ? null : (fullData.customer_notes || null),
+    
+    // P0: Zone code for inside_valley orders
+    zone_code: isQuick && quickData.fulfillment_type === 'inside_valley' 
+      ? (quickData.zone || null) 
+      : null,
+    
+    // P0: NCM destination branch for outside_valley orders
+    destination_branch: isQuick && quickData.fulfillment_type === 'outside_valley'
+      ? (quickData.destination_branch || null)
+      : null,
+    
+    // P0 FIX: Courier partner for outside_valley orders
+    courier_partner: isQuick && quickData.fulfillment_type === 'outside_valley'
+      ? (quickData.courier_partner || null)
+      : null,
+    
+    // P0 FIX: NCM delivery type (D2D = Home Delivery, D2B = Branch Pickup)
+    // CRITICAL: Must be saved at order creation to persist across sessions
+    delivery_type: isQuick && quickData.fulfillment_type === 'outside_valley'
+      ? (quickData.delivery_type || null)
+      : null,
   };
 }
 
@@ -339,6 +401,10 @@ export function useOrderForm<T extends QuickOrderFormData | FullOrderFormData>(
   const [createdOrder, setCreatedOrder] = useState<CreatedOrderResponse | null>(null);
   const [isSearching, setIsSearching] = useState(false);
   
+  // Request deduplication refs for product search
+  const searchAbortRef = useRef<AbortController | null>(null);
+  const searchTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  
   // Initialize form with explicit typing
   // Note: zodResolver type inference is complex, using type assertion for compatibility
   const form = useForm<T>({
@@ -406,49 +472,75 @@ export function useOrderForm<T extends QuickOrderFormData | FullOrderFormData>(
     }
   }, [update, watchedItems]);
   
-  // Product search
+  // Product search with debouncing and request deduplication
   const searchProducts = useCallback(async (query: string): Promise<ProductOption[]> => {
     if (!query || query.length < 2) return [];
     
-    setIsSearching(true);
-    try {
-      const response = await apiClient.get(API_ROUTES.PRODUCTS.SEARCH, {
-        params: { q: query, limit: 10, include_variants: true },
-      });
-      
-      if (response.data.success) {
-        // Transform to ProductOption format
-        const products = response.data.data || [];
-        const options: ProductOption[] = [];
-        
-        for (const product of products) {
-          for (const variant of (product.variants || [])) {
-            options.push({
-              variant_id: variant.id,
-              product_id: product.id,
-              product_name: product.name,
-              variant_name: Object.values(variant.attributes || {}).join(' / ') || 'Default',
-              sku: variant.sku,
-              price: variant.selling_price || variant.price || 0,
-              stock: variant.current_stock || 0,
-              image_url: product.image_url,
-              attributes: variant.attributes,
-              // Include product-level shipping rates for "Highest Shipping" calculation
-              shipping_inside: product.shipping_inside ?? 100,
-              shipping_outside: product.shipping_outside ?? 150,
-            });
-          }
-        }
-        
-        return options;
-      }
-      return [];
-    } catch (err) {
-      console.error('Product search failed:', err);
-      return [];
-    } finally {
-      setIsSearching(false);
+    // Cancel previous pending request
+    if (searchAbortRef.current) {
+      searchAbortRef.current.abort();
     }
+    
+    // Clear previous timeout
+    if (searchTimeoutRef.current) {
+      clearTimeout(searchTimeoutRef.current);
+    }
+    
+    // Create new abort controller
+    searchAbortRef.current = new AbortController();
+    const signal = searchAbortRef.current.signal;
+    
+    // Return promise that resolves after debounce delay
+    return new Promise((resolve) => {
+      searchTimeoutRef.current = setTimeout(async () => {
+        setIsSearching(true);
+        try {
+          // FIX: Backend expects 'mode: FULL' not 'include_variants'
+          console.log('[Product Search] Searching for:', query);
+          const response = await apiClient.get(API_ROUTES.PRODUCTS.SEARCH, {
+            params: { q: query, limit: 10, mode: 'FULL' },
+            signal,
+          });
+          
+          if (response.data.success) {
+            // Transform to ProductOption format
+            const products = response.data.data || [];
+            const options: ProductOption[] = [];
+            
+            for (const product of products) {
+              for (const variant of (product.variants || [])) {
+                options.push({
+                  variant_id: variant.id,
+                  product_id: product.id,
+                  product_name: product.name,
+                  variant_name: Object.values(variant.attributes || {}).join(' / ') || 'Default',
+                  sku: variant.sku,
+                  price: variant.selling_price || variant.price || 0,
+                  stock: variant.current_stock || 0,
+                  image_url: product.image_url,
+                  attributes: variant.attributes,
+                  // Include product-level shipping rates for "Highest Shipping" calculation
+                  shipping_inside: product.shipping_inside ?? 100,
+                  shipping_outside: product.shipping_outside ?? 150,
+                });
+              }
+            }
+            
+            resolve(options);
+          } else {
+            resolve([]);
+          }
+        } catch (err) {
+          // Ignore abort errors
+          if ((err as Error).name !== 'AbortError') {
+            console.error('Product search failed:', err);
+          }
+          resolve([]);
+        } finally {
+          setIsSearching(false);
+        }
+      }, 300); // 300ms debounce
+    });
   }, []);
   
   // Submit handler
@@ -468,7 +560,29 @@ export function useOrderForm<T extends QuickOrderFormData | FullOrderFormData>(
     
     try {
       const payload = transformToPayload(data, mode);
-      console.log(`[${mode.toUpperCase()}] Submitting order:`, payload);
+      
+      // P0 DEBUG: Log FULL payload to trace data loss bug
+      console.log('='.repeat(60));
+      console.log('[useOrderForm] 🔥 P0 DEBUG - FULL ORDER PAYLOAD:');
+      console.log('Form Data (raw):', {
+        zone: (data as any).zone,
+        delivery_charge: (data as any).delivery_charge,
+        discount_amount: (data as any).discount_amount,
+        fulfillment_type: (data as any).fulfillment_type,
+        courier_partner: (data as any).courier_partner,
+        delivery_type: (data as any).delivery_type,
+      });
+      console.log('Transformed Payload:', {
+        zone_code: payload.zone_code,
+        shipping_charges: payload.shipping_charges,
+        discount_amount: payload.discount_amount,
+        fulfillment_type: payload.fulfillment_type,
+        status: payload.status,
+        courier_partner: payload.courier_partner,
+        delivery_type: payload.delivery_type,
+      });
+      console.log('Full Payload (JSON):', JSON.stringify(payload, null, 2));
+      console.log('='.repeat(60));
       
       const response = await apiClient.post(API_ROUTES.ORDERS.CREATE, payload);
       

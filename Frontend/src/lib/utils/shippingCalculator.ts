@@ -149,7 +149,7 @@ export function isFreeShipping(fulfillmentType: FulfillmentType): boolean {
 /**
  * Format shipping amount with currency
  */
-export function formatShipping(amount: number, currency: string = 'Rs.'): string {
+export function formatShipping(amount: number, currency: string = 'रु.'): string {
   if (amount === 0) {
     return 'FREE';
   }

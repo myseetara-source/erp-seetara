@@ -30,7 +30,7 @@ const PROTECTED_ROUTES = {
   },
 };
 
-const AUTH_ROUTES = ['/login', '/portal/login', '/portal/rider/login'];
+const AUTH_ROUTES = ['/login', '/portal/login', '/portal/vendor/login', '/portal/rider/login'];
 
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
@@ -106,47 +106,72 @@ export async function middleware(request: NextRequest) {
     // RULE 3: Protect Vendor Portal
     // =========================================================================
     if (pathname.startsWith('/portal/vendor') && !pathname.includes('/login')) {
-      if (!isAuthenticated) {
-        return NextResponse.redirect(new URL('/portal/login', request.url));
+      // Check for portal_token cookie (custom JWT from vendor login)
+      const portalToken = request.cookies.get('portal_token')?.value;
+      
+      if (!isAuthenticated && !portalToken) {
+        return NextResponse.redirect(new URL('/portal/vendor/login', request.url));
       }
       
-      const { data: userData } = await supabase
-        .from('users')
-        .select('role')
-        .eq('id', user!.id)
-        .single();
-      
-      if (userData?.role !== 'vendor') {
-        return NextResponse.redirect(new URL('/dashboard', request.url));
+      // If using Supabase auth, verify role
+      if (isAuthenticated) {
+        const { data: userData } = await supabase
+          .from('users')
+          .select('role')
+          .eq('id', user!.id)
+          .single();
+        
+        if (userData?.role !== 'vendor') {
+          return NextResponse.redirect(new URL('/dashboard', request.url));
+        }
       }
+      // If using portal_token, trust the JWT (backend validates on API calls)
     }
     
     // =========================================================================
     // RULE 4: Protect Rider Portal
+    // P0 FIX: Support both Supabase Auth AND custom JWT (rider_token cookie)
     // =========================================================================
     if (pathname.startsWith('/portal/rider') && !pathname.includes('/login')) {
-      if (!isAuthenticated) {
+      // Check for rider_token cookie (custom JWT from rider login)
+      const riderToken = request.cookies.get('rider_token')?.value;
+      
+      // Allow access if either Supabase auth OR custom rider_token exists
+      if (!isAuthenticated && !riderToken) {
         return NextResponse.redirect(new URL('/portal/rider/login', request.url));
       }
       
-      const { data: userData } = await supabase
-        .from('users')
-        .select('role')
-        .eq('id', user!.id)
-        .single();
-      
-      if (userData?.role !== 'rider') {
-        return NextResponse.redirect(new URL('/dashboard', request.url));
+      // If using Supabase auth, verify role is rider
+      if (isAuthenticated && !riderToken) {
+        const { data: userData } = await supabase
+          .from('users')
+          .select('role')
+          .eq('id', user!.id)
+          .single();
+        
+        if (userData?.role !== 'rider') {
+          return NextResponse.redirect(new URL('/dashboard', request.url));
+        }
       }
+      // If using rider_token, trust the JWT (backend validates on API calls)
     }
     
     return response;
     
   } catch (error) {
-    console.error('Middleware error:', error);
-    // On error, allow request to proceed (fail open for development)
-    // In production, you might want to fail closed
-    return NextResponse.next();
+    console.error('[Middleware] Security error - failing closed:', error);
+    
+    // ==========================================================================
+    // P0 SECURITY FIX: FAIL CLOSED - Redirect to login on any error
+    // This prevents unauthorized access when auth services fail
+    // ==========================================================================
+    
+    // Clear any potentially corrupt auth cookies
+    const response = NextResponse.redirect(new URL('/login?error=auth_failed', request.url));
+    response.cookies.delete('sb-access-token');
+    response.cookies.delete('sb-refresh-token');
+    
+    return response;
   }
 }
 

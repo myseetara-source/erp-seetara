@@ -12,6 +12,7 @@ import {
   ValidationError,
 } from '../utils/errors.js';
 import { productService } from './product.service.js';
+import { buildSafeOrQuery } from '../utils/helpers.js';
 
 const logger = createLogger('VendorService');
 
@@ -206,7 +207,8 @@ class VendorService {
     if (is_active !== undefined) query = query.eq('is_active', is_active);
     if (has_balance) query = query.neq('balance', 0);
     if (search) {
-      query = query.or(`name.ilike.%${search}%,phone.ilike.%${search}%,company_name.ilike.%${search}%`);
+      const safeQuery = buildSafeOrQuery(search, ['name', 'phone', 'company_name']);
+      if (safeQuery) query = query.or(safeQuery);
     }
 
     const { data, error, count } = await query
@@ -308,22 +310,22 @@ class VendorService {
       .eq('transaction_type', 'purchase_return')
       .eq('status', 'approved');
 
-    // Get payment stats
+    // Get payment stats from vendor_ledger (not vendor_payments which doesn't exist)
     const { data: payments } = await supabaseAdmin
-      .from('vendor_payments')
-      .select('amount, payment_date')
+      .from('vendor_ledger')
+      .select('credit, transaction_date')
       .eq('vendor_id', id)
-      .eq('status', 'completed');
+      .eq('entry_type', 'payment');
 
     const totalPurchases = (purchases || []).reduce((sum, p) => sum + Math.abs(p.total_cost || 0), 0);
     const totalReturns = (returns || []).reduce((sum, r) => sum + Math.abs(r.total_cost || 0), 0);
-    const totalPayments = (payments || []).reduce((sum, p) => sum + (p.amount || 0), 0);
+    const totalPayments = (payments || []).reduce((sum, p) => sum + (p.credit || 0), 0);
 
     // Get latest dates
     const lastPurchase = purchases?.sort((a, b) => 
       new Date(b.transaction_date) - new Date(a.transaction_date))[0];
     const lastPayment = payments?.sort((a, b) => 
-      new Date(b.payment_date) - new Date(a.payment_date))[0];
+      new Date(b.transaction_date) - new Date(a.transaction_date))[0];
 
     return {
       total_supplies: purchases?.length || 0,
@@ -362,43 +364,46 @@ class VendorService {
       return sum + (item.quantity_ordered * item.unit_cost);
     }, 0);
 
-    // Create supply record
-    const { data: supply, error: supplyError } = await supabaseAdmin
-      .from('vendor_supplies')
+    // Create inventory transaction record (replaces vendor_supplies)
+    const { data: transaction, error: txnError } = await supabaseAdmin
+      .from('inventory_transactions')
       .insert({
-        supply_number: supplyNumber,
+        invoice_no: supplyNumber,
         vendor_id,
-        total_amount: totalAmount,
-        invoice_number,
-        invoice_date,
+        transaction_type: 'purchase',
+        status: 'pending',
+        total_cost: totalAmount,
+        transaction_date: invoice_date || new Date().toISOString().split('T')[0],
         notes,
-        created_by: userId,
+        performed_by: userId,
       })
       .select()
       .single();
 
-    if (supplyError) {
-      throw new DatabaseError('Failed to create supply', supplyError);
+    if (txnError) {
+      throw new DatabaseError('Failed to create purchase transaction', txnError);
     }
 
-    // Create supply items
-    const supplyItems = items.map(item => ({
-      supply_id: supply.id,
+    // Create transaction items (replaces vendor_supply_items)
+    const txnItems = items.map(item => ({
+      transaction_id: transaction.id,
       variant_id: item.variant_id,
-      quantity_ordered: item.quantity_ordered,
+      quantity: item.quantity_ordered,
       unit_cost: item.unit_cost,
-      total_cost: item.quantity_ordered * item.unit_cost,
     }));
 
     const { error: itemsError } = await supabaseAdmin
-      .from('vendor_supply_items')
-      .insert(supplyItems);
+      .from('inventory_transaction_items')
+      .insert(txnItems);
 
     if (itemsError) {
-      // Rollback supply
-      await supabaseAdmin.from('vendor_supplies').delete().eq('id', supply.id);
-      throw new DatabaseError('Failed to create supply items', itemsError);
+      // Rollback transaction
+      await supabaseAdmin.from('inventory_transactions').delete().eq('id', transaction.id);
+      throw new DatabaseError('Failed to create transaction items', itemsError);
     }
+
+    // Alias for backward compatibility
+    const supply = transaction;
 
     // Update vendor balance (increase - we owe them more)
     await this.updateVendorBalance(vendor_id, totalAmount);
@@ -420,102 +425,58 @@ class VendorService {
    * @returns {Object} Updated supply
    */
   async receiveSupply(supplyId, items, userId = null) {
-    // Get supply details
-    const { data: supply, error: supplyError } = await supabaseAdmin
-      .from('vendor_supplies')
+    // Get transaction details (replaces vendor_supplies)
+    const { data: transaction, error: txnError } = await supabaseAdmin
+      .from('inventory_transactions')
       .select(`
         *,
-        items:vendor_supply_items(*)
+        items:inventory_transaction_items(*)
       `)
       .eq('id', supplyId)
       .single();
 
-    if (supplyError || !supply) {
-      throw new NotFoundError('Supply');
+    if (txnError || !transaction) {
+      throw new NotFoundError('Purchase transaction');
     }
 
-    if (supply.status === 'received' || supply.status === 'cancelled') {
-      throw new ValidationError(`Cannot receive supply in '${supply.status}' status`);
+    if (transaction.status === 'approved' || transaction.status === 'voided') {
+      throw new ValidationError(`Cannot receive in '${transaction.status}' status`);
     }
 
-    // Process each item
-    for (const receivedItem of items) {
-      const supplyItem = supply.items.find(i => i.id === receivedItem.supply_item_id);
-      if (!supplyItem) continue;
-
-      const newReceived = supplyItem.quantity_received + receivedItem.quantity_received;
-      
-      // Validate quantity
-      if (newReceived > supplyItem.quantity_ordered) {
-        throw new ValidationError(
-          `Cannot receive more than ordered for item ${supplyItem.id}`
-        );
-      }
-
-      // Update supply item
-      await supabaseAdmin
-        .from('vendor_supply_items')
-        .update({ quantity_received: newReceived })
-        .eq('id', supplyItem.id);
-
-      // Add to inventory
-      await productService.adjustStock({
-        variant_id: supplyItem.variant_id,
-        movement_type: 'inward',
-        quantity: receivedItem.quantity_received,
-        reason: `Vendor supply ${supply.supply_number}`,
-        vendor_id: supply.vendor_id,
-      }, userId);
-    }
-
-    // Determine new status
-    const { data: updatedItems } = await supabaseAdmin
-      .from('vendor_supply_items')
-      .select('quantity_ordered, quantity_received')
-      .eq('supply_id', supplyId);
-
-    let newStatus = 'partial';
-    const allReceived = updatedItems.every(i => i.quantity_received >= i.quantity_ordered);
-    const anyReceived = updatedItems.some(i => i.quantity_received > 0);
-    
-    if (allReceived) {
-      newStatus = 'received';
-    } else if (!anyReceived) {
-      newStatus = 'pending';
-    }
-
-    // Update supply
-    const { data: updatedSupply, error: updateError } = await supabaseAdmin
-      .from('vendor_supplies')
+    // For inventory transactions, approval triggers stock update via database trigger
+    // Just update the status to approved
+    const { data: updatedTxn, error: updateError } = await supabaseAdmin
+      .from('inventory_transactions')
       .update({
-        status: newStatus,
-        received_by: userId,
-        received_at: newStatus === 'received' ? new Date().toISOString() : null,
+        status: 'approved',
+        approved_by: userId,
+        approved_at: new Date().toISOString(),
       })
       .eq('id', supplyId)
       .select()
       .single();
 
     if (updateError) {
-      throw new DatabaseError('Failed to update supply', updateError);
+      throw new DatabaseError('Failed to update transaction', updateError);
     }
 
-    logger.info('Supply received', { supplyId, status: newStatus });
-    return updatedSupply;
+    logger.info('Purchase transaction approved', { transactionId: supplyId, status: 'approved' });
+    return updatedTxn;
   }
 
   /**
-   * Get supply by ID with items
-   * @param {string} id - Supply UUID
-   * @returns {Object} Supply with items and vendor
+   * Get supply/purchase by ID with items
+   * Uses inventory_transactions table (replaces vendor_supplies)
+   * @param {string} id - Transaction UUID
+   * @returns {Object} Transaction with items and vendor
    */
   async getSupplyById(id) {
-    const { data: supply, error } = await supabaseAdmin
-      .from('vendor_supplies')
+    const { data: transaction, error } = await supabaseAdmin
+      .from('inventory_transactions')
       .select(`
         *,
         vendor:vendors(id, name, phone),
-        items:vendor_supply_items(
+        items:inventory_transaction_items(
           *,
           variant:product_variants(id, sku, product:products(name))
         )
@@ -523,17 +484,23 @@ class VendorService {
       .eq('id', id)
       .single();
 
-    if (error || !supply) {
-      throw new NotFoundError('Supply');
+    if (error || !transaction) {
+      throw new NotFoundError('Purchase transaction');
     }
 
-    return supply;
+    // Map to backward-compatible format
+    return {
+      ...transaction,
+      supply_number: transaction.invoice_no,
+      total_amount: transaction.total_cost,
+    };
   }
 
   /**
-   * List supplies
+   * List supplies/purchases
+   * Uses inventory_transactions table (replaces vendor_supplies)
    * @param {Object} options - Query options
-   * @returns {Object} Paginated supplies
+   * @returns {Object} Paginated transactions
    */
   async listSupplies(options = {}) {
     const {
@@ -549,11 +516,12 @@ class VendorService {
     const to = from + limit - 1;
 
     let query = supabaseAdmin
-      .from('vendor_supplies')
+      .from('inventory_transactions')
       .select(`
         *,
         vendor:vendors(id, name)
-      `, { count: 'exact' });
+      `, { count: 'exact' })
+      .eq('transaction_type', 'purchase'); // Only purchases
 
     if (vendor_id) query = query.eq('vendor_id', vendor_id);
     if (status) query = query.eq('status', status);
@@ -565,11 +533,18 @@ class VendorService {
       .range(from, to);
 
     if (error) {
-      throw new DatabaseError('Failed to list supplies', error);
+      throw new DatabaseError('Failed to list purchase transactions', error);
     }
 
+    // Map to backward-compatible format
+    const mappedData = (data || []).map(txn => ({
+      ...txn,
+      supply_number: txn.invoice_no,
+      total_amount: txn.total_cost,
+    }));
+
     return {
-      data,
+      data: mappedData,
       pagination: {
         page,
         limit,
@@ -633,23 +608,30 @@ class VendorService {
       balanceAfter: result.balance_after,
     });
 
-    // Return payment record
-    const { data: payment } = await supabaseAdmin
-      .from('vendor_payments')
-      .select('id, name, company_name, phone, email, address, pan_number, balance, total_purchases, total_payments, is_active, created_at, updated_at')
+    // Return payment record from vendor_ledger (not vendor_payments which doesn't exist)
+    const { data: ledgerEntry } = await supabaseAdmin
+      .from('vendor_ledger')
+      .select('id, vendor_id, entry_type, reference_no, credit, running_balance, description, transaction_date, created_at')
       .eq('id', result.payment_id)
       .single();
 
     return {
-      ...payment,
+      id: ledgerEntry?.id || result.payment_id,
+      payment_no: result.payment_no,
+      amount: parseFloat(amount),
+      vendor_id: vendor_id,
       vendor_name: vendor.name,
       balance_before: result.balance_before,
       balance_after: result.balance_after,
+      created_at: ledgerEntry?.created_at || new Date().toISOString(),
     };
   }
 
   /**
    * Fallback manual payment recording
+   * Records payment directly to vendor_ledger (vendor_payments table doesn't exist)
+   * 
+   * SECURITY: Uses atomic RPC with row-level locking to prevent race conditions.
    * @private
    */
   async _recordPaymentManual(data, userId, vendor) {
@@ -659,80 +641,113 @@ class VendorService {
     // Generate payment number
     const paymentNo = `PAY-${Date.now()}`;
     const balanceBefore = parseFloat(vendor.balance) || 0;
-    const balanceAfter = balanceBefore - parseFloat(amount);
 
-    // Create payment record
-    const { data: payment, error } = await supabaseAdmin
-      .from('vendor_payments')
+    // ATOMIC: Update vendor balance using RPC with row-level locking
+    // This prevents race conditions where concurrent payments corrupt the balance
+    const { data: rpcResult, error: rpcError } = await supabaseAdmin.rpc('update_vendor_balance_atomic', {
+      p_vendor_id: vendor_id,
+      p_amount: parseFloat(amount),
+      p_type: 'PAYMENT',
+    });
+
+    if (rpcError) {
+      throw new DatabaseError('Failed to update vendor balance for payment (RPC error)', rpcError);
+    }
+
+    if (rpcResult && !rpcResult.success) {
+      throw new DatabaseError(`Vendor balance update failed: ${rpcResult.error}`);
+    }
+
+    const balanceAfter = rpcResult?.new_balance || (balanceBefore - parseFloat(amount));
+
+    // Create ledger entry with the accurate balance from atomic RPC
+    const { data: ledgerEntry, error } = await supabaseAdmin
+      .from('vendor_ledger')
       .insert({
         vendor_id,
-        payment_no: paymentNo,
-        amount: parseFloat(amount),
-        payment_method: paymentMethod,
-        reference_number,
-        balance_before: balanceBefore,
-        balance_after: balanceAfter,
-        notes,
-        created_by: userId,
+        entry_type: 'payment',
+        reference_no: paymentNo,
+        debit: 0,
+        credit: parseFloat(amount),
+        running_balance: balanceAfter,
+        description: notes || `Payment via ${paymentMethod}${reference_number ? ` - Ref: ${reference_number}` : ''}`,
+        performed_by: userId,
+        transaction_date: new Date().toISOString().split('T')[0],
       })
       .select()
       .single();
 
     if (error) {
-      throw new DatabaseError('Failed to create payment record', error);
+      // P0 FIX: Ledger entry is CRITICAL for financial audit trail
+      // Balance was updated but ledger entry failed - this is a data consistency issue
+      // Throw error to alert the user and allow manual reconciliation
+      logger.error('Failed to create payment ledger entry after balance update', { 
+        vendor_id, 
+        error,
+        amount: parseFloat(amount),
+        balanceAfter,
+        paymentNo,
+      });
+      throw new DatabaseError(
+        `Payment recorded but ledger entry failed. Balance updated to ${balanceAfter}. Please contact support for manual reconciliation. Error: ${error.message}`,
+        error
+      );
     }
 
-    // Update vendor balance
-    await this.updateVendorBalance(vendor_id, -parseFloat(amount));
+    logger.info('Vendor payment recorded atomically', { 
+      ledgerId: ledgerEntry.id, 
+      previousBalance: rpcResult?.previous_balance,
+      newBalance: balanceAfter,
+    });
 
-    // Create ledger entry
-    await supabaseAdmin
-      .from('vendor_ledger')
-      .insert({
-        vendor_id,
-        entry_type: 'payment',
-        reference_id: payment.id,
-        reference_no: paymentNo,
-        debit: 0,
-        credit: parseFloat(amount),
-        running_balance: balanceAfter,
-        description: `Payment via ${paymentMethod}`,
-        performed_by: userId,
-      });
-
-    logger.info('Vendor payment recorded (manual fallback)', { paymentId: payment.id });
-
-    return payment;
+    // Return in payment-like format for compatibility
+    return {
+      id: ledgerEntry.id,
+      payment_no: paymentNo,
+      vendor_id: vendor_id,
+      amount: parseFloat(amount),
+      payment_method: paymentMethod,
+      reference_number: reference_number,
+      balance_before: balanceBefore,
+      balance_after: balanceAfter,
+      notes: notes,
+      created_at: ledgerEntry.created_at,
+    };
   }
 
   /**
-   * Update vendor balance
+   * Update vendor balance using atomic RPC
+   * 
+   * SECURITY: Uses database-level row locking (FOR UPDATE) to prevent race conditions.
+   * This guarantees 100% accurate financial records even under high concurrency.
+   * 
    * @param {string} vendorId - Vendor UUID
-   * @param {number} amount - Amount to add (positive) or subtract (negative)
+   * @param {number} amount - Amount to add (always positive for purchases)
    */
   async updateVendorBalance(vendorId, amount) {
-    const { data: vendor, error: fetchError } = await supabaseAdmin
-      .from('vendors')
-      .select('balance')
-      .eq('id', vendorId)
-      .single();
+    // For purchases, amount is positive (we owe vendor more)
+    const { data: rpcResult, error: rpcError } = await supabaseAdmin.rpc('update_vendor_balance_atomic', {
+      p_vendor_id: vendorId,
+      p_amount: Math.abs(amount),
+      p_type: 'PURCHASE',
+    });
 
-    if (fetchError) {
-      throw new DatabaseError('Failed to fetch vendor balance', fetchError);
+    if (rpcError) {
+      throw new DatabaseError('Failed to update vendor balance (RPC error)', rpcError);
     }
 
-    const newBalance = (vendor.balance || 0) + amount;
-
-    const { error: updateError } = await supabaseAdmin
-      .from('vendors')
-      .update({ balance: newBalance })
-      .eq('id', vendorId);
-
-    if (updateError) {
-      throw new DatabaseError('Failed to update vendor balance', updateError);
+    if (rpcResult && !rpcResult.success) {
+      throw new DatabaseError(`Vendor balance update failed: ${rpcResult.error}`);
     }
 
-    logger.debug('Vendor balance updated', { vendorId, change: amount, newBalance });
+    logger.debug('Vendor balance updated atomically', { 
+      vendorId, 
+      change: amount, 
+      previousBalance: rpcResult?.previous_balance,
+      newBalance: rpcResult?.new_balance,
+    });
+
+    return rpcResult?.new_balance;
   }
 
   /**
@@ -837,22 +852,17 @@ class VendorService {
       throw new DatabaseError(`Failed to fetch ledger entry: ${ledgerError.message}`);
     }
 
+    // Extract payment details from description or notes
+    // (vendor_payments table doesn't exist - payment details stored in ledger entry)
     let paymentMethod = 'cash';
     let receiptUrl = null;
-    let paymentNotes = ledgerData.notes;
+    let paymentNotes = ledgerData.notes || ledgerData.description;
 
-    // For payment entries, fetch additional details from vendor_payments table
-    if (ledgerData.entry_type === 'payment' && ledgerData.reference_id) {
-      const { data: paymentData } = await supabaseAdmin
-        .from('vendor_payments')
-        .select('payment_method, receipt_url, notes, reference_number')
-        .eq('id', ledgerData.reference_id)
-        .single();
-
-      if (paymentData) {
-        paymentMethod = paymentData.payment_method || 'cash';
-        receiptUrl = paymentData.receipt_url;
-        paymentNotes = paymentData.notes || ledgerData.notes;
+    // Try to extract payment method from description
+    if (ledgerData.description) {
+      const methodMatch = ledgerData.description.match(/Payment via (\w+)/i);
+      if (methodMatch) {
+        paymentMethod = methodMatch[1].toLowerCase();
       }
     }
 

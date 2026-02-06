@@ -126,7 +126,9 @@ export default function VendorPortalDashboard() {
     } catch (err: unknown) {
       console.error('Dashboard load error:', err);
       
-      if (err.response?.status === 401 || err.response?.status === 403) {
+      // Type guard for axios error
+      const axiosError = err as { response?: { status?: number } };
+      if (axiosError.response?.status === 401 || axiosError.response?.status === 403) {
         // Token expired or invalid
         localStorage.removeItem('portal_token');
         localStorage.removeItem('portal_user');
@@ -147,7 +149,7 @@ export default function VendorPortalDashboard() {
     router.push('/portal/login');
   };
 
-  const formatCurrency = (amount: number) => `Rs. ${amount.toLocaleString()}`;
+  const formatCurrency = (amount: number) => `रु. ${amount.toLocaleString()}`;
   const formatDate = (date: string) => new Date(date).toLocaleDateString('en-NP', {
     year: 'numeric',
     month: 'short',

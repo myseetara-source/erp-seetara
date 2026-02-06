@@ -10,7 +10,7 @@
 // =============================================================================
 
 export const CURRENCY_CONFIG = {
-  symbol: 'Rs.',           // Nepal Rupee symbol
+  symbol: 'रु.',           // Nepali Rupee symbol (Devanagari)
   code: 'NPR',             // ISO 4217 currency code
   locale: 'en-NP',         // Locale for number formatting
   decimalPlaces: 0,        // No decimals for NPR (paisa rarely used)
@@ -25,7 +25,7 @@ export const CURRENCY_CONFIG = {
  * Format a number as currency with the default symbol
  * @param amount - The amount to format
  * @param options - Optional formatting options
- * @returns Formatted currency string (e.g., "Rs. 1,234")
+ * @returns Formatted currency string (e.g., "रु. 1,234")
  */
 export function formatCurrency(
   amount: number | null | undefined,
@@ -85,7 +85,7 @@ export function formatCurrency(
 /**
  * Format currency for display in tables (compact, no symbol prefix)
  * @param amount - The amount to format
- * @returns Formatted string (e.g., "₹1.2K")
+ * @returns Formatted string (e.g., "रु.1.2K")
  */
 export function formatCurrencyCompact(amount: number | null | undefined): string {
   return formatCurrency(amount, { showSymbol: true, compact: true });
@@ -94,7 +94,7 @@ export function formatCurrencyCompact(amount: number | null | undefined): string
 /**
  * Format currency with explicit +/- sign for balance changes
  * @param amount - The amount to format
- * @returns Formatted string (e.g., "+Rs. 500" or "-Rs. 200")
+ * @returns Formatted string (e.g., "+रु. 500" or "-रु. 200")
  */
 export function formatCurrencyWithSign(amount: number | null | undefined): string {
   return formatCurrency(amount, { showSymbol: true, showSign: true });
@@ -118,7 +118,7 @@ export function parseCurrency(value: string): number {
   if (!value) return 0;
   // Remove currency symbols, spaces, and commas
   const cleaned = value
-    .replace(/[Rs.₹NPR\s,]/gi, '')
+    .replace(/[Rs.₹रु.NPR\s,]/gi, '')
     .replace(/K$/i, '000')
     .replace(/L$/i, '00000')
     .replace(/Cr$/i, '0000000')

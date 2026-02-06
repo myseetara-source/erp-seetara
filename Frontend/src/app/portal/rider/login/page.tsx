@@ -12,7 +12,7 @@
  * - Rider-only authentication
  */
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import {
   Lock,
@@ -39,6 +39,18 @@ export default function RiderLoginPage() {
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // P0 FIX: Prevent hydration mismatch by rendering date only on client
+  const [currentDate, setCurrentDate] = useState<string>('');
+  
+  useEffect(() => {
+    // Set date only on client to avoid hydration mismatch
+    setCurrentDate(new Date().toLocaleDateString('ne-NP', { 
+      weekday: 'long', 
+      year: 'numeric', 
+      month: 'long', 
+      day: 'numeric' 
+    }));
+  }, []);
 
   // Check for error params
   const errorParam = searchParams.get('error');
@@ -130,7 +142,7 @@ export default function RiderLoginPage() {
             <div className="mb-6 p-4 bg-red-500/20 border border-red-400/30 rounded-xl flex items-start gap-3">
               <AlertCircle className="w-5 h-5 text-red-300 flex-shrink-0 mt-0.5" />
               <p className="text-red-200 text-sm">
-                {error || errorMessages[errorParam] || 'त्रुटि भयो'}
+                {error || (errorParam ? errorMessages[errorParam] : null) || 'त्रुटि भयो'}
               </p>
             </div>
           )}
@@ -207,15 +219,10 @@ export default function RiderLoginPage() {
           </div>
         </div>
 
-        {/* Today's Date */}
+        {/* Today's Date - Client-side only to prevent hydration mismatch */}
         <div className="mt-6 text-center">
           <p className="text-orange-200/50 text-sm">
-            {new Date().toLocaleDateString('ne-NP', { 
-              weekday: 'long', 
-              year: 'numeric', 
-              month: 'long', 
-              day: 'numeric' 
-            })}
+            {currentDate}
           </p>
         </div>
       </div>

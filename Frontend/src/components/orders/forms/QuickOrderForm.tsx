@@ -52,7 +52,8 @@ export function QuickOrderForm({ onSuccess, onCancel }: QuickOrderFormProps) {
     formState: { errors, isValid },
     reset,
   } = useForm<QuickOrderFormData>({
-    resolver: zodResolver(QuickOrderSchema),
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    resolver: zodResolver(QuickOrderSchema) as any,
     defaultValues: defaultQuickOrderValues,
     mode: 'onChange',
   });
@@ -295,7 +296,7 @@ export function QuickOrderForm({ onSuccess, onCancel }: QuickOrderFormProps) {
         </div>
         <div className="flex justify-between text-sm">
           <span className="text-gray-600">Delivery</span>
-          <span className="font-medium">Rs. 100</span>
+          <span className="font-medium">रु. 100</span>
         </div>
         <div className="flex justify-between text-base pt-2 border-t border-gray-200">
           <span className="font-semibold text-gray-900">Total</span>

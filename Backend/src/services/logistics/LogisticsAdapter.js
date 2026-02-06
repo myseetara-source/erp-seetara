@@ -15,6 +15,7 @@
 import { AppError } from '../../utils/errors.js';
 import { supabaseAdmin } from '../../config/supabase.js';
 import logger from '../../utils/logger.js';
+import { sanitizeSearchInput } from '../../utils/helpers.js';
 
 // =============================================================================
 // LOGISTICS ADAPTER INTERFACE (Abstract Base Class)
@@ -230,10 +231,16 @@ export class LogisticsAdapter {
    * @returns {Promise<Object|null>} Order or null
    */
   async findOrderByTrackingId(trackingId) {
+    // SECURITY: Sanitize tracking ID to prevent SQL injection
+    const sanitizedTrackingId = sanitizeSearchInput(trackingId);
+    if (!sanitizedTrackingId) {
+      return null;
+    }
+    
     const { data, error } = await supabaseAdmin
       .from('orders')
       .select('*, customer:customers(*)')
-      .or(`courier_tracking_id.eq.${trackingId},awb_number.eq.${trackingId}`)
+      .or(`courier_tracking_id.eq.${sanitizedTrackingId},awb_number.eq.${sanitizedTrackingId}`)
       .single();
 
     if (error && error.code !== 'PGRST116') {
@@ -348,11 +355,17 @@ export class LogisticsAdapterFactory {
    * @returns {Promise<LogisticsAdapter|null>}
    */
   static async getAdapterByTrackingId(trackingId) {
+    // SECURITY: Sanitize tracking ID to prevent SQL injection
+    const sanitizedTrackingId = sanitizeSearchInput(trackingId);
+    if (!sanitizedTrackingId) {
+      return null;
+    }
+    
     // Find order with this tracking ID to get provider
     const { data: order } = await supabaseAdmin
       .from('orders')
       .select('courier_partner')
-      .or(`courier_tracking_id.eq.${trackingId},awb_number.eq.${trackingId}`)
+      .or(`courier_tracking_id.eq.${sanitizedTrackingId},awb_number.eq.${sanitizedTrackingId}`)
       .single();
 
     if (order?.courier_partner) {

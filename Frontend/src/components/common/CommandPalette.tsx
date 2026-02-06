@@ -270,7 +270,7 @@ export function CommandPalette() {
                 type: 'order',
                 id: order.id,
                 title: order.order_number,
-                subtitle: `${order.customer_name} • Rs. ${order.total_amount}`,
+                subtitle: `${order.customer_name} • रु. ${order.total_amount}`,
                 icon: <FileText className="h-4 w-4 text-orange-500" />,
                 path: `/dashboard/orders?selected=${order.id}`,
               });

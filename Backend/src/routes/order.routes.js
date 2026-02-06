@@ -4,6 +4,7 @@
 
 import { Router } from 'express';
 import * as orderController from '../controllers/order.controller.js';
+import * as orderPaymentController from '../controllers/orderPayment.controller.js';
 import { authenticate, authorize } from '../middleware/auth.middleware.js';
 import { validateBody, validateParams, validateQuery } from '../middleware/validate.middleware.js';
 import {
@@ -49,6 +50,13 @@ router.get(
   orderController.getOrderStats
 );
 
+// Refresh orders cache (materialized view) - Admin only
+router.post(
+  '/refresh-cache',
+  authorize('admin'),
+  orderController.refreshOrdersCache
+);
+
 // Create order
 router.post(
   '/',
@@ -87,6 +95,17 @@ router.delete(
 );
 
 // =============================================================================
+// REMARKS (Sticky Notes)
+// =============================================================================
+
+// Update order remarks (allowed for any status)
+router.patch(
+  '/:id/remarks',
+  validateParams(orderIdSchema),
+  orderController.updateOrderRemarks
+);
+
+// =============================================================================
 // STATUS MANAGEMENT
 // =============================================================================
 
@@ -110,12 +129,37 @@ router.post(
 // ORDER LOGS
 // =============================================================================
 
-// Get order logs
+// Get order logs (legacy)
 router.get(
   '/:id/logs',
   validateParams(orderIdSchema),
   validateQuery(paginationSchema),
   orderController.getOrderLogs
+);
+
+// =============================================================================
+// ORDER ACTIVITIES (Timeline Feature)
+// =============================================================================
+
+// Get order activities timeline
+router.get(
+  '/:id/activities',
+  validateParams(orderIdSchema),
+  orderController.getOrderActivitiesHandler
+);
+
+// Add activity (comment) to order
+router.post(
+  '/:id/activities',
+  validateParams(orderIdSchema),
+  orderController.addOrderActivity
+);
+
+// Get related orders (parent/child for exchanges)
+router.get(
+  '/:id/related',
+  validateParams(orderIdSchema),
+  orderController.getRelatedOrdersHandler
 );
 
 // =============================================================================
@@ -180,6 +224,61 @@ router.post(
   validateParams(orderIdSchema),
   validateBody(markReturnedSchema),
   orderController.markReturned
+);
+
+// =============================================================================
+// WORKFLOW INFO ENDPOINTS (For Smart UI)
+// =============================================================================
+
+// Get workflow info for an order (allowed transitions, locks, requirements)
+router.get(
+  '/:id/workflow',
+  validateParams(orderIdSchema),
+  orderController.getOrderWorkflow
+);
+
+// Get dispatch requirements for a status
+router.get(
+  '/dispatch-requirements/:status',
+  orderController.getDispatchRequirements
+);
+
+// =============================================================================
+// CUSTOMER ADVANCE PAYMENTS
+// =============================================================================
+
+// Get presigned URL for receipt upload (before creating payment)
+router.post(
+  '/payments/presign',
+  orderPaymentController.getReceiptPresignedUrl
+);
+
+// Get payment summary for an order
+router.get(
+  '/:id/payment-summary',
+  validateParams(orderIdSchema),
+  orderPaymentController.getOrderPaymentSummary
+);
+
+// Get all payments for an order
+router.get(
+  '/:id/payments',
+  validateParams(orderIdSchema),
+  orderPaymentController.getOrderPayments
+);
+
+// Record a new payment for an order
+router.post(
+  '/:id/payments',
+  validateParams(orderIdSchema),
+  orderPaymentController.createOrderPayment
+);
+
+// Delete a payment (soft delete, admin only)
+router.delete(
+  '/:id/payments/:paymentId',
+  authorize('admin'),
+  orderPaymentController.deleteOrderPayment
 );
 
 export default router;

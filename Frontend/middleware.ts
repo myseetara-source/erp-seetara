@@ -108,7 +108,9 @@ function isPublicRoute(pathname: string): boolean {
  */
 function getAuthToken(request: NextRequest): string | null {
   // Check all cookies for Supabase auth token pattern
-  for (const [name, cookie] of request.cookies) {
+  const cookies = request.cookies.getAll();
+  for (const cookie of cookies) {
+    const name = cookie.name;
     // Supabase auth cookie patterns
     if (name.includes('-auth-token') || name.includes('access-token')) {
       try {

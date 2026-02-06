@@ -13,6 +13,7 @@
  */
 
 import { productService } from '../services/product.service.js';
+import { sanitizeSearchInput } from '../utils/helpers.js';
 import { supabaseAdmin } from '../config/supabase.js';
 import { asyncHandler } from '../middleware/error.middleware.js';
 import { 
@@ -21,6 +22,7 @@ import {
   canSeeFinancials,
 } from '../utils/dataMasking.js';
 import { createLogger } from '../utils/logger.js';
+import { buildSafeOrQuery } from '../utils/helpers.js';
 
 const logger = createLogger('ProductController');
 
@@ -124,7 +126,13 @@ export const listProducts = asyncHandler(async (req, res) => {
 
 /**
  * Search products with variants
- * GET /products/search?q=query&limit=10&include_variants=true
+ * GET /products/search?q=query&limit=10&mode=FULL
+ * 
+ * Search Modes:
+ * - mode=SALES (default): Returns lightweight product summary with stats
+ * - mode=FULL: Returns complete product data with all variants
+ * 
+ * Search fields: name, brand, SKU (from variants)
  * 
  * Used by Order Form to search products
  */
@@ -152,14 +160,16 @@ export const searchProducts = asyncHandler(async (req, res) => {
   } = req.query;
 
   const userRole = req.user?.role;
-  const isAdmin = userRole === 'admin';
   const limitNum = Math.min(parseInt(limit, 10) || 15, 50);
   const searchMode = (mode || 'SALES').toUpperCase();
   const hasQuery = q && q.trim().length >= 1;
+  
+  // FIX: Add logging for debugging product search
+  logger.info('[Product Search] Request:', { q, mode: searchMode, limit: limitNum, userRole });
 
   // FULL MODE: Return complete variant data (legacy/backwards compatibility)
   if (searchMode === 'FULL') {
-    return searchProductsFullMode(req, res, { isAdmin, limitNum, hasQuery, q });
+    return searchProductsFullMode(req, res, { limitNum, hasQuery, q });
   }
 
   // =========================================================================
@@ -183,8 +193,8 @@ export const searchProducts = asyncHandler(async (req, res) => {
     .limit(limitNum);
 
   if (hasQuery) {
-    const searchTerm = q.trim();
-    query = query.or(`name.ilike.%${searchTerm}%,brand.ilike.%${searchTerm}%`);
+    const safeQuery = buildSafeOrQuery(q.trim(), ['name', 'brand']);
+    if (safeQuery) query = query.or(safeQuery);
   }
 
   const { data: products, error } = await query;
@@ -246,8 +256,8 @@ export const searchProducts = asyncHandler(async (req, res) => {
       total_stock: stats.total_stock,
       in_stock_count: stats.in_stock_count,
       price_range: stats.min_price === stats.max_price 
-        ? `Rs. ${stats.min_price}` 
-        : `Rs. ${stats.min_price} - ${stats.max_price}`,
+        ? `रु. ${stats.min_price}` 
+        : `रु. ${stats.min_price} - ${stats.max_price}`,
     };
   });
 
@@ -263,6 +273,8 @@ export const searchProducts = asyncHandler(async (req, res) => {
     const searchTerm = q.trim();
     const existingIds = new Set(processedProducts.map(p => p.id));
 
+    // SECURITY: Sanitize search term to prevent SQL injection
+    const sanitizedSearchTerm = sanitizeSearchInput(searchTerm);
     const { data: skuMatches } = await supabaseAdmin
       .from('product_variants')
       .select(`
@@ -270,7 +282,7 @@ export const searchProducts = asyncHandler(async (req, res) => {
         product:products(id, name, brand, image_url, shipping_inside, shipping_outside, is_active)
       `)
       .eq('is_active', true)
-      .ilike('sku', `%${searchTerm}%`)
+      .ilike('sku', `%${sanitizedSearchTerm || ''}%`)
       .limit(10);
 
     if (skuMatches) {
@@ -284,7 +296,7 @@ export const searchProducts = asyncHandler(async (req, res) => {
             variant_count: 1,
             total_stock: variant.current_stock,
             in_stock_count: variant.current_stock > 0 ? 1 : 0,
-            price_range: `Rs. ${variant.selling_price}`,
+            price_range: `रु. ${variant.selling_price}`,
             _matched_sku: variant.sku,
           });
         }
@@ -308,9 +320,43 @@ export const searchProducts = asyncHandler(async (req, res) => {
  * Search Products - FULL MODE (Legacy)
  * Returns complete variant data for backwards compatibility
  */
-const searchProductsFullMode = async (req, res, { isAdmin, limitNum, hasQuery, q }) => {
+const searchProductsFullMode = async (req, res, { limitNum, hasQuery, q }) => {
   const searchMode = (req.query.mode || 'SALES').toUpperCase();
+  const userRole = req.user?.role;
   
+  // FIX: Search in both products table AND variants (by SKU)
+  let productIds = new Set();
+  
+  // First, search in products table (name, brand)
+  if (hasQuery) {
+    const productQuery = supabaseAdmin
+      .from('products')
+      .select('id')
+      .eq('is_active', true)
+      .limit(limitNum);
+    
+    const safeProductQuery = buildSafeOrQuery(q.trim(), ['name', 'brand']);
+    if (safeProductQuery) {
+      productQuery.or(safeProductQuery);
+    }
+    
+    const { data: productMatches } = await productQuery;
+    (productMatches || []).forEach(p => productIds.add(p.id));
+    
+    // Second, search in variants table (SKU)
+    const sanitizedQuery = q.trim();
+    const variantQuery = supabaseAdmin
+      .from('product_variants')
+      .select('product_id')
+      .eq('is_active', true)
+      .ilike('sku', `%${sanitizedQuery}%`)
+      .limit(limitNum);
+    
+    const { data: variantMatches } = await variantQuery;
+    (variantMatches || []).forEach(v => productIds.add(v.product_id));
+  }
+  
+  // Now fetch full product data with variants
   let query = supabaseAdmin
     .from('products')
     .select(`
@@ -325,8 +371,9 @@ const searchProductsFullMode = async (req, res, { isAdmin, limitNum, hasQuery, q
     .order('created_at', { ascending: false })
     .limit(limitNum);
 
-  if (hasQuery) {
-    query = query.or(`name.ilike.%${q.trim()}%,brand.ilike.%${q.trim()}%`);
+  // If we have search results, filter to those product IDs
+  if (hasQuery && productIds.size > 0) {
+    query = query.in('id', Array.from(productIds));
   }
 
   const { data: products, error } = await query;
@@ -339,11 +386,17 @@ const searchProductsFullMode = async (req, res, { isAdmin, limitNum, hasQuery, q
   let processedProducts = (products || []).map(product => {
     let variants = (product.variants || []).filter(v => v.is_active);
 
+    // FIX: SALES mode should filter by AVAILABLE stock (current - reserved), not just current_stock
+    // This ensures products with all stock reserved don't show up in order forms
     if (searchMode === 'SALES') {
-      variants = variants.filter(v => v.current_stock > 0);
+      variants = variants.filter(v => {
+        const availableStock = (v.current_stock || 0) - (v.reserved_stock || 0);
+        return availableStock > 0;
+      });
     }
 
-    if (!isAdmin) {
+    // SECURITY: Mask cost_price for non-privileged roles (staff, operators, etc.)
+    if (!canSeeFinancials(userRole)) {
       variants = variants.map(v => ({
         ...v,
         cost_price: undefined,
@@ -378,7 +431,6 @@ export const getProductVariants = asyncHandler(async (req, res) => {
   const { id } = req.params;
   const { mode = 'SALES' } = req.query;
   const userRole = req.user?.role;
-  const isAdmin = userRole === 'admin';
   const searchMode = (mode || 'SALES').toUpperCase();
 
   const { data: variants, error } = await supabaseAdmin
@@ -398,13 +450,17 @@ export const getProductVariants = asyncHandler(async (req, res) => {
 
   let processedVariants = variants || [];
 
-  // SALES mode: only in-stock variants
+  // SALES mode: only variants with AVAILABLE stock (current - reserved)
+  // FIX: Filter by available stock, not just current_stock
   if (searchMode === 'SALES') {
-    processedVariants = processedVariants.filter(v => v.current_stock > 0);
+    processedVariants = processedVariants.filter(v => {
+      const availableStock = (v.current_stock || 0) - (v.reserved_stock || 0);
+      return availableStock > 0;
+    });
   }
 
-  // Mask financial data for non-admins
-  if (!isAdmin) {
+  // SECURITY: Mask financial data for non-privileged roles
+  if (!canSeeFinancials(userRole)) {
     processedVariants = processedVariants.map(v => ({
       ...v,
       cost_price: undefined,
@@ -680,6 +736,133 @@ export const getStockMovements = asyncHandler(async (req, res) => {
   });
 });
 
+/**
+ * Update reorder levels for product variants
+ * PATCH /products/:id/reorder-levels
+ * 
+ * SECURITY: Admin only - this is a configuration setting
+ * 
+ * Request body:
+ * {
+ *   variants: [
+ *     { variant_id: "uuid", reorder_level: 10 },
+ *     ...
+ *   ]
+ * }
+ */
+export const updateReorderLevels = asyncHandler(async (req, res) => {
+  const { id: productId } = req.params;
+  const { variants } = req.body;
+  
+  if (!variants || !Array.isArray(variants) || variants.length === 0) {
+    return res.status(400).json({
+      success: false,
+      message: 'variants array is required with at least one variant',
+    });
+  }
+  
+  logger.info('[ProductController] Updating reorder levels', { 
+    productId, 
+    variantCount: variants.length 
+  });
+  
+  const results = {
+    updated: [],
+    failed: [],
+  };
+  
+  for (const item of variants) {
+    const { variant_id, reorder_level } = item;
+    
+    if (!variant_id || reorder_level === undefined || reorder_level === null) {
+      results.failed.push({ 
+        variant_id, 
+        error: 'variant_id and reorder_level are required' 
+      });
+      continue;
+    }
+    
+    if (typeof reorder_level !== 'number' || reorder_level < 0) {
+      results.failed.push({ 
+        variant_id, 
+        error: 'reorder_level must be a non-negative number' 
+      });
+      continue;
+    }
+    
+    try {
+      const { data, error } = await supabaseAdmin
+        .from('product_variants')
+        .update({ 
+          reorder_level: Math.floor(reorder_level),
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', variant_id)
+        .eq('product_id', productId)
+        .select('id, sku, reorder_level')
+        .single();
+      
+      if (error) {
+        logger.error('[ProductController] Failed to update reorder level', { variant_id, error });
+        results.failed.push({ variant_id, error: error.message });
+      } else {
+        results.updated.push(data);
+      }
+    } catch (err) {
+      results.failed.push({ variant_id, error: err.message });
+    }
+  }
+  
+  const allSuccess = results.failed.length === 0;
+  
+  res.status(allSuccess ? 200 : 207).json({
+    success: allSuccess,
+    message: allSuccess 
+      ? `Updated reorder levels for ${results.updated.length} variants`
+      : `Updated ${results.updated.length} variants, ${results.failed.length} failed`,
+    data: results,
+  });
+});
+
+/**
+ * Get product with variants including reorder levels
+ * GET /products/:id/stock-config
+ * 
+ * Returns product with all variants and their reorder_level settings
+ * SECURITY: Admin only
+ */
+export const getProductStockConfig = asyncHandler(async (req, res) => {
+  const { id: productId } = req.params;
+  
+  // Fetch product with variants
+  const { data: product, error: productError } = await supabaseAdmin
+    .from('products')
+    .select(`
+      id, name, image_url,
+      variants:product_variants(
+        id, sku, attributes, current_stock, reorder_level, is_active
+      )
+    `)
+    .eq('id', productId)
+    .single();
+  
+  if (productError) {
+    logger.error('[ProductController] Failed to fetch product stock config', productError);
+    return res.status(404).json({
+      success: false,
+      message: 'Product not found',
+    });
+  }
+  
+  // Filter to only active variants
+  product.variants = (product.variants || []).filter(v => v.is_active);
+  
+  res.json({
+    success: true,
+    data: product,
+  });
+});
+
 export default {
   // Products
   createProduct,
@@ -700,4 +883,7 @@ export default {
   bulkAdjustStock,
   getStockAlerts,
   getStockMovements,
+  // Reorder Level (Low Stock Alert)
+  updateReorderLevels,
+  getProductStockConfig,
 };

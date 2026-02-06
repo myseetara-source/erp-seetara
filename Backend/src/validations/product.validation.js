@@ -351,6 +351,20 @@ export const inventoryReportQuerySchema = z.object({
   brand: z.string().optional(),
 });
 
+// ============================================================================
+// SEARCH SCHEMAS
+// ============================================================================
+
+/**
+ * Product Search Query Schema
+ * Used for GET /products/search endpoint
+ */
+export const productSearchQuerySchema = z.object({
+  q: z.string().optional().default(''),
+  limit: z.coerce.number().int().min(1).max(100).optional().default(15),
+  mode: z.enum(['SALES', 'FULL', 'INVENTORY']).optional().default('SALES'),
+});
+
 export default {
   skuSchema,
   createProductSchema,
@@ -367,4 +381,5 @@ export default {
   productListQuerySchema,
   variantListQuerySchema,
   inventoryReportQuerySchema,
+  productSearchQuerySchema,
 };

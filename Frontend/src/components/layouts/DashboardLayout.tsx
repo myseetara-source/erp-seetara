@@ -32,15 +32,22 @@ import {
   LogOut,
   Boxes,
   Bike,
-  HeadphonesIcon,
+  Headphones,
   MessageSquare,
   Shield,
 } from 'lucide-react';
 import { CommandPalette } from '@/components/common/CommandPalette';
 import { useAuth } from '@/hooks/useAuth';
+import { useRealtimeInventory } from '@/hooks/useRealtimeInventory';
+import { QueryProvider } from '@/components/providers/QueryProvider';
 
 interface DashboardLayoutProps {
   children: React.ReactNode;
+  /**
+   * Whether to show the top header bar
+   * @default true
+   */
+  showHeader?: boolean;
 }
 
 // Navigation items configuration with role-based visibility
@@ -79,7 +86,7 @@ const NAV_ITEMS: NavGroup[] = [
     items: [
       { href: '/dashboard/dispatch', label: 'Dispatch', icon: Bike, shortcut: 'D' },
       { href: '/dashboard/products', label: 'Products', icon: Package, shortcut: 'P' },
-      { href: '/dashboard/support', label: 'Support', icon: HeadphonesIcon, shortcut: 'T' },
+      { href: '/dashboard/support', label: 'Support', icon: Headphones, shortcut: 'T' },
     ],
   },
   {
@@ -127,15 +134,23 @@ function RoleBadge({ role }: { role: string }) {
   );
 }
 
-export default function DashboardLayout({ children }: DashboardLayoutProps) {
+export default function DashboardLayout({ children, showHeader = true }: DashboardLayoutProps) {
   const pathname = usePathname();
   const router = useRouter();
   
   // JWT-based auth - role comes from session.user.app_metadata
   const { user, loading: authLoading, signOut, isAdmin } = useAuth();
   
+  // 🚀 P0: Initialize realtime inventory sync on dashboard mount
+  // This ensures product data is cached locally with live updates from Supabase
+  useRealtimeInventory();
+  
+  // Check if on orders page - sidebar should be collapsed by default
+  const isOrdersPage = pathname.includes('/dashboard/orders');
+  
   const [sidebarOpen, setSidebarOpen] = useState(false);
-  const [sidebarExpanded, setSidebarExpanded] = useState(true);
+  const [sidebarExpanded, setSidebarExpanded] = useState(!isOrdersPage); // Collapsed on orders page
+  const [sidebarHovered, setSidebarHovered] = useState(false); // For hover expand
   const [showProfileMenu, setShowProfileMenu] = useState(false);
   const [isLoggingOut, setIsLoggingOut] = useState(false);
 
@@ -143,6 +158,9 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
   const [mounted, setMounted] = useState(false);
   const [dateTime, setDateTime] = useState('');
   const [greeting, setGreeting] = useState('Hello');
+  
+  // On orders page, sidebar expands on hover
+  const effectiveSidebarExpanded = isOrdersPage ? sidebarHovered : sidebarExpanded;
 
   // Logout handler using the hook
   const handleLogout = async () => {
@@ -159,9 +177,14 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
   };
 
   // Close sidebar on route change (mobile)
+  // Collapse sidebar when entering orders page
   useEffect(() => {
     setSidebarOpen(false);
-  }, [pathname]);
+    // Auto-collapse sidebar on orders page
+    if (isOrdersPage) {
+      setSidebarExpanded(false);
+    }
+  }, [pathname, isOrdersPage]);
 
   // Handle client-side only date/time (prevents hydration error)
   useEffect(() => {
@@ -199,6 +222,7 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
   const userRole = user?.role || 'staff';
 
   return (
+    <QueryProvider>
     <div className="flex h-screen bg-gray-100 overflow-hidden">
       {/* ===================================================================== */}
       {/* SIDEBAR */}
@@ -214,13 +238,15 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
 
       {/* Sidebar */}
       <aside
+        onMouseEnter={() => isOrdersPage && setSidebarHovered(true)}
+        onMouseLeave={() => isOrdersPage && setSidebarHovered(false)}
         className={`
           fixed inset-y-0 left-0 z-30 shrink-0 overflow-y-hidden
           transition-all duration-300 ease-in-out transform
           bg-white shadow-lg md:relative md:translate-x-0
           flex flex-col
           ${sidebarOpen ? 'translate-x-0' : '-translate-x-full'}
-          ${sidebarExpanded ? 'w-64' : 'w-20'}
+          ${effectiveSidebarExpanded ? 'w-64' : 'w-20'}
         `}
       >
         {/* Logo */}
@@ -229,7 +255,7 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
             <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-orange-500 to-amber-500 flex items-center justify-center shadow-lg shadow-orange-500/25">
               <Package className="w-6 h-6 text-white" />
             </div>
-            {sidebarExpanded && (
+            {effectiveSidebarExpanded && (
               <div className="hidden md:block">
                 <h1 className="font-bold text-gray-900">ERP System</h1>
                 <p className="text-xs text-gray-500">Order Management</p>
@@ -249,7 +275,7 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
         <nav className="flex-1 overflow-y-auto px-3 py-4 space-y-1">
           {getFilteredNavItems(NAV_ITEMS, userRole).map((group, idx) => (
             <div key={idx}>
-              {group.section && sidebarExpanded && (
+              {group.section && effectiveSidebarExpanded && (
                 <p className="px-3 pt-4 pb-2 text-xs font-semibold text-gray-400 uppercase tracking-wider">
                   {group.section}
                 </p>
@@ -276,7 +302,7 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
                     <span className={isActive ? 'text-white' : 'text-gray-400 group-hover:text-orange-500'}>
                       <Icon className="w-5 h-5" />
                     </span>
-                    {sidebarExpanded && (
+                    {effectiveSidebarExpanded && (
                       <>
                         <span className="flex-1">{item.label}</span>
                         {item.shortcut && (
@@ -299,29 +325,31 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
           ))}
         </nav>
 
-        {/* Collapse button */}
-        <div className="p-3 border-t border-gray-200 shrink-0 hidden md:block">
-          <button
-            onClick={() => setSidebarExpanded(!sidebarExpanded)}
-            className={`
-              w-full flex items-center justify-center gap-2 px-3 py-2.5
-              text-sm font-medium rounded-xl transition-all duration-300
-              ${sidebarExpanded
-                ? 'bg-gray-50 hover:bg-gray-100 text-gray-700'
-                : 'hover:bg-gray-50 text-gray-600'
-              }
-            `}
-          >
-            <span className="p-1.5 rounded-lg bg-gray-100">
-              {sidebarExpanded ? (
-                <ChevronLeft className="w-4 h-4 text-gray-600" />
-              ) : (
-                <ChevronRight className="w-4 h-4 text-gray-600" />
-              )}
-            </span>
-            {sidebarExpanded && <span>Collapse</span>}
-          </button>
-        </div>
+        {/* Collapse button - Hide on orders page (auto-collapse/expand on hover) */}
+        {!isOrdersPage && (
+          <div className="p-3 border-t border-gray-200 shrink-0 hidden md:block">
+            <button
+              onClick={() => setSidebarExpanded(!sidebarExpanded)}
+              className={`
+                w-full flex items-center justify-center gap-2 px-3 py-2.5
+                text-sm font-medium rounded-xl transition-all duration-300
+                ${effectiveSidebarExpanded
+                  ? 'bg-gray-50 hover:bg-gray-100 text-gray-700'
+                  : 'hover:bg-gray-50 text-gray-600'
+                }
+              `}
+            >
+              <span className="p-1.5 rounded-lg bg-gray-100">
+                {effectiveSidebarExpanded ? (
+                  <ChevronLeft className="w-4 h-4 text-gray-600" />
+                ) : (
+                  <ChevronRight className="w-4 h-4 text-gray-600" />
+                )}
+              </span>
+              {effectiveSidebarExpanded && <span>Collapse</span>}
+            </button>
+          </div>
+        )}
       </aside>
 
       {/* ===================================================================== */}
@@ -329,10 +357,10 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
       {/* ===================================================================== */}
       <main className="flex-1 min-w-0 h-screen overflow-x-hidden overflow-y-auto">
         {/* ===================================================================== */}
-        {/* TOP BAR - Hidden on Orders page for Focus Mode */}
+        {/* TOP BAR - Controlled by showHeader prop */}
         {/* ===================================================================== */}
-        {!pathname.includes('/dashboard/orders') && (
-          <header className="sticky top-0 z-20 bg-white border-b border-gray-200 shadow-sm">
+        {showHeader && (
+          <header className="sticky top-0 z-20 bg-white border-b border-gray-200 shadow-sm" data-dashboard-header>
             <div className="flex items-center justify-between h-16 px-4 lg:px-6">
               {/* Left side */}
               <div className="flex items-center gap-4">
@@ -438,8 +466,8 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
           </header>
         )}
 
-        {/* Mobile Menu Button for Orders page (since header is hidden) */}
-        {pathname.includes('/dashboard/orders') && (
+        {/* Mobile Menu Button when header is hidden */}
+        {!showHeader && (
           <button
             onClick={() => setSidebarOpen(!sidebarOpen)}
             className="md:hidden fixed top-3 left-3 z-20 p-2 bg-white text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-lg shadow-md border border-gray-200 transition-colors"
@@ -452,13 +480,14 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
         {/* PAGE CONTENT */}
         {/* ===================================================================== */}
         <div className={`animate-page-fade-in ${
-          pathname.includes('/dashboard/orders') 
-            ? 'p-3 lg:p-4' // Tighter padding for Focus Mode
+          !showHeader 
+            ? 'p-3 lg:p-4' // Tighter padding for headerless/focus mode
             : 'p-4 lg:p-6'
         }`}>
           {children}
         </div>
       </main>
     </div>
+    </QueryProvider>
   );
 }

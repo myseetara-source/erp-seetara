@@ -23,18 +23,28 @@ import {
 
 /**
  * Order Status Enum
+ * Updated to match database order_status ENUM
  */
 export const orderStatusSchema = z.enum([
   'intake',
+  'follow_up',
   'converted',
-  'followup',
   'hold',
   'packed',
-  'shipped',
+  'assigned',
+  'out_for_delivery',
+  'handover_to_courier',
+  'in_transit',
+  'store_sale',
   'delivered',
   'cancelled',
-  'refund',
-  'return',
+  'rejected',
+  'return_initiated',
+  'returned',
+  // P0: RTO Verification Workflow
+  'rto_initiated',              // Courier says customer rejected
+  'rto_verification_pending',   // Awaiting physical verification at warehouse
+  'lost_in_transit',            // Item lost, open courier dispute
 ]);
 
 /**
@@ -51,13 +61,20 @@ export const orderSourceSchema = z.enum([
 
 /**
  * Payment Method Enum
+ * NOTE: 'cash' is used for Store POS (in-store cash payment)
  */
-export const paymentMethodSchema = z.enum(['cod', 'prepaid', 'partial']);
+export const paymentMethodSchema = z.enum(['cod', 'prepaid', 'partial', 'cash']);
 
 /**
  * Payment Status Enum
  */
 export const paymentStatusSchema = z.enum(['pending', 'partial', 'paid', 'refunded']);
+
+/**
+ * Fulfillment Type Enum
+ * NOTE: Moved here (before createOrderSchema) to avoid "Cannot access before initialization" error
+ */
+export const fulfillmentTypeSchema = z.enum(['inside_valley', 'outside_valley', 'store']);
 
 // ============================================================================
 // CUSTOMER SCHEMAS (For Order Creation)
@@ -164,6 +181,8 @@ export const orderItemsArraySchema = z
  * Accepts customer details and items for order creation
  * 
  * Enhanced with coercion for all numeric fields to handle string inputs from forms
+ * 
+ * P0 FIX: Added zone_code and destination_branch fields
  */
 export const createOrderSchema = z.object({
   // Customer can be new or existing
@@ -176,6 +195,25 @@ export const createOrderSchema = z.object({
   source: orderSourceSchema.default('manual'),
   source_order_id: z.string().max(100).optional().nullable(),
   
+  // Fulfillment & Status (for Store POS, etc.)
+  // NOTE: Status is optional here - defaults to 'intake' in service if not provided
+  // For Store POS: frontend sends fulfillment_type='store' and status='store_sale'
+  fulfillment_type: fulfillmentTypeSchema.optional().default('inside_valley'),
+  status: orderStatusSchema.optional(), // Will default in service layer based on fulfillment_type
+  
+  // P0 FIX: Zone/Branch Routing - MUST be included in create schema
+  // zone_code: For inside_valley delivery routing (NORTH, WEST, CENTER, EAST, LALIT)
+  // destination_branch: For outside_valley courier routing (e.g., Narayanghat, Pokhara)
+  zone_code: z.enum(['NORTH', 'WEST', 'CENTER', 'EAST', 'LALIT']).optional().nullable(),
+  destination_branch: z.string().max(100).optional().nullable(),
+  
+  // P0 FIX: Courier partner for outside_valley orders (Nepal Can Move, Gaau Besi)
+  courier_partner: z.string().max(100).optional().nullable(),
+  
+  // P0 FIX: NCM delivery type - D2D (Home Delivery) or D2B (Branch Pickup)
+  // CRITICAL: Must be saved at order creation to persist across sessions
+  delivery_type: z.enum(['D2D', 'D2B']).optional().nullable(),
+  
   // Pricing Overrides (with coercion)
   discount_amount: z.coerce.number().min(0).default(0),
   discount_code: z.string().max(50).optional().nullable(),
@@ -184,6 +222,7 @@ export const createOrderSchema = z.object({
   
   // Payment
   payment_method: paymentMethodSchema.default('cod'),
+  payment_status: paymentStatusSchema.optional(), // For Store POS: 'paid'
   paid_amount: z.coerce.number().min(0).default(0),
   
   // Internal (with coercion for priority)
@@ -204,6 +243,7 @@ export const updateOrderSchema = z.object({
   // Shipping address updates
   shipping_name: z.string().min(2).max(255).optional(),
   shipping_phone: phoneSchema.optional(),
+  alt_phone: optionalPhoneSchema, // Secondary phone number
   shipping_address: z.string().max(500).optional(),
   shipping_city: z.string().max(100).optional(),
   shipping_state: z.string().max(100).optional(),
@@ -229,6 +269,19 @@ export const updateOrderSchema = z.object({
   internal_notes: z.string().max(1000).optional().nullable(),
   customer_notes: z.string().max(1000).optional().nullable(),
   assigned_to: uuidSchema.optional().nullable(),
+  
+  // Zone/Branch (for inside_valley and outside_valley routing)
+  zone_code: z.enum(['NORTH', 'WEST', 'CENTER', 'EAST', 'LALIT']).optional().nullable(),
+  destination_branch: z.string().max(100).optional().nullable(),
+  
+  // Fulfillment type (allows switching between Inside Valley ↔ Outside Valley)
+  fulfillment_type: z.enum(['inside_valley', 'outside_valley']).optional(),
+  
+  // P0 FIX: NCM delivery type - D2D (Home Delivery) or D2B (Branch Pickup)
+  delivery_type: z.enum(['D2D', 'D2B']).optional().nullable(),
+  
+  // Staff remarks (internal notes for order handling)
+  staff_remarks: z.string().max(1000).optional().nullable(),
 });
 
 // ============================================================================
@@ -277,18 +330,32 @@ export const updateOrderStatusSchema = z.object({
 // ============================================================================
 
 /**
+ * Location Type Enum (maps to fulfillment_type in backend)
+ */
+export const locationTypeSchema = z.enum(['INSIDE_VALLEY', 'OUTSIDE_VALLEY', 'POS']);
+
+/**
  * Order List Query
+ * Accepts comma-separated status values for multi-status filtering
  */
 export const orderListQuerySchema = paginationSchema.extend({
-  status: orderStatusSchema.optional(),
+  // Status can be a single value or comma-separated string (e.g., "intake,packed")
+  status: z.string().optional(),
   source: orderSourceSchema.optional(),
   customer_id: uuidSchema.optional(),
   payment_status: paymentStatusSchema.optional(),
   assigned_to: uuidSchema.optional(),
-  start_date: z.string().datetime().optional(),
-  end_date: z.string().datetime().optional(),
+  // Support both snake_case and camelCase date formats
+  start_date: z.string().optional(),
+  end_date: z.string().optional(),
+  startDate: z.string().optional(),
+  endDate: z.string().optional(),
   search: z.string().optional(), // Search by order number, customer name, phone
   awb: z.string().optional(), // Search by AWB number
+  // Tri-Core Architecture: Location and Fulfillment Type filters
+  location: locationTypeSchema.optional(),
+  fulfillmentType: fulfillmentTypeSchema.optional(),
+  fulfillment_type: fulfillmentTypeSchema.optional(),
 });
 
 /**

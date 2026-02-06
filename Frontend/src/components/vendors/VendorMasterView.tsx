@@ -104,6 +104,10 @@ function VendorListSidebar({
     return true;
   });
 
+  // Calculate totals
+  const totalPayable = filteredVendors.filter(v => v.balance > 0).reduce((sum, v) => sum + v.balance, 0);
+  const totalReceivable = Math.abs(filteredVendors.filter(v => v.balance < 0).reduce((sum, v) => sum + v.balance, 0));
+
   // Use compact format for sidebar
   const formatBalanceCompact = (amount: number) => {
     const absAmount = Math.abs(amount);
@@ -113,109 +117,137 @@ function VendorListSidebar({
   };
 
   return (
-    <div className="h-full flex flex-col bg-white border-r border-gray-200">
-      {/* Header - Compact */}
-      <div className="p-3 border-b border-gray-100">
-        <div className="flex items-center justify-between mb-2">
-          <h2 className="text-sm font-semibold text-gray-900">Vendors</h2>
+    <div className="h-full flex flex-col bg-white">
+      {/* Header - Professional Design */}
+      <div className="flex-shrink-0 p-4 bg-gradient-to-br from-orange-500 to-amber-500">
+        <div className="flex items-center justify-between mb-3">
+          <div className="flex items-center gap-2">
+            <Building2 className="w-5 h-5 text-white" />
+            <h2 className="text-base font-bold text-white">Vendors</h2>
+          </div>
           <Link href="/dashboard/vendors/add">
-            <Button size="sm" className="h-6 w-6 p-0 bg-orange-500 hover:bg-orange-600">
-              <Plus className="w-3.5 h-3.5" />
+            <Button size="sm" className="h-8 w-8 p-0 bg-white/20 hover:bg-white/30 border-0">
+              <Plus className="w-4 h-4 text-white" />
             </Button>
           </Link>
         </div>
+        
+        {/* Search - Always visible, prominent */}
         <div className="relative">
-          <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400" />
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
           <Input
             type="text"
-            placeholder="Search..."
+            placeholder="Search vendors..."
             value={search}
             onChange={(e) => onSearchChange(e.target.value)}
-            className="pl-8 h-7 text-xs bg-gray-50 border-gray-200 focus:bg-white"
+            className="pl-10 h-9 text-sm bg-white border-0 shadow-sm rounded-lg placeholder:text-gray-400 focus:ring-2 focus:ring-white/50"
           />
         </div>
       </div>
 
-      {/* Filter Tabs - Compact */}
-      <div className="flex border-b border-gray-100">
+      {/* Summary Stats - Always visible */}
+      <div className="flex-shrink-0 grid grid-cols-2 gap-2 p-3 bg-gray-50 border-b border-gray-200">
+        <div className="bg-white rounded-lg p-2.5 border border-red-100 shadow-sm">
+          <p className="text-[10px] font-medium text-gray-400 uppercase">Payable</p>
+          <p className="text-base font-bold text-red-600">रु.{formatBalanceCompact(totalPayable)}</p>
+        </div>
+        <div className="bg-white rounded-lg p-2.5 border border-green-100 shadow-sm">
+          <p className="text-[10px] font-medium text-gray-400 uppercase">Receivable</p>
+          <p className="text-base font-bold text-green-600">रु.{formatBalanceCompact(totalReceivable)}</p>
+        </div>
+      </div>
+
+      {/* Filter Tabs */}
+      <div className="flex-shrink-0 flex bg-white border-b border-gray-200">
         {FILTER_TABS.map((tab) => (
           <button
             key={tab.key}
             onClick={() => onFilterChange(tab.key)}
             className={cn(
-              'flex-1 px-2 py-1.5 text-xs font-medium transition-all relative',
-              activeFilter === tab.key ? 'text-orange-600' : 'text-gray-500 hover:text-gray-700'
+              'flex-1 px-3 py-2.5 text-xs font-semibold transition-all relative',
+              activeFilter === tab.key 
+                ? 'text-orange-600 bg-orange-50' 
+                : 'text-gray-500 hover:text-gray-700 hover:bg-gray-50'
             )}
           >
             <span className="flex items-center justify-center gap-1">
+              {tab.icon}
               {tab.label}
             </span>
             {activeFilter === tab.key && (
-              <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-orange-500" />
+              <div className="absolute bottom-0 left-2 right-2 h-0.5 bg-orange-500 rounded-full" />
             )}
           </button>
         ))}
       </div>
 
-      {/* Vendor List - Compact */}
-      <div className="flex-1 overflow-auto">
+      {/* Vendor List - Scrollable */}
+      <div className="flex-1 overflow-auto min-h-0">
         {isLoading ? (
-          <div className="p-2 space-y-1">
-            {[...Array(10)].map((_, i) => (
-              <div key={i} className="flex items-center gap-2 p-2">
-                <Skeleton className="w-8 h-8 rounded-full" />
+          <div className="p-3 space-y-2">
+            {[...Array(8)].map((_, i) => (
+              <div key={i} className="flex items-center gap-3 p-2.5 bg-gray-50 rounded-lg">
+                <Skeleton className="w-10 h-10 rounded-full" />
                 <div className="flex-1">
-                  <Skeleton className="h-3 w-24 mb-1" />
-                  <Skeleton className="h-2 w-16" />
+                  <Skeleton className="h-4 w-28 mb-1.5" />
+                  <Skeleton className="h-3 w-20" />
                 </div>
-                <Skeleton className="h-3 w-12" />
+                <Skeleton className="h-5 w-14" />
               </div>
             ))}
           </div>
         ) : filteredVendors.length === 0 ? (
-          <div className="flex flex-col items-center justify-center h-32 text-gray-400">
-            <Building2 className="w-8 h-8 mb-2 opacity-50" />
-            <p className="text-xs">No vendors found</p>
+          <div className="flex flex-col items-center justify-center py-12 text-gray-400">
+            <div className="w-16 h-16 rounded-2xl bg-gray-100 flex items-center justify-center mb-3">
+              <Building2 className="w-8 h-8 text-gray-300" />
+            </div>
+            <p className="text-sm font-medium text-gray-500">No vendors found</p>
+            <p className="text-xs text-gray-400 mt-1">Try adjusting your search or filter</p>
           </div>
         ) : (
-          <div className="py-0.5">
+          <div className="p-2">
             {filteredVendors.map((vendor) => (
               <button
                 key={vendor.id}
                 onClick={() => onSelectVendor(vendor.id)}
                 className={cn(
-                  'w-full flex items-center gap-2 px-3 py-2 text-left transition-all',
-                  'hover:bg-gray-50 border-l-2',
+                  'w-full flex items-center gap-3 p-2.5 rounded-xl text-left transition-all mb-1',
+                  'hover:bg-orange-50 border-2',
                   selectedVendorId === vendor.id
-                    ? 'bg-orange-50 border-l-orange-500'
-                    : 'border-l-transparent'
+                    ? 'bg-orange-50 border-orange-300 shadow-sm'
+                    : 'border-transparent hover:border-orange-200'
                 )}
               >
                 <div className={cn(
-                  'w-8 h-8 rounded-full flex items-center justify-center text-white font-medium text-xs',
-                  vendor.is_active ? 'bg-gradient-to-br from-orange-400 to-amber-500' : 'bg-gray-300'
+                  'w-10 h-10 rounded-xl flex items-center justify-center text-white font-bold text-sm shadow-sm',
+                  vendor.is_active 
+                    ? 'bg-gradient-to-br from-orange-400 to-amber-500' 
+                    : 'bg-gray-300'
                 )}>
                   {vendor.name.charAt(0).toUpperCase()}
                 </div>
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-1.5">
-                    <span className="text-sm font-medium text-gray-900 truncate">{vendor.name}</span>
+                    <span className="text-sm font-semibold text-gray-900 truncate">{vendor.name}</span>
                     {!vendor.is_active && (
-                      <span className="flex-shrink-0 w-1.5 h-1.5 rounded-full bg-gray-400" />
+                      <span className="flex-shrink-0 px-1.5 py-0.5 text-[9px] bg-gray-100 text-gray-500 rounded">Inactive</span>
                     )}
                   </div>
                   {vendor.company_name && (
-                    <p className="text-[11px] text-gray-500 truncate">{vendor.company_name}</p>
+                    <p className="text-xs text-gray-500 truncate">{vendor.company_name}</p>
                   )}
                 </div>
                 <div className="text-right flex-shrink-0">
                   <span className={cn(
-                    'text-sm font-medium',
-                    vendor.balance > 0 ? 'text-red-600' : vendor.balance < 0 ? 'text-green-600' : 'text-gray-500'
+                    'text-sm font-bold',
+                    vendor.balance > 0 ? 'text-red-600' : vendor.balance < 0 ? 'text-green-600' : 'text-gray-400'
                   )}>
-                    ₹{formatBalanceCompact(vendor.balance)}
+                    रु.{formatBalanceCompact(vendor.balance)}
                   </span>
-                  <p className="text-[10px] text-gray-400">
+                  <p className={cn(
+                    'text-[10px] font-medium',
+                    vendor.balance > 0 ? 'text-red-400' : vendor.balance < 0 ? 'text-green-400' : 'text-gray-400'
+                  )}>
                     {vendor.balance > 0 ? 'Payable' : vendor.balance < 0 ? 'Receivable' : 'Settled'}
                   </p>
                 </div>
@@ -225,17 +257,20 @@ function VendorListSidebar({
         )}
       </div>
 
-      {/* Summary Footer */}
-      {!isLoading && filteredVendors.length > 0 && (
-        <div className="p-3 border-t border-gray-100 bg-gray-50">
-          <div className="flex items-center justify-between text-xs text-gray-500">
-            <span>{filteredVendors.length} vendors</span>
-            <span className="font-medium text-gray-700">
-              Total: ₹{filteredVendors.reduce((sum, v) => sum + Math.abs(v.balance), 0).toLocaleString()}
+      {/* Footer - Always visible */}
+      <div className="flex-shrink-0 p-3 bg-gradient-to-r from-gray-50 to-gray-100 border-t border-gray-200">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-1.5">
+            <div className="w-2 h-2 rounded-full bg-orange-500"></div>
+            <span className="text-xs font-medium text-gray-600">
+              {filteredVendors.length} vendor{filteredVendors.length !== 1 ? 's' : ''}
             </span>
           </div>
+          <span className="text-xs font-bold text-gray-700">
+            Net: रु.{formatBalanceCompact(totalPayable - totalReceivable)}
+          </span>
         </div>
-      )}
+      </div>
     </div>
   );
 }
@@ -390,93 +425,166 @@ function VendorDetailView({ vendorId, onTransactionSuccess, onSelectTransaction,
 
   if (!vendor) return null;
 
+  const currentBalance = stats?.balance || vendor.balance || 0;
   const STAT_CARDS = [
-    { label: 'Total Purchases', value: formatCurrency(stats?.purchases || 0), subValue: `${stats?.purchase_count || 0} orders`, icon: Package, color: 'text-blue-600', bg: 'bg-blue-50' },
-    { label: 'Total Payments', value: formatCurrency(stats?.payments || 0), subValue: stats?.last_payment_date ? `Last: ${new Date(stats.last_payment_date).toLocaleDateString()}` : 'No payments', icon: CreditCard, color: 'text-green-600', bg: 'bg-green-50' },
-    { label: 'Returns', value: formatCurrency(stats?.returns || 0), subValue: 'Total returns', icon: RotateCcw, color: 'text-orange-600', bg: 'bg-orange-50' },
-    { label: 'Current Balance', value: formatCurrency(stats?.balance || vendor.balance || 0), subValue: (stats?.balance || vendor.balance) > 0 ? 'Payable to vendor' : 'Receivable', icon: Wallet, color: (stats?.balance || vendor.balance) > 0 ? 'text-red-600' : 'text-green-600', bg: (stats?.balance || vendor.balance) > 0 ? 'bg-red-50' : 'bg-green-50' },
+    { 
+      label: 'TOTAL PURCHASES', 
+      value: formatCurrency(stats?.purchases || 0), 
+      icon: Package, 
+      iconBg: 'bg-gradient-to-br from-blue-500 to-indigo-600',
+      borderColor: 'border-l-blue-500',
+    },
+    { 
+      label: 'TOTAL PAYMENTS', 
+      value: formatCurrency(stats?.payments || 0), 
+      icon: CreditCard, 
+      iconBg: 'bg-gradient-to-br from-green-500 to-emerald-600',
+      borderColor: 'border-l-green-500',
+    },
+    { 
+      label: 'RETURNS', 
+      value: formatCurrency(stats?.returns || 0), 
+      icon: RotateCcw, 
+      iconBg: 'bg-gradient-to-br from-orange-500 to-amber-600',
+      borderColor: 'border-l-orange-500',
+    },
+    { 
+      label: 'CURRENT BALANCE', 
+      value: formatCurrency(Math.abs(currentBalance)), 
+      icon: Wallet, 
+      iconBg: currentBalance > 0 
+        ? 'bg-gradient-to-br from-red-500 to-rose-600' 
+        : 'bg-gradient-to-br from-green-500 to-emerald-600',
+      borderColor: currentBalance > 0 ? 'border-l-red-500' : 'border-l-green-500',
+      badge: currentBalance > 0 ? 'Payable' : currentBalance < 0 ? 'Receivable' : 'Settled',
+      badgeColor: currentBalance > 0 ? 'bg-red-100 text-red-700' : 'bg-green-100 text-green-700',
+    },
   ];
 
   return (
     <div className="h-full flex flex-col bg-gray-50 overflow-auto">
-      {/* Header - Compact */}
-      <div className="bg-white border-b border-gray-200 px-4 py-3">
+      {/* Header - Premium Design */}
+      <div className="bg-white border-b border-gray-200 px-5 py-4 shadow-sm">
         <div className="flex items-center justify-between">
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-4">
             <div className={cn(
-              'w-10 h-10 rounded-lg flex items-center justify-center text-lg font-bold text-white',
+              'w-14 h-14 rounded-2xl flex items-center justify-center text-2xl font-bold text-white shadow-lg',
               vendor.is_active ? 'bg-gradient-to-br from-orange-400 to-amber-500' : 'bg-gray-400'
             )}>
               {vendor.name.charAt(0).toUpperCase()}
             </div>
             <div>
-              <div className="flex items-center gap-2">
-                <h1 className="text-base font-semibold text-gray-900">{vendor.name}</h1>
-                {!vendor.is_active && <Badge variant="outline" className="text-xs text-gray-500 border-gray-300">Inactive</Badge>}
+              <div className="flex items-center gap-2 mb-1">
+                <h1 className="text-xl font-bold text-gray-900">{vendor.name}</h1>
+                {!vendor.is_active && (
+                  <Badge variant="outline" className="text-xs text-gray-500 border-gray-300">Inactive</Badge>
+                )}
               </div>
-              <div className="flex items-center gap-3 text-xs text-gray-500">
-                {vendor.company_name && <span>{vendor.company_name}</span>}
-                {vendor.phone && <span className="flex items-center gap-1"><Phone className="w-3 h-3" />{vendor.phone}</span>}
+              <div className="flex items-center gap-4 text-sm text-gray-500">
+                {vendor.company_name && (
+                  <span className="flex items-center gap-1.5">
+                    <Building2 className="w-3.5 h-3.5" />
+                    {vendor.company_name}
+                  </span>
+                )}
+                {vendor.phone && (
+                  <span className="flex items-center gap-1.5">
+                    <Phone className="w-3.5 h-3.5" />
+                    {vendor.phone}
+                  </span>
+                )}
               </div>
             </div>
           </div>
-          <div className="flex items-center gap-2">
-            <div className="flex items-center gap-1.5 px-2 py-1 bg-gray-50 rounded-md border border-gray-100">
-              <Globe className="w-3.5 h-3.5 text-gray-400" />
-              <span className="text-xs text-gray-500">Portal</span>
-              <Switch checked={portalEnabled} onCheckedChange={handleTogglePortal} className="data-[state=checked]:bg-orange-500 scale-75" />
+          <div className="flex items-center gap-3">
+            <div className="flex items-center gap-2 px-3 py-2 bg-gray-50 rounded-lg border border-gray-200">
+              <Globe className="w-4 h-4 text-gray-400" />
+              <span className="text-xs font-medium text-gray-600">Portal</span>
+              <Switch 
+                checked={portalEnabled} 
+                onCheckedChange={handleTogglePortal} 
+                className="data-[state=checked]:bg-orange-500" 
+              />
             </div>
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <Button variant="ghost" size="sm" className="h-7 w-7 p-0"><MoreVertical className="w-4 h-4" /></Button>
+                <Button variant="outline" size="sm" className="h-9 w-9 p-0">
+                  <MoreVertical className="w-4 h-4" />
+                </Button>
               </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="text-sm">
+              <DropdownMenuContent align="end" className="w-48">
                 <DropdownMenuItem asChild>
                   <Link href={`/dashboard/vendors/${vendor.id}`} className="flex items-center gap-2">
-                    <Edit className="w-3.5 h-3.5" />Edit
+                    <Edit className="w-4 h-4" />
+                    Edit Vendor
                   </Link>
                 </DropdownMenuItem>
-                <DropdownMenuItem><History className="w-3.5 h-3.5 mr-2" />Ledger</DropdownMenuItem>
+                <DropdownMenuItem>
+                  <History className="w-4 h-4 mr-2" />
+                  View Ledger
+                </DropdownMenuItem>
                 <DropdownMenuSeparator />
-                <DropdownMenuItem className="text-red-600"><Trash2 className="w-3.5 h-3.5 mr-2" />Delete</DropdownMenuItem>
+                <DropdownMenuItem className="text-red-600">
+                  <Trash2 className="w-4 h-4 mr-2" />
+                  Delete Vendor
+                </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
           </div>
         </div>
       </div>
 
-      {/* Stats Grid - Ultra Compact */}
-      <div className="px-4 py-2">
-        <div className="grid grid-cols-4 gap-2">
+      {/* Stats Grid - Premium Design */}
+      <div className="px-4 py-3">
+        <div className="grid grid-cols-4 gap-3">
           {STAT_CARDS.map((card, index) => (
-            <div key={index} className="bg-white rounded-md p-2.5 border border-gray-100">
-              <div className="flex items-center justify-between">
-                <span className="text-[10px] font-medium text-gray-400 uppercase tracking-wide">{card.label}</span>
-                <card.icon className={cn('w-3 h-3', card.color)} />
+            <div 
+              key={index} 
+              className={cn(
+                'bg-white rounded-xl p-3 border-l-4 shadow-sm hover:shadow-md transition-shadow',
+                card.borderColor
+              )}
+            >
+              <div className="flex items-center justify-between mb-2">
+                <div className={cn(
+                  'w-8 h-8 rounded-lg flex items-center justify-center shadow-sm',
+                  card.iconBg
+                )}>
+                  <card.icon className="w-4 h-4 text-white" />
+                </div>
+                {(card as typeof card & { badge?: string; badgeColor?: string }).badge && (
+                  <span className={cn(
+                    'text-[9px] font-bold px-1.5 py-0.5 rounded-full uppercase',
+                    (card as typeof card & { badgeColor?: string }).badgeColor
+                  )}>
+                    {(card as typeof card & { badge?: string }).badge}
+                  </span>
+                )}
               </div>
-              <p className={cn('text-base font-bold mt-0.5', card.color)}>{card.value}</p>
+              <p className="text-lg font-bold text-gray-900">{card.value}</p>
+              <p className="text-[10px] font-medium text-gray-400 tracking-wide">{card.label}</p>
             </div>
           ))}
         </div>
       </div>
 
-      {/* Action Buttons - Compact */}
-      <div className="px-4 pb-3">
-        <div className="flex gap-2">
+      {/* Action Buttons - Premium Design */}
+      <div className="px-4 pb-4">
+        <div className="flex gap-3">
           <Button 
-            size="sm" 
-            className="flex-1 h-8 bg-green-600 hover:bg-green-700 text-white text-xs font-medium"
+            className="flex-1 h-10 bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700 text-white font-semibold shadow-md hover:shadow-lg transition-all"
             onClick={() => setShowPaymentModal(true)}
           >
-            <CreditCard className="w-3.5 h-3.5 mr-1.5" />Record Payment
+            <CreditCard className="w-4 h-4 mr-2" />
+            Record Payment
           </Button>
           <Button 
-            size="sm" 
             variant="outline" 
-            className="flex-1 h-8 border-blue-200 text-blue-600 hover:bg-blue-50 text-xs font-medium"
+            className="flex-1 h-10 border-2 border-blue-200 text-blue-600 hover:bg-blue-50 hover:border-blue-300 font-semibold transition-all"
             onClick={() => router.push(`/dashboard/inventory/purchase/new?vendorId=${vendor.id}`)}
           >
-            <Package className="w-3.5 h-3.5 mr-1.5" />New Purchase
+            <Package className="w-4 h-4 mr-2" />
+            New Purchase
           </Button>
         </div>
       </div>
@@ -709,9 +817,9 @@ export default function VendorMasterView() {
   }, [selectedVendorId]);
 
   return (
-    <div className="h-[calc(100vh-48px)] flex overflow-hidden">
+    <div className="h-[calc(100vh-64px)] flex overflow-hidden bg-gray-100">
       {/* Left Panel: Vendor List (Fixed Width) */}
-      <div className="w-[280px] flex-shrink-0 border-r border-gray-200">
+      <div className="w-[320px] flex-shrink-0 border-r border-gray-300 shadow-lg bg-white">
         <VendorListSidebar
           vendors={vendors}
           selectedVendorId={selectedVendorId}
@@ -724,12 +832,15 @@ export default function VendorMasterView() {
         />
       </div>
       
-      {/* Middle + Right Panels: Flex container that shares remaining space */}
-      <div className="flex-1 flex overflow-hidden">
-        {/* Middle Panel: Vendor Detail (Shrinks when right panel opens) */}
+      {/* Middle + Right Panels: Flex container with proper width distribution */}
+      <div className="flex-1 flex overflow-hidden min-w-0">
+        {/* Middle Panel: Vendor Detail - FIXED min-width to prevent compression */}
         <div className={cn(
-          "flex-1 min-w-0 overflow-auto transition-all duration-300 ease-in-out",
-          selectedTransaction && "flex-[2]"
+          "overflow-auto transition-all duration-300 ease-in-out bg-gray-50",
+          // When right panel is open, middle panel gets remaining space minus right panel width
+          selectedTransaction 
+            ? "flex-1 min-w-[480px]" // Minimum width when right panel is open
+            : "flex-1 min-w-0"        // Full flex when right panel is closed
         )}>
           <VendorDetailView 
             vendorId={selectedVendorId} 
@@ -739,7 +850,7 @@ export default function VendorMasterView() {
           />
         </div>
         
-        {/* Right Panel: Transaction Detail (Inline, not overlay) */}
+        {/* Right Panel: Transaction Detail (Inline, fixed width, no overlap) */}
         <AnimatePresence mode="wait">
           {selectedTransaction && (
             <TransactionDetailPanel

@@ -11,6 +11,7 @@ import { smsService } from '../services/sms/SMSService.js';
 import { asyncHandler } from '../middleware/error.middleware.js';
 import { BadRequestError, NotFoundError } from '../utils/errors.js';
 import logger from '../utils/logger.js';
+import { buildSafeOrQuery, sanitizeSearchInput } from '../utils/helpers.js';
 
 // =============================================================================
 // TEMPLATES
@@ -35,7 +36,8 @@ export const listTemplates = asyncHandler(async (req, res) => {
     query = query.eq('is_active', is_active === 'true');
   }
   if (search) {
-    query = query.or(`slug.ilike.%${search}%,name.ilike.%${search}%`);
+    const safeQuery = buildSafeOrQuery(search, ['slug', 'name']);
+    if (safeQuery) query = query.or(safeQuery);
   }
 
   const { data: templates, error } = await query;
@@ -236,7 +238,11 @@ export const getLogs = asyncHandler(async (req, res) => {
     query = query.eq('template_slug', template_slug);
   }
   if (phone) {
-    query = query.ilike('recipient_phone', `%${phone}%`);
+    // SECURITY: Sanitize phone to prevent SQL injection
+    const sanitizedPhone = sanitizeSearchInput(phone);
+    if (sanitizedPhone) {
+      query = query.ilike('recipient_phone', `%${sanitizedPhone}%`);
+    }
   }
   if (date_from) {
     query = query.gte('queued_at', date_from);

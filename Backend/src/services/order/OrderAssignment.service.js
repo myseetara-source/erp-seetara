@@ -17,6 +17,7 @@ import {
 } from '../../utils/errors.js';
 import { orderCoreService } from './OrderCore.service.js';
 import { orderStateService } from './OrderState.service.js';
+import { logAssignment, logActivity, ACTIVITY_TYPES } from '../ActivityLogger.service.js';
 
 const logger = createLogger('OrderAssignment');
 
@@ -80,12 +81,23 @@ class OrderAssignmentService {
       throw new DatabaseError('Failed to assign rider', updateError);
     }
 
-    // Log assignment
+    // Log assignment to activity timeline
+    await logAssignment(supabaseAdmin, {
+      orderId,
+      user: context.user || { id: userId, name: 'System' },
+      riderName: rider.name,
+      riderPhone: rider.phone,
+      action: 'assigned',
+    });
+
+    // Also log to order_logs for backward compatibility
     await orderCoreService.createOrderLog({
       order_id: orderId,
+      old_status: order.status,
+      new_status: order.status,
       action: 'rider_assigned',
       description: `Rider ${rider.name} (${rider.phone}) assigned`,
-      created_by: userId,
+      changed_by: userId,
     });
 
     logger.info('Rider assigned to order', {

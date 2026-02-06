@@ -18,6 +18,22 @@ import { catchAsync } from '../utils/errors.js';
 import { createLogger } from '../utils/logger.js';
 import config from '../config/index.js';
 import { CACHE_DURATION } from '../middleware/cache.middleware.js';
+import { sanitizeSearchInput } from '../utils/helpers.js';
+
+/**
+ * Generate a URL-safe slug from a string
+ * @param {string} text - The text to convert to a slug
+ * @returns {string} - URL-safe slug
+ */
+const generateSlug = (text) => {
+  return text
+    .toLowerCase()
+    .trim()
+    .replace(/[^\w\s-]/g, '') // Remove special characters except spaces and hyphens
+    .replace(/\s+/g, '-') // Replace spaces with hyphens
+    .replace(/-+/g, '-') // Replace multiple hyphens with single hyphen
+    .replace(/^-+|-+$/g, ''); // Remove leading/trailing hyphens
+};
 
 const logger = createLogger('StaticController');
 
@@ -41,7 +57,11 @@ export const getCategories = catchAsync(async (req, res) => {
     .limit(Number(limit));
 
   if (search) {
-    query = query.ilike('name', `%${search}%`);
+    // SECURITY: Sanitize search to prevent SQL injection
+    const sanitizedSearch = sanitizeSearchInput(search);
+    if (sanitizedSearch) {
+      query = query.ilike('name', `%${sanitizedSearch}%`);
+    }
   }
 
   const { data, error } = await query;
@@ -91,9 +111,12 @@ export const createCategory = catchAsync(async (req, res) => {
     });
   }
 
+  const trimmedName = name.trim();
+  const slug = generateSlug(trimmedName);
+
   const { data, error } = await supabaseAdmin
     .from('categories')
-    .upsert({ name: name.trim(), is_active: true }, { onConflict: 'name' })
+    .upsert({ name: trimmedName, slug, is_active: true }, { onConflict: 'name' })
     .select()
     .single();
 
@@ -132,7 +155,11 @@ export const getBrands = catchAsync(async (req, res) => {
     .limit(Number(limit));
 
   if (search) {
-    query = query.ilike('name', `%${search}%`);
+    // SECURITY: Sanitize search to prevent SQL injection
+    const sanitizedSearch = sanitizeSearchInput(search);
+    if (sanitizedSearch) {
+      query = query.ilike('name', `%${sanitizedSearch}%`);
+    }
   }
 
   const { data, error } = await query;
@@ -182,9 +209,12 @@ export const createBrand = catchAsync(async (req, res) => {
     });
   }
 
+  const trimmedName = name.trim();
+  const slug = generateSlug(trimmedName);
+
   const { data, error } = await supabaseAdmin
     .from('brands')
-    .upsert({ name: name.trim(), is_active: true }, { onConflict: 'name' })
+    .upsert({ name: trimmedName, slug, is_active: true }, { onConflict: 'name' })
     .select()
     .single();
 
@@ -361,6 +391,140 @@ export const getHealthStatus = (req, res) => {
   });
 };
 
+// =============================================================================
+// P0 FIX: Order ID Trigger Migration
+// =============================================================================
+
+const ORDER_ID_MIGRATION_SQL = `
+-- =============================================================================
+-- P0 FIX: Bulletproof Order Number Generation
+-- Fixes "invalid input syntax for type integer: 'IV-001'" error
+-- ROOT CAUSE: generate_order_number() parses legacy ORD-IV-001 formats
+-- =============================================================================
+
+-- STEP 1: Fix the generate_order_number function (THE ACTUAL BUG!)
+CREATE OR REPLACE FUNCTION generate_order_number()
+RETURNS TRIGGER AS $$
+DECLARE
+    v_seq INTEGER := 0;
+    v_candidate TEXT;
+    rec RECORD;
+BEGIN
+    -- Skip if order_number is already set
+    IF NEW.order_number IS NOT NULL AND LENGTH(TRIM(NEW.order_number)) > 0 THEN
+        RETURN NEW;
+    END IF;
+    
+    -- P0 FIX: Process one row at a time to handle legacy formats safely
+    BEGIN
+        FOR rec IN 
+            SELECT order_number FROM orders 
+            WHERE order_number IS NOT NULL
+              AND order_number LIKE 'ORD-%'
+              AND SUBSTRING(order_number FROM 5) ~ '^[0-9]+$'
+        LOOP
+            BEGIN
+                v_candidate := SUBSTRING(rec.order_number FROM 5);
+                IF v_candidate ~ '^[0-9]+$' THEN
+                    IF v_candidate::INT > v_seq THEN
+                        v_seq := v_candidate::INT;
+                    END IF;
+                END IF;
+            EXCEPTION WHEN OTHERS THEN NULL;
+            END;
+        END LOOP;
+    EXCEPTION WHEN OTHERS THEN
+        v_seq := (EXTRACT(EPOCH FROM NOW())::INT % 900000);
+    END;
+    
+    NEW.order_number := 'ORD-' || LPAD((v_seq + 1)::TEXT, 6, '0');
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+-- STEP 2: Drop problematic readable_id triggers
+DROP TRIGGER IF EXISTS trg_generate_readable_id ON orders;
+DROP TRIGGER IF EXISTS trg_prevent_readable_id_change ON orders;
+DROP TRIGGER IF EXISTS trg_generate_smart_order_id ON orders;
+DROP TRIGGER IF EXISTS generate_smart_order_id_trigger ON orders;
+DROP FUNCTION IF EXISTS generate_smart_order_id() CASCADE;
+DROP FUNCTION IF EXISTS prevent_readable_id_change() CASCADE;
+
+-- STEP 3: Create safe readable_id function
+CREATE OR REPLACE FUNCTION generate_order_readable_id_safe()
+RETURNS TRIGGER AS $$
+DECLARE
+    v_date_prefix TEXT;
+    v_max_seq INT := 100;
+    v_new_seq INT;
+    v_candidate TEXT;
+    v_extracted INT;
+    rec RECORD;
+BEGIN
+    IF NEW.readable_id IS NOT NULL AND LENGTH(TRIM(NEW.readable_id)) > 0 THEN
+        RETURN NEW;
+    END IF;
+    
+    v_date_prefix := TO_CHAR(CURRENT_DATE, 'YY-MM-DD');
+    
+    BEGIN
+        FOR rec IN 
+            SELECT readable_id FROM orders 
+            WHERE readable_id IS NOT NULL
+              AND readable_id LIKE v_date_prefix || '-%'
+              AND array_length(string_to_array(readable_id, '-'), 1) = 4
+        LOOP
+            BEGIN
+                v_candidate := SPLIT_PART(rec.readable_id, '-', 4);
+                v_candidate := REGEXP_REPLACE(v_candidate, '[^0-9]', '', 'g');
+                IF v_candidate ~ '^[0-9]+$' AND LENGTH(v_candidate) > 0 THEN
+                    v_extracted := v_candidate::INT;
+                    IF v_extracted > v_max_seq THEN v_max_seq := v_extracted; END IF;
+                END IF;
+            EXCEPTION WHEN OTHERS THEN NULL;
+            END;
+        END LOOP;
+    EXCEPTION WHEN OTHERS THEN
+        v_max_seq := 100 + (EXTRACT(EPOCH FROM NOW())::INT % 800);
+    END;
+    
+    v_new_seq := v_max_seq + 1;
+    NEW.readable_id := v_date_prefix || '-' || v_new_seq::TEXT;
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+-- STEP 4: Create readable_id trigger
+DROP TRIGGER IF EXISTS trg_generate_order_readable_id ON orders;
+CREATE TRIGGER trg_generate_order_readable_id
+    BEFORE INSERT ON orders
+    FOR EACH ROW EXECUTE FUNCTION generate_order_readable_id_safe();
+`;
+
+/**
+ * Get Order ID Migration SQL
+ * GET /health/fix-order-trigger
+ * 
+ * Returns the SQL that needs to be run in Supabase SQL Editor
+ * to fix the IV-001 parsing error that breaks POS Exchange/Refund.
+ */
+export const getOrderIdMigration = async (req, res) => {
+  logger.info('[Migration] Order ID fix migration requested');
+  
+  res.json({
+    success: true,
+    message: 'Copy the SQL below and run it in Supabase SQL Editor',
+    instructions: [
+      '1. Go to: https://supabase.com/dashboard/project/narlifgdtmlockhugfgz/sql/new',
+      '2. Paste the SQL below into the editor',
+      '3. Click "Run" to execute',
+      '4. Refresh the ERP application and try Exchange/Refund again',
+    ],
+    migration_sql: ORDER_ID_MIGRATION_SQL,
+    fix_for: 'POS Exchange/Refund - "invalid input syntax for type integer: IV-001" error',
+  });
+};
+
 export default {
   getCategories,
   createCategory,
@@ -374,4 +538,5 @@ export default {
   getOrderSources,
   getAppConfig,
   getHealthStatus,
+  getOrderIdMigration,
 };

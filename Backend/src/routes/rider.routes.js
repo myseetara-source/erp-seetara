@@ -1,161 +1,109 @@
 /**
- * Rider Routes
+ * Rider Portal API Routes
  * 
- * API endpoints for rider management and delivery operations.
+ * Endpoints for the mobile Rider App:
+ * - GET /rider/me - Get current rider's profile (alias for /rider/profile)
+ * - GET /rider/tasks - Get assigned orders (pending delivery)
+ * - GET /rider/cash - Get cash summary (COD due)
+ * - GET /rider/history - Get delivery history
+ * - GET /rider/profile - Get rider profile & stats
+ * - POST /rider/delivery-outcome - Submit delivery outcome
+ * - POST /rider/toggle-duty - Toggle on/off duty
+ * - POST /rider/update-location - Update GPS location
  * 
- * Route Groups:
- * - /dispatch/* : Admin/Staff endpoints for managing riders
- * - /rider/*   : Rider app endpoints (requires role: 'rider')
- * 
- * @module routes/rider.routes
+ * @priority P0 - Rider Portal
  */
 
 import { Router } from 'express';
 import { authenticate, authorize } from '../middleware/auth.middleware.js';
-import { validate } from '../middleware/validate.middleware.js';
-import { z } from 'zod';
-import {
-  listRiders,
-  getRider,
-  assignOrdersToRider,
-  updateRiderStatus,
-  verifySettlement,
-  getMyProfile,
-  getRiderTasks,
-  reorderTasks,
-  updateDeliveryStatus,
-  updateLocation,
-  startRun,
-  endRun,
-  getCashSummary,
-  submitSettlement,
-} from '../controllers/rider.controller.js';
+import * as riderController from '../controllers/rider.controller.js';
 
 const router = Router();
 
 // =============================================================================
-// VALIDATION SCHEMAS
+// RIDER APP ROUTES (Require authentication)
 // =============================================================================
 
-const assignOrdersSchema = z.object({
-  rider_id: z.string().uuid('Invalid rider ID'),
-  order_ids: z.array(z.string().uuid()).min(1, 'At least one order required'),
-});
+/**
+ * GET /rider/me
+ * Get current rider's profile (alias for profile - used by frontend)
+ */
+router.get('/rider/me', authenticate, riderController.getProfile);
 
-const updateStatusSchema = z.object({
-  status: z.enum(['available', 'on_delivery', 'on_break', 'off_duty', 'suspended']),
-});
+/**
+ * GET /rider/tasks
+ * Get orders assigned to the current rider (pending delivery)
+ */
+router.get('/rider/tasks', authenticate, riderController.getTasks);
 
-const reorderTasksSchema = z.object({
-  orders: z.array(z.object({
-    order_id: z.string().uuid(),
-    sequence: z.number().int().min(1),
-  })).min(1),
-});
+/**
+ * GET /rider/cash
+ * Get cash summary (COD collected, due, etc.)
+ */
+router.get('/rider/cash', authenticate, riderController.getCashSummary);
 
-const deliveryStatusSchema = z.object({
-  order_id: z.string().uuid('Invalid order ID'),
-  status: z.enum(['delivered', 'rejected', 'not_home', 'wrong_address', 'rescheduled', 'returned']),
-  reason: z.string().optional(),
-  collected_cash: z.number().min(0).optional(),
-  proof_photo_url: z.string().url().optional(),
-  notes: z.string().optional(),
-  lat: z.number().optional(),
-  lng: z.number().optional(),
-});
+/**
+ * GET /rider/history
+ * Get delivery history (last N days)
+ */
+router.get('/rider/history', authenticate, riderController.getHistory);
 
-const locationSchema = z.object({
-  lat: z.number().min(-90).max(90),
-  lng: z.number().min(-180).max(180),
-});
+/**
+ * GET /rider/settlements
+ * Get settlement history (last N days)
+ */
+router.get('/rider/settlements', authenticate, riderController.getSettlements);
 
-const settlementSchema = z.object({
-  amount: z.number().positive('Amount must be positive'),
-  method: z.enum(['cash', 'bank_transfer']).optional(),
-});
+/**
+ * GET /rider/profile
+ * Get rider profile with stats
+ */
+router.get('/rider/profile', authenticate, riderController.getProfile);
 
-const verifySettlementSchema = z.object({
-  actual_amount: z.number().min(0),
-  notes: z.string().optional(),
-});
+/**
+ * POST /rider/toggle-duty
+ * Toggle on/off duty status
+ */
+router.post('/rider/toggle-duty', authenticate, riderController.toggleDuty);
 
-// =============================================================================
-// DISPATCH ROUTES (Admin/Staff)
-// =============================================================================
+/**
+ * POST /rider/update-location
+ * Update current GPS location
+ */
+router.post('/rider/update-location', authenticate, riderController.updateLocation);
 
-const dispatchRouter = Router();
+/**
+ * POST /rider/delivery-outcome
+ * Submit delivery outcome (delivered, reschedule, reject)
+ */
+router.post('/rider/delivery-outcome', authenticate, riderController.submitDeliveryOutcome);
 
-// Require authentication for all dispatch routes
-dispatchRouter.use(authenticate);
-dispatchRouter.use(authorize('admin', 'staff', 'operator'));
+/**
+ * POST /rider/update-status
+ * Update delivery status (alias for delivery-outcome - used by frontend)
+ */
+router.post('/rider/update-status', authenticate, riderController.submitDeliveryOutcome);
 
-// List all riders
-dispatchRouter.get('/riders', listRiders);
-
-// Get single rider
-dispatchRouter.get('/riders/:id', getRider);
-
-// Assign orders to rider
-dispatchRouter.post('/assign', validate(assignOrdersSchema), assignOrdersToRider);
-
-// Update rider status
-dispatchRouter.patch('/riders/:id/status', validate(updateStatusSchema), updateRiderStatus);
-
-// Verify settlement (Admin only)
-dispatchRouter.post('/settlements/:id/verify', 
-  authorize('admin'),
-  validate(verifySettlementSchema),
-  verifySettlement
-);
+/**
+ * POST /rider/send-sms
+ * Send SMS to customer from rider app
+ */
+router.post('/rider/send-sms', authenticate, riderController.sendCustomerSMS);
 
 // =============================================================================
-// RIDER APP ROUTES (Rider role only)
+// LEGACY DISPATCH ENDPOINTS (for backward compatibility)
 // =============================================================================
 
-const riderRouter = Router();
+/**
+ * GET /dispatch/riders
+ * List all riders (for dispatch center)
+ */
+router.get('/dispatch/riders', authenticate, authorize('admin', 'manager', 'operator'), riderController.listRiders);
 
-// Require authentication for all rider routes
-riderRouter.use(authenticate);
-
-// Middleware to verify rider role
-const requireRider = (req, res, next) => {
-  if (req.user.role !== 'rider') {
-    return res.status(403).json({
-      success: false,
-      message: 'Access denied. Rider role required.',
-    });
-  }
-  next();
-};
-
-riderRouter.use(requireRider);
-
-// Profile
-riderRouter.get('/me', getMyProfile);
-
-// Tasks
-riderRouter.get('/tasks', getRiderTasks);
-riderRouter.patch('/tasks/reorder', validate(reorderTasksSchema), reorderTasks);
-
-// Delivery status update
-riderRouter.post('/update-status', validate(deliveryStatusSchema), updateDeliveryStatus);
-
-// Location
-riderRouter.post('/location', validate(locationSchema), updateLocation);
-
-// Run management
-riderRouter.post('/start-run', startRun);
-riderRouter.post('/end-run', endRun);
-
-// Cash & Settlement
-riderRouter.get('/cash', getCashSummary);
-riderRouter.post('/settle', validate(settlementSchema), submitSettlement);
-
-// =============================================================================
-// MOUNT ROUTERS
-// =============================================================================
-
-router.use('/dispatch', dispatchRouter);
-router.use('/rider', riderRouter);
+/**
+ * POST /dispatch/assign
+ * Assign orders to a rider
+ */
+router.post('/dispatch/assign', authenticate, authorize('admin', 'manager', 'operator'), riderController.assignOrdersToRider);
 
 export default router;

@@ -47,19 +47,24 @@ export const shopifyOrder = asyncHandler(async (req, res) => {
       return res.json({ success: true, message: 'Order already exists' });
     }
 
-    // Find variants by SKU
+    // Find variants by SKU (BATCH QUERY - N+1 FIX)
+    // Performance: Single query for all SKUs instead of N queries
+    const skus = normalizedOrder.items.map(item => item.sku);
+    const variantsResult = await productService.getVariantsBySkus(skus);
+    const variantMap = new Map(variantsResult.map(v => [v.sku, v]));
+
     const items = [];
     for (const item of normalizedOrder.items) {
-      try {
-        const variant = await productService.getVariantBySku(item.sku);
+      const variant = variantMap.get(item.sku);
+      if (variant) {
         items.push({
           variant_id: variant.id,
           quantity: item.quantity,
           unit_price: item.unit_price,
         });
-      } catch (err) {
+      } else {
         logger.warn('Variant not found for Shopify item', { sku: item.sku });
-        // You might want to handle this differently - skip or create placeholder
+        // Skip items with missing variants
       }
     }
 
@@ -108,17 +113,22 @@ export const woocommerceOrder = asyncHandler(async (req, res) => {
     
     const existingOrderId = req.body.id?.toString();
 
-    // Find variants by SKU
+    // Find variants by SKU (BATCH QUERY - N+1 FIX)
+    // Performance: Single query for all SKUs instead of N queries
+    const skus = normalizedOrder.items.map(item => item.sku);
+    const variantsResult = await productService.getVariantsBySkus(skus);
+    const variantMap = new Map(variantsResult.map(v => [v.sku, v]));
+
     const items = [];
     for (const item of normalizedOrder.items) {
-      try {
-        const variant = await productService.getVariantBySku(item.sku);
+      const variant = variantMap.get(item.sku);
+      if (variant) {
         items.push({
           variant_id: variant.id,
           quantity: item.quantity,
           unit_price: item.unit_price,
         });
-      } catch (err) {
+      } else {
         logger.warn('Variant not found for WooCommerce item', { sku: item.sku });
       }
     }
@@ -168,10 +178,18 @@ export const createApiOrder = asyncHandler(async (req, res) => {
     throw new ValidationError(`Invalid source. Must be one of: ${validSources.join(', ')}`);
   }
 
-  // Find variants by SKU
+  // Find variants by SKU (BATCH QUERY - N+1 FIX)
+  // Performance: Single query for all SKUs instead of N queries
+  const skus = items.map(item => item.sku);
+  const variantsResult = await productService.getVariantsBySkus(skus);
+  const variantMap = new Map(variantsResult.map(v => [v.sku, v]));
+
   const resolvedItems = [];
   for (const item of items) {
-    const variant = await productService.getVariantBySku(item.sku);
+    const variant = variantMap.get(item.sku?.toUpperCase());
+    if (!variant) {
+      throw new ValidationError(`Product with SKU '${item.sku}' not found`);
+    }
     resolvedItems.push({
       variant_id: variant.id,
       quantity: item.quantity,
@@ -462,6 +480,412 @@ export const testLogisticsWebhook = asyncHandler(async (req, res) => {
   return logisticsWebhook(req, res);
 });
 
+// =============================================================================
+// NCM (NEPAL CAN MOVE) WEBHOOK LISTENER
+// =============================================================================
+
+/**
+ * NCM Status Mapping
+ * Maps NCM status strings to our internal status codes
+ * 
+ * Reference: NCM Portal statuses observed in production
+ * - "Pickup Order Created" -> Order just synced to NCM
+ * - "Order Picked" -> Rider picked up from warehouse
+ * - "Dispatched" -> Sent to destination branch
+ * - "Arrived" -> Arrived at destination branch
+ * - "Sent for Delivery" -> Out for delivery
+ * - "Delivery Completed" -> Successfully delivered
+ * - "Undelivered" -> Delivery attempt failed
+ * - "Return Request" -> Customer wants to return
+ * - "RTO" -> Return to Origin initiated
+ * - "Return Completed" -> Returned to warehouse
+ */
+const NCM_STATUS_MAP = {
+  // =========================================================================
+  // PICKUP PHASE (Order Created -> Picked Up)
+  // =========================================================================
+  'pickup_order_created': 'processing',       // NCM received the order
+  'pickup_order created': 'processing',       // Alternative format
+  'order_created': 'processing',
+  'pickup_completed': 'in_transit',
+  'picked_up': 'in_transit',
+  'order_picked': 'in_transit',
+  'order picked': 'in_transit',               // NCM uses space-separated
+  
+  // =========================================================================
+  // TRANSIT PHASE (Moving between hubs)
+  // =========================================================================
+  'order_dispatched': 'in_transit',
+  'dispatched': 'in_transit',
+  'order_arrived': 'in_transit',
+  'arrived': 'in_transit',
+  'in_transit': 'in_transit',
+  'in transit': 'in_transit',
+  'hub_received': 'in_transit',
+  
+  // =========================================================================
+  // OUT FOR DELIVERY
+  // =========================================================================
+  'sent_for_delivery': 'out_for_delivery',
+  'sent for delivery': 'out_for_delivery',    // NCM uses space-separated
+  'out_for_delivery': 'out_for_delivery',
+  'ofd': 'out_for_delivery',
+  
+  // =========================================================================
+  // DELIVERED (Success!)
+  // =========================================================================
+  'delivery_completed': 'delivered',
+  'delivery completed': 'delivered',           // NCM uses space-separated
+  'delivered': 'delivered',
+  'dlvd': 'delivered',
+  
+  // =========================================================================
+  // DELIVERY ISSUES / HOLD
+  // =========================================================================
+  'undelivered': 'hold',
+  'on_hold': 'hold',
+  'hold': 'hold',
+  'address_issue': 'hold',
+  'customer_not_available': 'hold',
+  'phone_unreachable': 'hold',
+  'rescheduled': 'hold',
+  
+  // =========================================================================
+  // P0: RETURNS (RTO - Return to Origin) WITH HOLDING STATE LOGIC
+  // =========================================================================
+  // CRITICAL: Courier "Returned" statuses do NOT go directly to 'returned'
+  // They go to holding states until warehouse physically verifies
+  // =========================================================================
+  
+  // Step 1: Customer rejects → RTO_INITIATED
+  'return_request': 'rto_initiated',
+  'return request': 'rto_initiated',
+  'return_initiated': 'rto_initiated',
+  'rto': 'rto_initiated',
+  'rto_initiated': 'rto_initiated',
+  'return_in_transit': 'rto_initiated',
+  'customer_rejected': 'rto_initiated',
+  'customer rejected': 'rto_initiated',
+  'undelivered': 'rto_initiated',
+  
+  // Step 2: Courier says "returned" → RTO_VERIFICATION_PENDING (HOLDING STATE)
+  // ⚠️ NOT 'returned' - awaiting physical verification at warehouse
+  'return_completed': 'rto_verification_pending',
+  'return completed': 'rto_verification_pending',    // NCM uses space-separated
+  'returned': 'rto_verification_pending',            // ← P0 FIX: HOLDING STATE
+  'rto_completed': 'rto_verification_pending',
+  'returned_to_vendor': 'rto_verification_pending',
+  'returned to vendor': 'rto_verification_pending',
+  'delivered_to_merchant': 'rto_verification_pending',
+  'delivered to merchant': 'rto_verification_pending',
+  
+  // Step 3: 'returned' status can ONLY be set via verify_rto_return() at warehouse
+  
+  // =========================================================================
+  // CANCELLED
+  // =========================================================================
+  'cancelled': 'cancelled',
+  'order_cancelled': 'cancelled',
+  'cancel': 'cancelled',
+  
+  // =========================================================================
+  // REDIRECT (Special case - forwarded to another address)
+  // =========================================================================
+  'redirect': 'in_transit',
+  'redirected': 'in_transit',
+};
+
+/**
+ * NCM Webhook Listener
+ * POST /webhooks/ncm-listener
+ * 
+ * Receives real-time order status updates from NCM (Nepal Can Move).
+ * This endpoint should be added to NCM's "Order Delivery Webhook URL" field.
+ * 
+ * NCM Test Verification:
+ * - NCM sends test requests to verify URL before saving
+ * - We must return { success: true, response: "OK" } for test pings
+ * 
+ * Payload Examples:
+ * Test ping: { test: true } or { event: "test" }
+ * Status update: { order_id: "123", status: "delivered", ... }
+ */
+export const ncmWebhookListener = async (req, res) => {
+  const LOG_PREFIX = '[NCM-Webhook]';
+  
+  try {
+    const payload = req.body;
+    const userAgent = req.headers['user-agent'] || '';
+    
+    logger.info(`${LOG_PREFIX} Webhook received`, {
+      userAgent,
+      bodyKeys: Object.keys(payload || {}),
+      ip: req.ip,
+    });
+
+    // =========================================================================
+    // TEST VERIFICATION - Required by NCM to save the webhook URL
+    // =========================================================================
+    
+    // NCM sends test pings to verify the webhook URL is valid
+    // We MUST return 200 with { success: true, response: "OK" }
+    if (
+      payload.test === true ||
+      payload.test === 'true' ||
+      payload.event === 'test' ||
+      payload.event === 'webhook.test' ||
+      payload.type === 'test' ||
+      !payload.order_id // If no order_id, treat as test ping
+    ) {
+      logger.info(`${LOG_PREFIX} Test verification request - returning OK`);
+      return res.status(200).json({
+        success: true,
+        response: 'OK',
+        message: 'NCM webhook URL verified successfully',
+        timestamp: new Date().toISOString(),
+      });
+    }
+
+    // =========================================================================
+    // SECURITY CHECK (Optional but recommended)
+    // =========================================================================
+    
+    // NCM should include their identifier in User-Agent
+    // This is a soft check - we log but don't reject
+    if (!userAgent.toLowerCase().includes('ncm')) {
+      logger.warn(`${LOG_PREFIX} User-Agent does not contain 'NCM'`, { userAgent });
+      // Don't reject - might be valid request from different client
+    }
+
+    // =========================================================================
+    // EXTRACT EVENT DATA
+    // =========================================================================
+    
+    const {
+      order_id,          // NCM's tracking ID (our courier_tracking_id)
+      tracking_id,       // Alternative field name
+      status,            // Current status (e.g., 'delivered', 'returned')
+      event,             // Event type (e.g., 'order.status.changed')
+      remarks,           // Additional notes
+      location,          // Current location
+      receiver_name,     // Person who received (for delivered)
+      timestamp,         // Event timestamp
+      delivery_date,     // Delivery date (if delivered)
+      cod_amount,        // COD amount collected
+      cod_collected,     // Whether COD was collected
+    } = payload;
+
+    const trackingId = order_id || tracking_id;
+    const ncmStatus = (status || '').toLowerCase().replace(/\s+/g, '_');
+
+    logger.info(`${LOG_PREFIX} Processing status update`, {
+      trackingId,
+      ncmStatus,
+      event,
+      remarks,
+    });
+
+    if (!trackingId) {
+      logger.warn(`${LOG_PREFIX} Missing order_id/tracking_id in payload`);
+      // Return 200 to prevent NCM from retrying endlessly
+      return res.status(200).json({
+        success: false,
+        message: 'Missing order_id in payload',
+      });
+    }
+
+    // =========================================================================
+    // FIND ORDER IN DATABASE
+    // =========================================================================
+    
+    const { supabaseAdmin } = await import('../config/supabase.js');
+    
+    // Find order by:
+    // 1. external_order_id (NCM's internal order ID - primary lookup)
+    // 2. courier_tracking_id (tracking number)
+    // 3. awb_number (legacy field)
+    const { data: order, error: findError } = await supabaseAdmin
+      .from('orders')
+      .select('id, readable_id, status, payment_method, payment_status, total_amount, courier_partner, external_order_id')
+      .or(`external_order_id.eq.${trackingId},courier_tracking_id.eq.${trackingId},awb_number.eq.${trackingId}`)
+      .single();
+    
+    // Log the lookup details for debugging
+    logger.info(`${LOG_PREFIX} Order lookup`, {
+      searchValue: trackingId,
+      found: !!order,
+      externalOrderId: order?.external_order_id,
+    });
+
+    if (findError || !order) {
+      logger.warn(`${LOG_PREFIX} Order not found for tracking ID`, { trackingId });
+      // Return 200 to prevent NCM from retrying
+      return res.status(200).json({
+        success: true,
+        message: 'Order not found for this tracking ID',
+        tracking_id: trackingId,
+      });
+    }
+
+    logger.info(`${LOG_PREFIX} Order found`, {
+      orderId: order.id,
+      readableId: order.readable_id,
+      currentStatus: order.status,
+    });
+
+    // =========================================================================
+    // MAP NCM STATUS TO INTERNAL STATUS
+    // =========================================================================
+    
+    const internalStatus = NCM_STATUS_MAP[ncmStatus] || null;
+    
+    if (!internalStatus) {
+      logger.warn(`${LOG_PREFIX} Unknown NCM status`, { ncmStatus });
+      // Log as activity but don't update status
+    }
+
+    // =========================================================================
+    // LOG ACTIVITY (Always log the webhook event)
+    // =========================================================================
+    
+    const { logActivity, ACTIVITY_TYPES } = await import('../services/ActivityLogger.service.js');
+    
+    const activityMessage = internalStatus
+      ? `NCM: Status updated to "${status}"${remarks ? ` - ${remarks}` : ''}${location ? ` (${location})` : ''}`
+      : `NCM: Event received - "${status || event}"${remarks ? ` - ${remarks}` : ''}`;
+
+    await logActivity(supabaseAdmin, {
+      orderId: order.id,
+      user: null, // System event
+      message: activityMessage,
+      type: ACTIVITY_TYPES.SYSTEM_LOG,
+      metadata: {
+        source: 'ncm_webhook',
+        tracking_id: trackingId,
+        ncm_status: status,
+        internal_status: internalStatus,
+        location,
+        remarks,
+        receiver_name,
+        timestamp: timestamp || new Date().toISOString(),
+        raw_payload: payload,
+      },
+    });
+
+    // =========================================================================
+    // UPDATE ORDER STATUS (If status changed)
+    // P0 FIX: Save exact status text for dynamic courier status display
+    // =========================================================================
+    
+    const updateData = {
+      logistics_status: status,      // P0: Exact status text for display
+      courier_raw_status: status,    // Backup field
+      updated_at: new Date().toISOString(),
+    };
+
+    // Only update status if we have a valid mapping AND it's different
+    if (internalStatus && internalStatus !== order.status) {
+      updateData.status = internalStatus;
+      
+      // If delivered, set delivered_at timestamp
+      if (internalStatus === 'delivered') {
+        updateData.delivered_at = delivery_date || timestamp || new Date().toISOString();
+        
+        // If COD, mark payment as collected
+        if (order.payment_method === 'cod') {
+          updateData.payment_status = 'paid';
+          updateData.paid_amount = cod_amount || order.total_amount;
+        }
+      }
+      
+      // =========================================================================
+      // P0: RTO HOLDING STATE LOGIC - CRITICAL
+      // =========================================================================
+      
+      // If RTO initiated (customer rejected), set rto_initiated_at
+      if (internalStatus === 'rto_initiated') {
+        if (!order.rto_initiated_at) {
+          updateData.rto_initiated_at = timestamp || new Date().toISOString();
+        }
+        updateData.rto_reason = status || remarks || 'Customer rejected';
+        logger.warn(`${LOG_PREFIX} 🚨 RTO INITIATED for ${order.readable_id}: "${status}"`);
+      }
+      
+      // If RTO verification pending (courier says returned) - HOLDING STATE
+      // ⚠️ CRITICAL: Do NOT set returned_at here, do NOT update inventory
+      // This is the HOLDING STATE until warehouse physically verifies
+      if (internalStatus === 'rto_verification_pending') {
+        if (!order.rto_initiated_at) {
+          updateData.rto_initiated_at = timestamp || new Date().toISOString();
+        }
+        logger.warn(`${LOG_PREFIX} ⏳ RTO VERIFICATION PENDING for ${order.readable_id} - awaiting warehouse scan`);
+        // ⚠️ IMPORTANT: We do NOT set return_received_at here
+        // That is ONLY set when warehouse calls verify_rto_return()
+      }
+      
+      // If lost in transit (manual marking via admin)
+      if (internalStatus === 'lost_in_transit') {
+        logger.error(`${LOG_PREFIX} ❌ LOST IN TRANSIT: ${order.readable_id}`);
+      }
+      
+      // REMOVED: Old 'returned' logic - 'returned' status is ONLY set via
+      // verify_rto_return() function at warehouse level
+      // This ensures no order is marked as fully returned automatically
+    }
+
+    // Perform the update
+    const { error: updateError } = await supabaseAdmin
+      .from('orders')
+      .update(updateData)
+      .eq('id', order.id);
+
+    if (updateError) {
+      logger.error(`${LOG_PREFIX} Failed to update order`, {
+        orderId: order.id,
+        error: updateError.message,
+      });
+      // Still return 200 - we don't want NCM to retry
+    } else {
+      logger.info(`${LOG_PREFIX} Order updated successfully`, {
+        orderId: order.id,
+        readableId: order.readable_id,
+        oldStatus: order.status,
+        newStatus: updateData.status || order.status,
+      });
+    }
+
+    // =========================================================================
+    // RETURN SUCCESS
+    // =========================================================================
+    
+    return res.status(200).json({
+      success: true,
+      message: 'Webhook processed successfully',
+      data: {
+        order_id: order.readable_id,
+        tracking_id: trackingId,
+        status_received: status,
+        status_mapped: internalStatus,
+        status_updated: !!updateData.status,
+      },
+    });
+
+  } catch (error) {
+    logger.error(`${LOG_PREFIX} Webhook processing error`, {
+      error: error.message,
+      stack: error.stack,
+    });
+
+    // ALWAYS return 200 to prevent NCM from retrying endlessly
+    // The error is logged for our investigation
+    return res.status(200).json({
+      success: false,
+      message: 'Webhook received but processing failed',
+      error: error.message,
+    });
+  }
+};
+
 export default {
   shopifyOrder,
   woocommerceOrder,
@@ -470,4 +894,6 @@ export default {
   // Logistics webhooks
   logisticsWebhook,
   testLogisticsWebhook,
+  // NCM specific webhook
+  ncmWebhookListener,
 };

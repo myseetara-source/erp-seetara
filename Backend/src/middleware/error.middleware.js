@@ -70,13 +70,47 @@ export const errorHandler = (err, req, res, next) => {
   }
 
   // Handle Supabase/Postgres errors
-  if (err.code && err.code.startsWith('PGRST')) {
-    logger.error('Database error', { ...logData, code: err.code });
+  if (err.code && (err.code.startsWith('PGRST') || err.code.startsWith('2'))) {
+    logger.error('Database error', { ...logData, code: err.code, pgMessage: err.message });
+    
+    // Provide user-friendly messages for common database errors
+    let message = 'Database operation failed';
+    
+    switch (err.code) {
+      case 'PGRST202':
+        message = 'Database function not found. Please contact support.';
+        break;
+      case 'PGRST205':
+        message = 'Database table not found. Please contact support.';
+        break;
+      case '23503':
+        message = 'Referenced record not found. Please check your input.';
+        break;
+      case '23505':
+        message = 'A duplicate record already exists.';
+        break;
+      case '42703':
+        message = 'Database schema mismatch. Please contact support.';
+        break;
+      case '22P02':
+        message = 'Invalid data format. Please check your input.';
+        break;
+      case '23514':
+        message = 'Data validation failed. Please check your input.';
+        break;
+      default:
+        // In development, show the actual error
+        if (process.env.NODE_ENV !== 'production') {
+          message = err.message || 'Database operation failed';
+        }
+    }
+    
     return res.status(500).json({
       success: false,
       error: {
         code: 'DATABASE_ERROR',
-        message: 'Database operation failed',
+        message,
+        ...(process.env.NODE_ENV !== 'production' && { pgCode: err.code }),
       },
     });
   }

@@ -10,19 +10,24 @@
  */
 
 import { Router } from 'express';
+import { authenticate, authorize } from '../middleware/auth.middleware.js';
 
 // =============================================================================
 // ROUTE IMPORTS (Alphabetically ordered)
 // =============================================================================
 
 import adminRoutes from './admin.routes.js';
+import archiveRoutes from './archive.routes.js';
 import authRoutes from './auth.routes.js';
 import customerRoutes from './customer.routes.js';
+import dispatchRoutes from './dispatch.routes.js';
 import externalRoutes from './external.routes.js';
 import followupRoutes from './followup.routes.js';
 import inventoryRoutes from './inventory.routes.js';
+import leadRoutes from './lead.routes.js';
 import logisticsRoutes from './logistics.routes.js';
 import orderRoutes from './order.routes.js';
+import posRoutes from './pos.routes.js';
 import productRoutes from './product.routes.js';
 import purchaseRoutes from './purchase.routes.js';
 import riderRoutes from './rider.routes.js';
@@ -47,19 +52,24 @@ const router = Router();
 // =============================================================================
 
 router.get('/health', staticController.getHealthStatus);
+router.get('/health/fix-order-trigger', staticController.getOrderIdMigration);
 
 // =============================================================================
 // API ROUTES (Alphabetically ordered)
 // =============================================================================
 
 router.use('/admin', adminRoutes);
+router.use('/archives', archiveRoutes);
 router.use('/auth', authRoutes);
 router.use('/customers', customerRoutes);
+router.use('/dispatch', dispatchRoutes);  // P0: Logistics Command Center
 router.use('/external', externalRoutes);
 router.use('/followups', followupRoutes);
 router.use('/inventory', inventoryRoutes);
+router.use('/leads', leadRoutes);
 router.use('/logistics', logisticsRoutes);
 router.use('/orders', orderRoutes);
+router.use('/pos', posRoutes);
 router.use('/products', productRoutes);
 router.use('/purchases', purchaseRoutes);
 router.use('/sms', smsRoutes);
@@ -83,10 +93,13 @@ router.use('/', riderRoutes);
 // instead of /static/categories and /static/brands.
 // These routes delegate to the static controller.
 
+// GET routes - public (for dropdowns/filters)
 router.get('/categories', staticController.getCategories);
-router.post('/categories', staticController.createCategory);
 router.get('/brands', staticController.getBrands);
-router.post('/brands', staticController.createBrand);
+
+// POST routes - SECURITY FIX: Require admin/manager authentication
+router.post('/categories', authenticate, authorize('admin', 'manager'), staticController.createCategory);
+router.post('/brands', authenticate, authorize('admin', 'manager'), staticController.createBrand);
 
 // =============================================================================
 // EXPORT

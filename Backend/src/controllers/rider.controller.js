@@ -244,7 +244,7 @@ export const updateDeliveryStatus = asyncHandler(async (req, res) => {
   res.json({
     success: true,
     message: status === 'delivered' 
-      ? `Order delivered successfully. Cash collected: Rs. ${result.cashCollected || 0}`
+      ? `Order delivered successfully. Cash collected: रु. ${result.cashCollected || 0}`
       : `Order marked as ${status}`,
     data: result,
   });
@@ -373,6 +373,352 @@ export const verifySettlement = asyncHandler(async (req, res) => {
 });
 
 // =============================================================================
+// P0: RIDER MOBILE APP ENDPOINTS
+// =============================================================================
+
+/**
+ * GET /rider/tasks
+ * Get pending deliveries for the rider app
+ */
+export const getTasks = asyncHandler(async (req, res) => {
+  const userId = req.user.id;
+  
+  // Get rider ID from user
+  let riderId;
+  try {
+    const rider = await RiderService.getRiderByUserId(userId);
+    riderId = rider?.id;
+  } catch (e) {
+    // If no rider profile, return empty
+    return res.json({
+      success: true,
+      data: [],
+    });
+  }
+
+  if (!riderId) {
+    return res.json({
+      success: true,
+      data: [],
+    });
+  }
+
+  const result = await RiderService.getRiderTasks(riderId, {
+    include_all: true,  // Include rejected orders for "Returned" tab
+  });
+
+  // Transform to match frontend interface
+  // Enhanced: Include zone_code and alt_phone for Route Planning
+  const tasks = (result.tasks || []).map(task => ({
+    order_id: task.id,
+    id: task.id,
+    order_number: task.readable_id || task.order_number,
+    readable_id: task.readable_id,
+    customer_name: task.shipping_name,
+    customer_phone: task.shipping_phone,
+    alt_phone: task.alt_phone,  // Secondary phone number
+    shipping_address: task.shipping_address,
+    shipping_city: task.shipping_city,
+    zone_code: task.zone_code,  // Zone for delivery planning
+    total_amount: task.total_amount,
+    payment_method: task.payment_method,
+    payment_status: task.payment_status,
+    status: task.status,
+    priority: task.priority || 0,
+    notes: task.internal_notes,
+    remarks: task.remarks,  // Include remarks for "Next Attempt" detection
+    rejection_reason: task.rejection_reason,
+    created_at: task.created_at,
+    delivered_at: task.delivered_at,
+  }));
+
+  res.json({
+    success: true,
+    data: tasks,
+  });
+});
+
+/**
+ * GET /rider/history
+ * Get delivery history for last N days
+ * Query params: days (default 14)
+ */
+export const getHistory = asyncHandler(async (req, res) => {
+  const userId = req.user.id;
+  const { days = 14 } = req.query;
+
+  let riderId;
+  try {
+    const rider = await RiderService.getRiderByUserId(userId);
+    riderId = rider?.id;
+  } catch (e) {
+    return res.json({ success: true, data: [] });
+  }
+
+  if (!riderId) {
+    return res.json({ success: true, data: [] });
+  }
+
+  const history = await RiderService.getRiderHistoryDays(riderId, parseInt(days) || 14);
+
+  res.json({
+    success: true,
+    data: history,
+  });
+});
+
+/**
+ * GET /rider/settlements
+ * Get settlement history for last N days
+ * Query params: days (default 14)
+ */
+export const getSettlements = asyncHandler(async (req, res) => {
+  const userId = req.user.id;
+  const { days = 14 } = req.query;
+
+  let riderId;
+  try {
+    const rider = await RiderService.getRiderByUserId(userId);
+    riderId = rider?.id;
+  } catch (e) {
+    return res.json({ success: true, data: [] });
+  }
+
+  if (!riderId) {
+    return res.json({ success: true, data: [] });
+  }
+
+  const settlements = await RiderService.getRiderSettlements(riderId, parseInt(days) || 14);
+
+  res.json({
+    success: true,
+    data: settlements,
+  });
+});
+
+/**
+ * GET /rider/profile
+ * Get rider profile with dashboard stats
+ * P0 FIX: Removed invalid columns (email, is_on_duty)
+ */
+export const getProfile = asyncHandler(async (req, res) => {
+  const userId = req.user.id;
+
+  let rider;
+  try {
+    rider = await RiderService.getRiderByUserId(userId);
+  } catch (e) {
+    logger.error('[RiderController] getProfile error getting rider', { error: e.message, userId });
+    throw new ForbiddenError('No rider profile found');
+  }
+
+  if (!rider) {
+    throw new ForbiddenError('No rider profile found');
+  }
+
+  // Get stats
+  const stats = await RiderService.getRiderDashboardStats(rider.id);
+
+  // Determine if on duty based on status
+  const isOnDuty = rider.status === 'available' || rider.status === 'on_delivery';
+
+  res.json({
+    success: true,
+    data: {
+      id: rider.id,
+      rider_code: rider.rider_code,
+      name: rider.full_name,
+      phone: rider.phone,
+      status: rider.status,
+      is_on_duty: isOnDuty,
+      vehicle_type: rider.vehicle_type,
+      vehicle_number: rider.vehicle_number,
+      stats: stats,
+    },
+  });
+});
+
+/**
+ * POST /rider/toggle-duty
+ * Toggle on/off duty status
+ */
+export const toggleDuty = asyncHandler(async (req, res) => {
+  const userId = req.user.id;
+  const { on_duty } = req.body;
+
+  let rider;
+  try {
+    rider = await RiderService.getRiderByUserId(userId);
+  } catch (e) {
+    throw new ForbiddenError('No rider profile found');
+  }
+
+  if (!rider) {
+    throw new ForbiddenError('No rider profile found');
+  }
+
+  const newStatus = on_duty ? 'available' : 'off_duty';
+  const updated = await RiderService.updateRiderStatus(rider.id, newStatus, userId);
+
+  res.json({
+    success: true,
+    data: {
+      is_on_duty: on_duty,
+      status: newStatus,
+    },
+  });
+});
+
+/**
+ * POST /rider/delivery-outcome
+ * Submit delivery outcome (delivered, reschedule, reject)
+ */
+export const submitDeliveryOutcome = asyncHandler(async (req, res) => {
+  const userId = req.user.id;
+  const { 
+    order_id, 
+    status, 
+    result: resultField, // Accept both 'result' and 'status' from frontend
+    reason, 
+    note, 
+    notes,
+    cod_collected, 
+    collected_cash, // Accept both 'cod_collected' and 'collected_cash'
+    photo_url, 
+    receipt_url,
+    payment_type,
+    location 
+  } = req.body;
+
+  if (!order_id) {
+    throw new BadRequestError('order_id is required');
+  }
+
+  // Accept either 'status' or 'result' from frontend
+  const statusValue = resultField || status;
+  if (!statusValue) {
+    throw new BadRequestError('status/result is required');
+  }
+
+  let rider;
+  try {
+    rider = await RiderService.getRiderByUserId(userId);
+  } catch (e) {
+    throw new ForbiddenError('No rider profile found');
+  }
+
+  if (!rider) {
+    throw new ForbiddenError('No rider profile found');
+  }
+
+  // Map status to internal format
+  const statusMap = {
+    'delivered': 'delivered',
+    'reschedule': 'rescheduled',
+    'rescheduled': 'rescheduled',
+    'next_attempt': 'rescheduled',
+    'reject': 'rejected',
+    'rejected': 'rejected',
+  };
+
+  const mappedResult = statusMap[statusValue] || statusValue;
+  const cashAmount = collected_cash || cod_collected;
+
+  logger.info('[RiderController] submitDeliveryOutcome', {
+    riderId: rider.id,
+    orderId: order_id,
+    result: mappedResult,
+    reason,
+    cashAmount,
+    paymentType: payment_type,
+  });
+
+  const updateResult = await RiderService.updateDeliveryStatus(rider.id, order_id, {
+    result: mappedResult,
+    reason: reason,
+    notes: notes || note,
+    collected_cash: cashAmount,
+    proof_photo_url: photo_url || receipt_url,
+    payment_type: payment_type,
+    lat: location?.lat,
+    lng: location?.lng,
+  });
+
+  // Build success message
+  let message;
+  if (mappedResult === 'delivered') {
+    message = cashAmount ? `Delivery completed! Collected रु. ${cashAmount}` : 'Delivery completed!';
+  } else if (mappedResult === 'rejected') {
+    message = 'Order marked as rejected. Please return to office.';
+  } else if (mappedResult === 'rescheduled') {
+    message = 'Order scheduled for next delivery attempt.';
+  } else {
+    message = `Order status updated to ${mappedResult}`;
+  }
+
+  res.json({
+    success: true,
+    message,
+    data: updateResult,
+  });
+});
+
+/**
+ * POST /rider/send-sms
+ * Send SMS to customer from rider app
+ */
+export const sendCustomerSMS = asyncHandler(async (req, res) => {
+  const userId = req.user.id;
+  const { order_id, phone, template_id, message } = req.body;
+
+  if (!phone || !message) {
+    throw new BadRequestError('Phone and message are required');
+  }
+
+  // Get rider profile
+  let rider;
+  try {
+    rider = await RiderService.getRiderByUserId(userId);
+  } catch (e) {
+    throw new ForbiddenError('No rider profile found');
+  }
+
+  if (!rider) {
+    throw new ForbiddenError('No rider profile found');
+  }
+
+  // Send SMS via SMS service
+  try {
+    const { SMSService } = await import('../services/sms/SMSService.js');
+    
+    await SMSService.sendSMS({
+      to: phone,
+      message: message,
+      metadata: {
+        rider_id: rider.id,
+        order_id: order_id,
+        template_id: template_id,
+        sent_by: 'rider_app',
+      },
+    });
+
+    logger.info('[RiderController] SMS sent by rider', {
+      riderId: rider.id,
+      orderNumber: order_id,
+      templateId: template_id,
+    });
+
+    res.json({
+      success: true,
+      message: 'SMS sent successfully',
+    });
+  } catch (smsError) {
+    logger.error('[RiderController] Failed to send SMS:', smsError.message);
+    throw new BadRequestError('Failed to send SMS. Please try again.');
+  }
+});
+
+// =============================================================================
 // EXPORTS
 // =============================================================================
 
@@ -394,4 +740,13 @@ export default {
   endRun,
   getCashSummary,
   submitSettlement,
+  
+  // P0: Mobile App Endpoints
+  getTasks,
+  getHistory,
+  getSettlements,
+  getProfile,
+  toggleDuty,
+  submitDeliveryOutcome,
+  sendCustomerSMS,
 };

@@ -13,6 +13,7 @@
 import { supabaseAdmin } from '../config/supabase.js';
 import { AppError, catchAsync } from '../utils/errors.js';
 import { createLogger } from '../utils/logger.js';
+import { sanitizeSearchInput } from '../utils/helpers.js';
 
 const logger = createLogger('FollowupController');
 
@@ -209,8 +210,10 @@ export const getPendingFollowups = catchAsync(async (req, res) => {
     .limit(Number(limit));
 
   // Filter by staff if not admin or if specific staff requested
+  // Use safe filter methods instead of string interpolation
   if (!isAdmin && userId) {
-    query = query.or(`assigned_to.eq.${userId},assigned_to.is.null`);
+    // Show orders assigned to this user OR unassigned
+    query = query.or(`assigned_to.eq.${sanitizeSearchInput(userId)},assigned_to.is.null`);
   } else if (staff_id) {
     query = query.eq('assigned_to', staff_id);
   }

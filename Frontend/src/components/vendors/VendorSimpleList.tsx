@@ -111,7 +111,7 @@ export default function VendorSimpleList() {
   // Format currency
   const formatCurrency = (amount?: number) => {
     if (amount === undefined || amount === null) return '—';
-    return `Rs. ${amount.toLocaleString('en-NP', { minimumFractionDigits: 2 })}`;
+    return `रु. ${amount.toLocaleString('en-NP', { minimumFractionDigits: 2 })}`;
   };
 
   return (

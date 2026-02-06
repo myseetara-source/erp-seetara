@@ -67,12 +67,12 @@ body {
 input:not([type="checkbox"]):not([type="radio"]):not([type="range"]),
 select,
 .input-base {
-  @apply h-9 text-sm px-3;
+  @apply h-9 text-sm;
 }
 
 /* Textareas */
 textarea {
-  @apply text-sm px-3 py-2;
+  @apply text-sm py-2;
 }
 
 /* Labels */

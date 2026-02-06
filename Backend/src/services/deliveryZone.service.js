@@ -12,6 +12,7 @@ import {
   ValidationError,
   DatabaseError,
 } from '../utils/errors.js';
+import { buildSafeOrQuery } from '../utils/helpers.js';
 
 const logger = createLogger('DeliveryZoneService');
 
@@ -138,7 +139,8 @@ class DeliveryZoneService {
       query = query.eq('is_active', is_active);
     }
     if (search) {
-      query = query.or(`city_name.ilike.%${search}%,district.ilike.%${search}%`);
+      const safeQuery = buildSafeOrQuery(search, ['city_name', 'district']);
+      if (safeQuery) query = query.or(safeQuery);
     }
 
     const { data, error, count } = await query

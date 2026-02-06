@@ -235,11 +235,12 @@ export function SecureActionDialog({
   }, [onCancel, handleOpenChange]);
 
   // Check if confirm button should be disabled
-  const isConfirmDisabled = 
+  const isConfirmDisabled = Boolean(
     isVerifying || 
     isExecuting || 
     (requirePassword && !password.trim()) ||
-    (requireTypedConfirmation && typedConfirmation !== requireTypedConfirmation);
+    (requireTypedConfirmation && typedConfirmation !== requireTypedConfirmation)
+  );
 
   return (
     <Dialog open={isOpen} onOpenChange={handleOpenChange}>

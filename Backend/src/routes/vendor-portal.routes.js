@@ -43,7 +43,8 @@ const requireVendor = (req, res, next) => {
     });
   }
   
-  if (!req.user.vendor_id) {
+  // Note: auth middleware uses camelCase (vendorId), not snake_case (vendor_id)
+  if (!req.user.vendorId) {
     return res.status(403).json({
       success: false,
       error: {

@@ -65,7 +65,7 @@ export const ORDER_STATUSES = {
 export type OrderStatus = typeof ORDER_STATUSES[keyof typeof ORDER_STATUSES];
 
 export const ORDER_STATUS_LABELS: Record<OrderStatus, string> = {
-  [ORDER_STATUSES.INTAKE]: 'Intake',
+  [ORDER_STATUSES.INTAKE]: 'New',
   [ORDER_STATUSES.FOLLOW_UP]: 'Follow Up',
   [ORDER_STATUSES.CONVERTED]: 'Converted',
   [ORDER_STATUSES.HOLD]: 'On Hold',

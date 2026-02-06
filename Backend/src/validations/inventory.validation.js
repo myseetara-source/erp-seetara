@@ -46,7 +46,8 @@ export const transactionItemSchema = z.object({
 // =============================================================================
 
 const baseTransactionSchema = z.object({
-  invoice_no: z.string().min(1, 'Invoice number is required'),
+  // invoice_no is optional - backend generates it automatically if not provided
+  invoice_no: z.string().optional(),
   transaction_date: z.string().or(z.date()).optional(),
   notes: z.string().optional(),
   items: z.array(transactionItemSchema).min(1, 'At least one item is required'),

@@ -18,7 +18,6 @@ import {
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { createClient } from '@/lib/supabase/client';
 import { toast } from 'sonner';
 import apiClient from '@/lib/api/apiClient';
 import { formatCurrency } from '@/lib/utils/currency';
@@ -117,7 +116,6 @@ export default function RecordPaymentModal({
   });
   
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const supabase = createClient();
 
   // Dynamic state
   const supportsReceipt = formData.payment_method !== 'cash';
@@ -255,50 +253,27 @@ export default function RecordPaymentModal({
 
       const paymentMethodForDB = getPaymentMethodForDB();
       
-      const { error } = await supabase.rpc('record_vendor_payment', {
-        p_vendor_id: vendorId,
-        p_amount: payingAmount,
-        p_payment_method: paymentMethodForDB,
-        p_payment_date: formData.payment_date,
-        p_transaction_ref: formData.transaction_ref || null,
-        p_bank_name: null,
-        p_remarks: formData.remarks || null,
-        p_receipt_url: receiptUrl,
-      });
+      // Build payload with explicit type coercion
+      const payload = {
+        vendor_id: vendorId,                           // ✅ UUID string from props
+        amount: Number(payingAmount),                  // ✅ Ensure it's a number
+        payment_mode: paymentMethodForDB,              // ✅ 'cash', 'bank', 'esewa', etc.
+        reference_number: formData.transaction_ref || null,
+        notes: formData.remarks || null,
+        receipt_url: receiptUrl,
+      };
+      
+      // DEBUG: Log payload for troubleshooting 400 errors
+      console.log('💰 Payment Payload:', payload);
+      console.log('🆔 Vendor ID:', vendorId, 'Type:', typeof vendorId);
+      console.log('💵 Amount:', payingAmount, 'Type:', typeof payingAmount);
+      console.log('📝 Payment Mode:', paymentMethodForDB);
+      
+      // Use backend API for proper payment recording with ledger entry
+      const response = await apiClient.post('/vendors/payments', payload);
 
-      if (error) {
-        console.error('Payment RPC error:', error);
-        
-        if (error.code === 'PGRST202' || error.message.includes('function')) {
-          const paymentNo = `PAY-${new Date().toISOString().slice(0,10).replace(/-/g,'')}-${Math.floor(Math.random() * 10000).toString().padStart(4, '0')}`;
-          
-          const { error: insertError } = await supabase
-            .from('vendor_payments')
-            .insert({
-              vendor_id: vendorId,
-              payment_no: paymentNo,
-              amount: payingAmount,
-              payment_method: paymentMethodForDB,
-              reference_number: formData.transaction_ref || null,
-              balance_before: currentBalance,
-              balance_after: remainingBalance,
-              payment_date: formData.payment_date,
-              notes: formData.remarks || null,
-              receipt_url: receiptUrl,
-              status: 'completed',
-            });
-
-          if (insertError) {
-            console.error('Direct insert error:', insertError);
-            toast.error(insertError.message || 'Failed to record payment');
-            return;
-          }
-
-          await supabase.from('vendors').update({ balance: remainingBalance }).eq('id', vendorId);
-        } else {
-          toast.error(error.message || 'Failed to record payment');
-          return;
-        }
+      if (!response.data?.success) {
+        throw new Error(response.data?.message || 'Failed to record payment');
       }
 
       toast.success(`Payment of ${formatCurrency(payingAmount)} recorded!`);
@@ -311,9 +286,24 @@ export default function RecordPaymentModal({
         payment_date: new Date().toISOString().split('T')[0], transaction_ref: '', remarks: '',
       });
 
-    } catch (err) {
-      console.error('Payment error:', err);
-      toast.error('Failed to record payment');
+    } catch (err: unknown) {
+      console.error('❌ Payment error:', err);
+      
+      // Extract meaningful error message from API response
+      let errorMessage = 'Failed to record payment';
+      if (err && typeof err === 'object') {
+        const axiosError = err as { response?: { data?: { message?: string; error?: { message?: string; details?: string } } } };
+        if (axiosError.response?.data?.error?.message) {
+          errorMessage = axiosError.response.data.error.message;
+        } else if (axiosError.response?.data?.message) {
+          errorMessage = axiosError.response.data.message;
+        } else if (err instanceof Error) {
+          errorMessage = err.message;
+        }
+      }
+      
+      console.error('💔 Error details:', errorMessage);
+      toast.error(errorMessage);
     } finally {
       setIsSubmitting(false);
     }

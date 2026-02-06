@@ -191,6 +191,64 @@ export async function uploadProductImage(file: File): Promise<{ url: string; key
 }
 
 // =============================================================================
+// LOW STOCK ALERT (REORDER LEVEL) API FUNCTIONS
+// =============================================================================
+
+/**
+ * Product stock configuration response
+ */
+export interface ProductStockConfig {
+  id: string;
+  name: string;
+  image_url?: string | null;
+  variants: {
+    id: string;
+    sku: string;
+    attributes: VariantAttributes;
+    current_stock: number;
+    reorder_level: number | null;
+    is_active: boolean;
+  }[];
+}
+
+/**
+ * Reorder level update payload
+ */
+export interface ReorderLevelUpdate {
+  variant_id: string;
+  reorder_level: number;
+}
+
+/**
+ * Get product stock configuration (for Low Stock Alert settings)
+ * ADMIN ONLY
+ */
+export async function getProductStockConfig(productId: string): Promise<ProductStockConfig> {
+  const response = await apiClient.get<ApiResponse<ProductStockConfig>>(
+    `/products/${productId}/stock-config`
+  );
+  return response.data.data;
+}
+
+/**
+ * Update reorder levels for product variants (Low Stock Alert)
+ * ADMIN ONLY
+ */
+export async function updateReorderLevels(
+  productId: string, 
+  variants: ReorderLevelUpdate[]
+): Promise<{ updated: { id: string; sku: string; reorder_level: number }[]; failed: { variant_id: string; error: string }[] }> {
+  const response = await apiClient.patch<ApiResponse<{ 
+    updated: { id: string; sku: string; reorder_level: number }[]; 
+    failed: { variant_id: string; error: string }[] 
+  }>>(
+    `/products/${productId}/reorder-levels`,
+    { variants }
+  );
+  return response.data.data;
+}
+
+// =============================================================================
 // TYPE MAPPERS (DbProduct → Product)
 // =============================================================================
 

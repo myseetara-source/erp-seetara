@@ -68,7 +68,7 @@ export const createPurchase = asyncHandler(async (req, res) => {
   if (canSeeFinancials(userRole)) {
     // Admin sees everything
     responseData = purchase;
-    message = `Purchase ${purchase.supply_number} created. Total: Rs. ${purchase.total_amount}. Vendor balance updated.`;
+    message = `Purchase ${purchase.supply_number} created. Total: रु. ${purchase.total_amount}. Vendor balance updated.`;
   } else {
     // Staff sees operational data only
     responseData = maskPurchaseResponse(purchase, userRole);
@@ -165,7 +165,7 @@ export const recordPayment = asyncHandler(async (req, res) => {
 
   res.json({
     success: true,
-    message: `Payment of Rs. ${result.payment_amount} recorded. Remaining balance: Rs. ${result.remaining}`,
+    message: `Payment of रु. ${result.payment_amount} recorded. Remaining balance: रु. ${result.remaining}`,
     data: result,
   });
 });
@@ -203,7 +203,7 @@ export const processReturn = asyncHandler(async (req, res) => {
   if (canSeeFinancials(userRole)) {
     res.json({
       success: true,
-      message: `Return processed. Credit of Rs. ${result.credit_amount} applied to vendor balance.`,
+      message: `Return processed. Credit of रु. ${result.credit_amount} applied to vendor balance.`,
       data: result,
     });
   } else {

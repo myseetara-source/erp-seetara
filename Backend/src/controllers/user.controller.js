@@ -15,6 +15,7 @@ import { asyncHandler } from '../middleware/error.middleware.js';
 import { createLogger } from '../utils/logger.js';
 import { AppError } from '../utils/errors.js';
 import { z } from 'zod';
+import { buildSafeOrQuery } from '../utils/helpers.js';
 
 const logger = createLogger('UserController');
 
@@ -76,7 +77,8 @@ export const listUsers = asyncHandler(async (req, res) => {
   if (role) query = query.eq('role', role);
   if (is_active !== undefined) query = query.eq('is_active', is_active === 'true');
   if (search) {
-    query = query.or(`name.ilike.%${search}%,email.ilike.%${search}%,phone.ilike.%${search}%`);
+    const safeQuery = buildSafeOrQuery(search, ['name', 'email', 'phone']);
+    if (safeQuery) query = query.or(safeQuery);
   }
 
   // Pagination

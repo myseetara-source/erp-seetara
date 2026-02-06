@@ -12,6 +12,7 @@ import { supabaseAdmin } from '../../config/supabase.js';
 import { AppError } from '../../utils/errors.js';
 import { createLogger } from '../../utils/logger.js';
 import { TRANSACTION_TYPES, TRANSACTION_STATUSES } from './constants.js';
+import { sanitizeSearchInput } from '../../utils/helpers.js';
 
 const logger = createLogger('StockCore');
 
@@ -20,10 +21,11 @@ class StockCoreService {
    * Get variant stock movements
    */
   async getVariantStockMovements(variantId, limit = 50) {
+    // FIXED: Use quantity (not quantity_fresh/damaged which don't exist in schema)
     const { data, error } = await supabaseAdmin
       .from('inventory_transaction_items')
       .select(`
-        id, quantity_fresh, quantity_damaged, created_at,
+        id, quantity, unit_cost, source_type, created_at,
         transaction:inventory_transactions(
           id, transaction_type, invoice_no, transaction_date, status,
           vendor:vendors(id, name)
@@ -120,13 +122,14 @@ class StockCoreService {
   async searchPurchaseInvoices(filters) {
     const { vendor_id, search, limit = 20 } = filters;
 
+    // FIXED: Use quantity (not quantity_fresh/damaged which don't exist in schema)
     let query = supabaseAdmin
       .from('inventory_transactions')
       .select(`
         id, invoice_no, transaction_date, total_cost, status, notes,
         vendor:vendors(id, name),
         items:inventory_transaction_items(
-          id, variant_id, quantity_fresh, quantity_damaged, unit_cost,
+          id, variant_id, quantity, unit_cost, source_type,
           variant:product_variants(id, sku, product:products(id, name))
         )
       `)
@@ -140,7 +143,11 @@ class StockCoreService {
     }
 
     if (search) {
-      query = query.ilike('invoice_no', `%${search}%`);
+      // SECURITY: Sanitize search to prevent SQL injection
+      const sanitizedSearch = sanitizeSearchInput(search);
+      if (sanitizedSearch) {
+        query = query.ilike('invoice_no', `%${sanitizedSearch}%`);
+      }
     }
 
     const { data, error } = await query;
@@ -155,15 +162,16 @@ class StockCoreService {
 
   /**
    * Add remaining returnable quantities to invoices
+   * FIXED: Use quantity field (not quantity_fresh/damaged)
    */
   async _addRemainingQuantities(invoices) {
     const invoiceIds = invoices.map(inv => inv.id);
     if (invoiceIds.length === 0) return invoices;
 
-    // Get all returns for these invoices
+    // Get all returns for these invoices - using quantity field
     const { data: returns } = await supabaseAdmin
       .from('inventory_transactions')
-      .select('reference_transaction_id, items:inventory_transaction_items(variant_id, quantity_fresh, quantity_damaged)')
+      .select('reference_transaction_id, items:inventory_transaction_items(variant_id, quantity)')
       .eq('transaction_type', TRANSACTION_TYPES.PURCHASE_RETURN)
       .in('reference_transaction_id', invoiceIds);
 
@@ -173,10 +181,9 @@ class StockCoreService {
       for (const ret of returns) {
         for (const item of ret.items || []) {
           const key = `${ret.reference_transaction_id}-${item.variant_id}`;
-          const current = returnedMap.get(key) || { fresh: 0, damaged: 0 };
-          current.fresh += item.quantity_fresh || 0;
-          current.damaged += item.quantity_damaged || 0;
-          returnedMap.set(key, current);
+          const current = returnedMap.get(key) || 0;
+          // Returns have negative quantity, so use absolute value
+          returnedMap.set(key, current + Math.abs(item.quantity || 0));
         }
       }
     }
@@ -186,11 +193,16 @@ class StockCoreService {
       ...inv,
       items: (inv.items || []).map(item => {
         const key = `${inv.id}-${item.variant_id}`;
-        const returned = returnedMap.get(key) || { fresh: 0, damaged: 0 };
+        const returned = returnedMap.get(key) || 0;
+        const originalQty = item.quantity || 0;
         return {
           ...item,
-          remaining_fresh: (item.quantity_fresh || 0) - returned.fresh,
-          remaining_damaged: (item.quantity_damaged || 0) - returned.damaged,
+          // For backward compatibility, also provide these fields
+          quantity_fresh: originalQty,
+          quantity_damaged: 0,
+          remaining_fresh: originalQty - returned,
+          remaining_damaged: 0,
+          remaining: originalQty - returned,
         };
       }),
     }));
