@@ -13,7 +13,7 @@
 import React, { useCallback } from 'react';
 import {
   Eye, ChevronDown, MoreVertical, Edit3, Printer, Copy, Archive,
-  ArrowLeftRight, Package, Plus,
+  ArrowLeftRight, Package, Plus, Layers,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -33,6 +33,8 @@ import { LogisticsPopover } from '@/components/orders/LogisticsPopover';
 import { EditableCustomerCell } from '@/components/orders/EditableCustomerCell';
 import { EditableAddressCell } from '@/components/orders/EditableAddressCell';
 import { RemarksCell } from '@/components/orders/RemarksCell';
+import { EditableSourceCell } from '@/components/orders/EditableSourceCell';
+import EditableItemsPanel from '@/components/orders/EditableItemsPanel';
 
 // Utils
 import {
@@ -82,96 +84,7 @@ interface OrderTableRowProps {
 // EXPANDED ROW (Item Details)
 // =============================================================================
 
-const ExpandedItemsRow = React.memo<{ order: Order; colSpan: number }>(({ order, colSpan }) => {
-  if (!order.items || order.items.length === 0) return null;
-  
-  return (
-    <tr className="bg-gray-50/80">
-      <td colSpan={colSpan} className="px-4 py-3">
-        <div className="animate-in slide-in-from-top-2 duration-200">
-          <div className="bg-white rounded-lg border border-gray-200 overflow-hidden shadow-sm">
-            <div className="px-3 py-2 bg-gray-50 border-b border-gray-200">
-              <p className="text-[10px] font-semibold text-gray-500 uppercase tracking-wider flex items-center gap-1.5">
-                <Package className="w-3 h-3" />
-                Order Items ({order.items.length})
-              </p>
-            </div>
-            <div className="divide-y divide-gray-100">
-              {order.items.map((item: any, idx: number) => (
-                <div key={item.id || idx} className="flex items-center gap-3 px-3 py-2 hover:bg-gray-50/50">
-                  {/* Thumbnail */}
-                  <div className="w-10 h-10 rounded-lg bg-gray-100 border border-gray-200 flex items-center justify-center flex-shrink-0 overflow-hidden">
-                    {item.variant?.product?.image_url ? (
-                      <img 
-                        src={item.variant.product.image_url} 
-                        alt={item.product_name}
-                        className="w-full h-full object-cover"
-                      />
-                    ) : (
-                      <Package className="w-4 h-4 text-gray-300" />
-                    )}
-                  </div>
-                  
-                  {/* Product Name & Variant */}
-                  <div className="flex-1 min-w-0">
-                    <p className="font-medium text-gray-900 text-xs truncate">
-                      {item.product_name}
-                    </p>
-                    <div className="flex items-center gap-1.5 mt-0.5 flex-wrap">
-                      {item.variant_name && (
-                        <span className="px-1.5 py-0.5 bg-gray-100 text-gray-600 rounded text-[9px] font-medium">
-                          {item.variant_name}
-                        </span>
-                      )}
-                      {item.variant?.color && (
-                        <span className="px-1.5 py-0.5 bg-blue-50 text-blue-600 rounded text-[9px] font-medium">
-                          {item.variant.color}
-                        </span>
-                      )}
-                      {item.variant?.size && (
-                        <span className="px-1.5 py-0.5 bg-purple-50 text-purple-600 rounded text-[9px] font-medium">
-                          {item.variant.size}
-                        </span>
-                      )}
-                    </div>
-                  </div>
-                  
-                  {/* SKU */}
-                  <div className="w-28 flex-shrink-0">
-                    <p className="font-mono text-[10px] text-gray-500 truncate">
-                      {item.sku || item.variant?.sku || '-'}
-                    </p>
-                  </div>
-                  
-                  {/* Qty x Price */}
-                  <div className="text-right flex-shrink-0 w-24">
-                    <p className="text-xs font-semibold text-gray-900">
-                      {item.quantity} × रु.{(item.unit_price || 0).toLocaleString()}
-                    </p>
-                    <p className="text-[10px] text-gray-500">
-                      = रु.{((item.quantity || 0) * (item.unit_price || 0)).toLocaleString()}
-                    </p>
-                  </div>
-                </div>
-              ))}
-            </div>
-            {/* Total row */}
-            <div className="px-3 py-2 bg-orange-50 border-t border-orange-100 flex justify-between items-center">
-              <p className="text-[10px] font-semibold text-orange-700 uppercase">
-                Total ({order.items.reduce((sum: number, i: any) => sum + (i.quantity || 0), 0)} items)
-              </p>
-              <p className="text-sm font-bold text-orange-700">
-                रु.{order.items.reduce((sum: number, i: any) => sum + ((i.quantity || 0) * (i.unit_price || 0)), 0).toLocaleString()}
-              </p>
-            </div>
-          </div>
-        </div>
-      </td>
-    </tr>
-  );
-});
-
-ExpandedItemsRow.displayName = 'ExpandedItemsRow';
+// ExpandedItemsRow is now replaced by EditableItemsPanel (imported above)
 
 // =============================================================================
 // MAIN ROW COMPONENT
@@ -203,9 +116,10 @@ function OrderTableRowComponent({
   const colSpan = isPOS ? 10 : 12;
 
   // Memoized handlers
+  // Row click does nothing now - detail view only opens via Eye button
   const handleRowClick = useCallback(() => {
-    onSelect(order.id);
-  }, [onSelect, order.id]);
+    // no-op: detail panel opens only from Eye icon
+  }, []);
 
   const handleCheckboxChange = useCallback((checked: boolean) => {
     onToggleSelection(order.id, checked);
@@ -224,7 +138,7 @@ function OrderTableRowComponent({
       <tr
         onClick={handleRowClick}
         className={cn(
-          'cursor-pointer group transition-colors',
+          'group transition-colors',
           isSelected ? 'bg-orange-50' : 'hover:bg-gray-50/80',
           isExpanded && 'bg-orange-50/50'
         )}
@@ -336,15 +250,16 @@ function OrderTableRowComponent({
                 className={cn(
                   "p-0.5 rounded transition-all flex-shrink-0",
                   isExpanded
-                    ? "bg-orange-100 text-orange-600"
-                    : "opacity-0 group-hover/product:opacity-100 hover:bg-gray-100 text-gray-400 hover:text-gray-600"
+                    ? "bg-orange-100 text-orange-600 shadow-sm"
+                    : "opacity-0 group-hover/product:opacity-100 hover:bg-orange-50 text-gray-400 hover:text-orange-500"
                 )}
-                title={isExpanded ? "Collapse items" : "Expand items"}
+                title={isExpanded ? "Collapse items" : "View & edit items"}
               >
-                <ChevronDown className={cn(
-                  "w-3.5 h-3.5 transition-transform duration-200",
-                  isExpanded && "rotate-180"
-                )} />
+                {isExpanded ? (
+                  <ChevronDown className="w-3.5 h-3.5 rotate-180 transition-transform duration-200" />
+                ) : (
+                  <Layers className="w-3.5 h-3.5" />
+                )}
               </button>
             )}
           </div>
@@ -449,6 +364,19 @@ function OrderTableRowComponent({
           </td>
         )}
         
+        {/* Source / Page - Editable until packed - HIDDEN for Store POS */}
+        {!isPOS && (
+          <td className="w-[6%] px-1.5 py-1" onClick={(e) => e.stopPropagation()}>
+            <EditableSourceCell
+              orderId={order.id}
+              currentSourceId={order.source_id}
+              currentSourceName={order.order_source?.name}
+              orderStatus={order.status}
+              onUpdate={onRefresh}
+            />
+          </td>
+        )}
+
         {/* Remarks */}
         <td className={cn("px-1.5 py-1 align-top", isPOS ? 'w-[14%]' : 'w-[10%]')} onClick={(e) => e.stopPropagation()}>
           <RemarksCell
@@ -521,9 +449,9 @@ function OrderTableRowComponent({
         </td>
       </tr>
       
-      {/* Expanded Items Row */}
+      {/* Expanded Items Panel - View & Edit Items */}
       {isExpanded && order.items && order.items.length > 0 && (
-        <ExpandedItemsRow order={order} colSpan={colSpan} />
+        <EditableItemsPanel order={order} colSpan={colSpan} onRefresh={onRefresh} />
       )}
     </React.Fragment>
   );
@@ -551,7 +479,11 @@ function arePropsEqual(prevProps: OrderTableRowProps, nextProps: OrderTableRowPr
   if (prevOrder.destination_branch !== nextOrder.destination_branch) return false;
   if (prevOrder.rider_name !== nextOrder.rider_name) return false;
   if (prevOrder.delivery_type !== nextOrder.delivery_type) return false;
+  if (prevOrder.order_source?.name !== nextOrder.order_source?.name) return false;
   if (prevOrder.staff_remarks !== nextOrder.staff_remarks) return false;
+  // Detect item changes (add/remove/qty update)
+  if (prevOrder.items?.length !== nextOrder.items?.length) return false;
+  if (prevOrder.subtotal !== nextOrder.subtotal) return false;
   
   return true;
 }

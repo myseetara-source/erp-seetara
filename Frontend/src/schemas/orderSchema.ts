@@ -121,6 +121,7 @@ export const OrderSchema = z.object({
   
   // Order metadata
   source: OrderSource.default('manual'),
+  source_id: z.string().optional().nullable(),  // FK to order_sources (page/brand) - empty string = no source
   source_order_id: z.string().max(100).optional().nullable(),
   
   // Pricing Overrides
@@ -263,6 +264,7 @@ export const defaultOrderValues: Partial<OrderFormData> = {
   },
   items: [],
   source: 'manual',
+  source_id: '',
   discount_amount: 0,
   shipping_charges: 100,
   cod_charges: 0,

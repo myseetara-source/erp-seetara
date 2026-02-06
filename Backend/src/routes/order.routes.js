@@ -95,6 +95,29 @@ router.delete(
 );
 
 // =============================================================================
+// ORDER ITEMS MANAGEMENT (Add/Remove/Update items)
+// =============================================================================
+
+// Add item to order
+router.post(
+  '/:id/items',
+  validateParams(orderIdSchema),
+  orderController.addOrderItem
+);
+
+// Update order item (quantity/price)
+router.patch(
+  '/:id/items/:itemId',
+  orderController.updateOrderItem
+);
+
+// Remove item from order
+router.delete(
+  '/:id/items/:itemId',
+  orderController.removeOrderItem
+);
+
+// =============================================================================
 // REMARKS (Sticky Notes)
 // =============================================================================
 

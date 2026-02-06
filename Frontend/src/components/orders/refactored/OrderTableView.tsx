@@ -10,8 +10,8 @@
  * @architecture Modular composition with React.memo
  */
 
-import React, { useState, useCallback, useMemo } from 'react';
-import { Package } from 'lucide-react';
+import React, { useState, useCallback, useMemo, useEffect } from 'react';
+import { Package, Loader2 } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Checkbox } from '@/components/ui/checkbox';
 import { cn } from '@/lib/utils';
@@ -125,6 +125,10 @@ const TableHeader = React.memo<TableHeaderProps>(({ activeLocation, isAllSelecte
         {!isPOS && (
           <th className="w-[8%] px-1.5 py-1.5 text-left font-semibold text-[10px] uppercase tracking-wider text-gray-500">Delivery</th>
         )}
+        {/* Source / Page - HIDDEN for Store POS */}
+        {!isPOS && (
+          <th className="w-[6%] px-1.5 py-1.5 text-left font-semibold text-[10px] uppercase tracking-wider text-gray-500">Source</th>
+        )}
         {/* Remarks */}
         <th className={cn(
           "px-1.5 py-1.5 text-left font-semibold text-[10px] uppercase tracking-wider text-gray-500",
@@ -148,19 +152,69 @@ TableHeader.displayName = 'TableHeader';
 // =============================================================================
 
 const LoadingSkeleton = React.memo(() => (
-  <div className="flex-1 p-6 space-y-4 overflow-auto">
-    {[...Array(12)].map((_, i) => (
-      <div key={i} className="flex items-center gap-4">
-        <Skeleton className="w-5 h-5 rounded" />
-        <div className="flex-1">
-          <Skeleton className="h-4 w-32 mb-2" />
-          <Skeleton className="h-3 w-24" />
+  <div className="flex-1 flex flex-col overflow-auto">
+    {/* Loading header */}
+    <div className="flex items-center justify-center gap-2.5 py-5">
+      <Loader2 className="w-5 h-5 animate-spin text-orange-500" />
+      <span className="text-sm font-medium text-gray-500">Loading orders...</span>
+    </div>
+
+    {/* Table-shaped skeleton rows */}
+    <div className="px-2 space-y-0">
+      {[...Array(10)].map((_, i) => (
+        <div
+          key={i}
+          className="flex items-center gap-3 px-2 py-2.5 border-b border-gray-50"
+          style={{ opacity: 1 - i * 0.08 }}
+        >
+          {/* Checkbox */}
+          <Skeleton className="w-4 h-4 rounded flex-shrink-0" />
+          {/* Eye */}
+          <Skeleton className="w-4 h-4 rounded-full flex-shrink-0" />
+          {/* Order ID + Status */}
+          <div className="w-[9%] flex-shrink-0 space-y-1.5">
+            <Skeleton className="h-3.5 w-20" />
+            <Skeleton className="h-5 w-14 rounded-full" />
+          </div>
+          {/* Customer */}
+          <div className="w-[12%] flex-shrink-0 space-y-1.5">
+            <Skeleton className="h-3.5 w-24" />
+            <Skeleton className="h-3 w-20" />
+          </div>
+          {/* Address */}
+          <div className="w-[14%] flex-shrink-0 space-y-1.5">
+            <Skeleton className="h-3.5 w-28" />
+            <Skeleton className="h-4 w-20 rounded-full" />
+          </div>
+          {/* Product */}
+          <div className="w-[10%] flex-shrink-0 space-y-1.5">
+            <Skeleton className="h-3.5 w-20" />
+            <Skeleton className="h-3 w-16" />
+          </div>
+          {/* SKU */}
+          <div className="w-[8%] flex-shrink-0 space-y-1.5">
+            <Skeleton className="h-3.5 w-20" />
+            <Skeleton className="h-3 w-10" />
+          </div>
+          {/* Payable */}
+          <div className="w-[7%] flex-shrink-0 space-y-1.5">
+            <Skeleton className="h-3.5 w-14" />
+            <Skeleton className="h-3 w-12" />
+          </div>
+          {/* Adjust */}
+          <div className="w-[7%] flex-shrink-0 space-y-1.5">
+            <Skeleton className="h-3.5 w-12" />
+            <Skeleton className="h-3 w-10" />
+          </div>
+          {/* Delivery */}
+          <Skeleton className="w-[8%] h-3.5 flex-shrink-0" />
+          {/* Source */}
+          <Skeleton className="w-[6%] h-5 rounded-full flex-shrink-0" />
+          {/* Remarks */}
+          <Skeleton className="w-[10%] h-3.5 flex-shrink-0" />
         </div>
-        <Skeleton className="h-4 w-28" />
-        <Skeleton className="h-4 w-20" />
-        <Skeleton className="h-6 w-16" />
-      </div>
-    ))}
+      ))}
+    </div>
   </div>
 ));
 
@@ -280,15 +334,24 @@ function OrderTableViewComponent({
   const toggleOrderExpand = useCallback((orderId: string, e: React.MouseEvent) => {
     e.stopPropagation();
     setExpandedOrders(prev => {
-      const newSet = new Set(prev);
-      if (newSet.has(orderId)) {
-        newSet.delete(orderId);
-      } else {
-        newSet.add(orderId);
+      // Accordion: if already open, close it. Otherwise open only this one.
+      if (prev.has(orderId)) {
+        return new Set();
       }
-      return newSet;
+      return new Set([orderId]);
     });
   }, []);
+
+  // Esc key closes any expanded panel
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && expandedOrders.size > 0) {
+        setExpandedOrders(new Set());
+      }
+    };
+    document.addEventListener('keydown', handleKeyDown);
+    return () => document.removeEventListener('keydown', handleKeyDown);
+  }, [expandedOrders.size]);
 
   const handleOpenExchangeModal = useCallback((orderId: string) => {
     setExchangeOrderId(orderId);

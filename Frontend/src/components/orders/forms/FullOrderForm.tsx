@@ -57,6 +57,7 @@ import {
   PaymentStatus,
 } from '@/schemas/orderSchema';
 import { getProducts, type Product, type ProductVariant } from '@/lib/api/purchases';
+import { getActiveOrderSources, type OrderSource as OrderSourceType } from '@/lib/api/orderSources';
 import apiClient from '@/lib/api/apiClient';
 
 export function FullOrderForm() {
@@ -82,6 +83,7 @@ export function FullOrderForm() {
   // State
   const [products, setProducts] = useState<Product[]>([]);
   const [allVariants, setAllVariants] = useState<ProductVariant[]>([]);
+  const [orderSourceOptions, setOrderSourceOptions] = useState<OrderSourceType[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
@@ -92,7 +94,7 @@ export function FullOrderForm() {
   const watchDiscountAmount = watch('discount_amount');
   const watchDeliveryCharge = watch('shipping_charges');
 
-  // Load products
+  // Load products and order sources
   useEffect(() => {
     async function loadProducts() {
       try {
@@ -108,7 +110,16 @@ export function FullOrderForm() {
         setIsLoading(false);
       }
     }
+    async function loadOrderSources() {
+      try {
+        const sources = await getActiveOrderSources();
+        setOrderSourceOptions(sources);
+      } catch (error) {
+        console.error('Failed to load order sources:', error);
+      }
+    }
     loadProducts();
+    loadOrderSources();
   }, []);
 
   // Calculate totals
@@ -151,7 +162,12 @@ export function FullOrderForm() {
     setSubmitError(null);
 
     try {
-      const response = await apiClient.post('/orders', data);
+      // Clean up source_id: convert empty string to null
+      const payload = {
+        ...data,
+        source_id: (data as any).source_id || null,
+      };
+      const response = await apiClient.post('/orders', payload);
       
       if (response.data.success) {
         setSubmitSuccess(true);
@@ -511,6 +527,23 @@ export function FullOrderForm() {
                 <option value="instagram">Instagram</option>
                 <option value="store">Store</option>
               </select>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Source / Page
+                <span className="text-xs text-gray-400 ml-1">(sent to courier)</span>
+              </label>
+              <select
+                {...register('source_id')}
+                className="w-full px-3 py-2.5 border border-gray-300 rounded-lg"
+              >
+                <option value="">— No Page —</option>
+                {orderSourceOptions.map((src) => (
+                  <option key={src.id} value={src.id}>{src.name}</option>
+                ))}
+              </select>
+              <p className="text-xs text-gray-400 mt-1">Brand name shown on courier manifest.</p>
             </div>
           </div>
         </div>

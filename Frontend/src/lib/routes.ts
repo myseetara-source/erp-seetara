@@ -225,6 +225,39 @@ export const API_ROUTES = {
   },
 
   // ---------------------------------------------------------------------------
+  // CATEGORIES (Dedicated CRUD)
+  // ---------------------------------------------------------------------------
+  CATEGORIES: {
+    LIST: `${BASE_URL}/categories`,
+    CREATE: `${BASE_URL}/categories`,
+    DETAIL: (id: string) => `${BASE_URL}/categories/${id}`,
+    UPDATE: (id: string) => `${BASE_URL}/categories/${id}`,
+    DELETE: (id: string) => `${BASE_URL}/categories/${id}`,
+  },
+
+  // ---------------------------------------------------------------------------
+  // BRANDS (Dedicated CRUD)
+  // ---------------------------------------------------------------------------
+  BRANDS: {
+    LIST: `${BASE_URL}/brands`,
+    CREATE: `${BASE_URL}/brands`,
+    DETAIL: (id: string) => `${BASE_URL}/brands/${id}`,
+    UPDATE: (id: string) => `${BASE_URL}/brands/${id}`,
+    DELETE: (id: string) => `${BASE_URL}/brands/${id}`,
+  },
+
+  // ---------------------------------------------------------------------------
+  // ORDER SOURCES (Page / Brand management)
+  // ---------------------------------------------------------------------------
+  ORDER_SOURCES: {
+    LIST: `${BASE_URL}/order-sources`,
+    CREATE: `${BASE_URL}/order-sources`,
+    DETAIL: (id: string) => `${BASE_URL}/order-sources/${id}`,
+    UPDATE: (id: string) => `${BASE_URL}/order-sources/${id}`,
+    DELETE: (id: string) => `${BASE_URL}/order-sources/${id}`,
+  },
+
+  // ---------------------------------------------------------------------------
   // STATIC DATA (Cached)
   // ---------------------------------------------------------------------------
   STATIC: {

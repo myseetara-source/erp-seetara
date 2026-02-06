@@ -44,6 +44,7 @@ import { cn } from '@/lib/utils';
 import { useQuickOrderForm, ProductOption } from '@/hooks/useOrderForm';
 import { AsyncProductSelect } from '@/components/common/AsyncProductSelect';
 import { DELIVERY_ZONES, ZoneConfig } from '@/config/zones';
+import { getActiveOrderSources, type OrderSource } from '@/lib/api/orderSources';
 
 // =============================================================================
 // TYPES
@@ -72,7 +73,15 @@ export function QuickCreatePanel({
 }: QuickCreatePanelProps) {
   const router = useRouter();
   const [isExpanded, setIsExpanded] = useState(defaultExpanded);
+  const [orderSourceOptions, setOrderSourceOptions] = useState<OrderSource[]>([]);
   const formRef = useRef<HTMLDivElement>(null);
+
+  // Load order sources on mount
+  useEffect(() => {
+    getActiveOrderSources()
+      .then(setOrderSourceOptions)
+      .catch(() => {});
+  }, []);
 
   // Notify parent when expand state changes
   const handleExpandToggle = () => {
@@ -382,6 +391,22 @@ export function QuickCreatePanel({
                 </div>
               </div>
             )}
+          </div>
+
+          {/* Row 2.5: Source / Page Selector */}
+          <div className="mb-4">
+            <label className="text-xs font-medium text-gray-700 mb-2 block">
+              Source / Page <span className="text-[10px] text-gray-400 ml-1">(shown on courier manifest)</span>
+            </label>
+            <select
+              {...register('source_id')}
+              className="w-full h-10 px-3 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent bg-white"
+            >
+              <option value="">— Select Page —</option>
+              {orderSourceOptions.map(src => (
+                <option key={src.id} value={src.id}>{src.name}</option>
+              ))}
+            </select>
           </div>
 
           {/* Hidden input to ALWAYS register zone field with react-hook-form */}

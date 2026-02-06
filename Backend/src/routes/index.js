@@ -10,7 +10,6 @@
  */
 
 import { Router } from 'express';
-import { authenticate, authorize } from '../middleware/auth.middleware.js';
 
 // =============================================================================
 // ROUTE IMPORTS (Alphabetically ordered)
@@ -19,6 +18,8 @@ import { authenticate, authorize } from '../middleware/auth.middleware.js';
 import adminRoutes from './admin.routes.js';
 import archiveRoutes from './archive.routes.js';
 import authRoutes from './auth.routes.js';
+import brandRoutes from './brand.routes.js';
+import categoryRoutes from './category.routes.js';
 import customerRoutes from './customer.routes.js';
 import dispatchRoutes from './dispatch.routes.js';
 import externalRoutes from './external.routes.js';
@@ -27,6 +28,7 @@ import inventoryRoutes from './inventory.routes.js';
 import leadRoutes from './lead.routes.js';
 import logisticsRoutes from './logistics.routes.js';
 import orderRoutes from './order.routes.js';
+import orderSourceRoutes from './order-source.routes.js';
 import posRoutes from './pos.routes.js';
 import productRoutes from './product.routes.js';
 import purchaseRoutes from './purchase.routes.js';
@@ -61,6 +63,8 @@ router.get('/health/fix-order-trigger', staticController.getOrderIdMigration);
 router.use('/admin', adminRoutes);
 router.use('/archives', archiveRoutes);
 router.use('/auth', authRoutes);
+router.use('/brands', brandRoutes);
+router.use('/categories', categoryRoutes);
 router.use('/customers', customerRoutes);
 router.use('/dispatch', dispatchRoutes);  // P0: Logistics Command Center
 router.use('/external', externalRoutes);
@@ -69,6 +73,7 @@ router.use('/inventory', inventoryRoutes);
 router.use('/leads', leadRoutes);
 router.use('/logistics', logisticsRoutes);
 router.use('/orders', orderRoutes);
+router.use('/order-sources', orderSourceRoutes);
 router.use('/pos', posRoutes);
 router.use('/products', productRoutes);
 router.use('/purchases', purchaseRoutes);
@@ -89,17 +94,8 @@ router.use('/', riderRoutes);
 // =============================================================================
 // BACKWARD COMPATIBILITY ROUTES
 // =============================================================================
-// Some older frontend code calls /categories and /brands directly
-// instead of /static/categories and /static/brands.
-// These routes delegate to the static controller.
-
-// GET routes - public (for dropdowns/filters)
-router.get('/categories', staticController.getCategories);
-router.get('/brands', staticController.getBrands);
-
-// POST routes - SECURITY FIX: Require admin/manager authentication
-router.post('/categories', authenticate, authorize('admin', 'manager'), staticController.createCategory);
-router.post('/brands', authenticate, authorize('admin', 'manager'), staticController.createBrand);
+// /categories and /brands are now handled by dedicated route files above.
+// /static/categories and /static/brands still exist for cached dropdown data.
 
 // =============================================================================
 // EXPORT

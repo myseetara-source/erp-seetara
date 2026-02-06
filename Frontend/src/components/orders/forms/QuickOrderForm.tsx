@@ -35,6 +35,7 @@ import {
   transformQuickToFullOrder,
 } from '@/schemas/orderSchema';
 import { getProducts, type Product, type ProductVariant } from '@/lib/api/purchases';
+import { getActiveOrderSources, type OrderSource } from '@/lib/api/orderSources';
 import apiClient from '@/lib/api/apiClient';
 
 interface QuickOrderFormProps {
@@ -61,6 +62,8 @@ export function QuickOrderForm({ onSuccess, onCancel }: QuickOrderFormProps) {
   // Local state
   const [products, setProducts] = useState<Product[]>([]);
   const [allVariants, setAllVariants] = useState<ProductVariant[]>([]);
+  const [orderSources, setOrderSources] = useState<OrderSource[]>([]);
+  const [selectedSourceId, setSelectedSourceId] = useState<string>('');
   const [isLoading, setIsLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
@@ -75,7 +78,7 @@ export function QuickOrderForm({ onSuccess, onCancel }: QuickOrderFormProps) {
   const total = (quantity || 0) * (unitPrice || 0);
   const grandTotal = total + 100; // Including delivery charge
 
-  // Load products on mount
+  // Load products and order sources on mount
   useEffect(() => {
     async function loadProducts() {
       try {
@@ -93,7 +96,16 @@ export function QuickOrderForm({ onSuccess, onCancel }: QuickOrderFormProps) {
         setIsLoading(false);
       }
     }
+    async function loadOrderSources() {
+      try {
+        const sources = await getActiveOrderSources();
+        setOrderSources(sources);
+      } catch (error) {
+        console.error('Failed to load order sources:', error);
+      }
+    }
     loadProducts();
+    loadOrderSources();
   }, []);
 
   // Auto-fill price when variant changes
@@ -124,6 +136,10 @@ export function QuickOrderForm({ onSuccess, onCancel }: QuickOrderFormProps) {
 
     try {
       const fullOrderData = transformQuickToFullOrder(data);
+      // Attach source_id if selected
+      if (selectedSourceId) {
+        (fullOrderData as any).source_id = selectedSourceId;
+      }
       
       const response = await apiClient.post('/orders', fullOrderData);
       
@@ -211,6 +227,25 @@ export function QuickOrderForm({ onSuccess, onCancel }: QuickOrderFormProps) {
           <p className="text-xs text-red-500">{errors.customer_name.message}</p>
         )}
       </div>
+
+      {/* Source / Page Selection */}
+      {orderSources.length > 0 && (
+        <div className="space-y-1.5">
+          <label className="text-sm font-medium text-gray-700">
+            Source / Page <span className="text-xs text-gray-400">(shown on courier manifest)</span>
+          </label>
+          <select
+            value={selectedSourceId}
+            onChange={(e) => setSelectedSourceId(e.target.value)}
+            className="w-full px-3 py-2.5 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
+          >
+            <option value="">— Select Page —</option>
+            {orderSources.map(src => (
+              <option key={src.id} value={src.id}>{src.name}</option>
+            ))}
+          </select>
+        </div>
+      )}
 
       {/* Product Selection */}
       <div className="space-y-1.5">

@@ -414,7 +414,9 @@ class NCMService {
         // OPTIONAL FIELDS
         phone2: phone2Value,                  // Empty string if invalid, not null
         package: packageString,               // Generated from order items
-        vref_id: order.readable_id || '',     // Vendor reference ID
+        // P1: Use order source name as vref_id so courier rider sees the brand
+        // Falls back to readable_id if no source is linked
+        vref_id: order.order_source?.name || order.readable_id || '',
         instruction: 'Handle with care',      // Default instruction
         delivery_type: ncmDeliveryType,       // 'Door2Door' or 'Door2Branch'
       };
@@ -427,6 +429,8 @@ class NCMService {
       console.log('🚚 [NCMService] SENDING TO NCM:');
       console.log('='.repeat(60));
       console.log(`   Order ID: ${order.readable_id || order.order_number}`);
+      console.log(`   Source/Brand: ${order.order_source?.name || 'none'}`);
+      console.log(`   VREF ID: ${payload.vref_id}`);
       console.log(`   Input Delivery Type: "${deliveryType || order.delivery_type}"`);
       console.log(`   Mapped NCM Type: "${ncmDeliveryType}"`);
       console.log(`   Branch: ${destinationBranch}`);

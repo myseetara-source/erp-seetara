@@ -20,6 +20,9 @@ import {
   MessageSquare,
   Bike,
   Headphones,
+  FolderOpen,
+  Award,
+  Globe,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
@@ -86,6 +89,23 @@ const navSections: NavSection[] = [
         href: '/dashboard/products',
         label: 'Products',
         icon: <Package className="w-4 h-4" />,
+        children: [
+          {
+            href: '/dashboard/products',
+            label: 'All Products',
+            icon: <Package className="w-4 h-4" />,
+          },
+          {
+            href: '/dashboard/products/categories',
+            label: 'Categories',
+            icon: <FolderOpen className="w-4 h-4" />,
+          },
+          {
+            href: '/dashboard/products/brands',
+            label: 'Brands',
+            icon: <Award className="w-4 h-4" />,
+          },
+        ],
       },
       {
         href: '/dashboard/support',
@@ -108,14 +128,26 @@ const navSections: NavSection[] = [
         icon: <BarChart3 className="w-4 h-4" />,
       },
       {
-        href: '/dashboard/settings/sms',
-        label: 'SMS Panel',
-        icon: <MessageSquare className="w-4 h-4" />,
-      },
-      {
         href: '/dashboard/settings',
         label: 'Settings',
         icon: <Settings className="w-4 h-4" />,
+        children: [
+          {
+            href: '/dashboard/settings/order-sources',
+            label: 'Order Sources',
+            icon: <Globe className="w-4 h-4" />,
+          },
+          {
+            href: '/dashboard/settings/sms',
+            label: 'SMS Panel',
+            icon: <MessageSquare className="w-4 h-4" />,
+          },
+          {
+            href: '/dashboard/settings/team',
+            label: 'Team',
+            icon: <Users className="w-4 h-4" />,
+          },
+        ],
       },
     ],
   },
@@ -189,7 +221,10 @@ function NavItemComponent({
         {isExpanded && isChildrenOpen && (
           <div className="ml-3 space-y-0.5 pl-3 border-l-2 border-orange-200">
             {item.children!.map((child) => {
-              const isChildActive = pathname === child.href || pathname.startsWith(child.href)
+              // If child href equals parent href, use exact match only (e.g., "All Products")
+              const isChildActive = child.href === item.href
+                ? pathname === child.href
+                : pathname === child.href || pathname.startsWith(child.href + '/')
               return (
                 <Link
                   key={child.href}

@@ -347,82 +347,32 @@ class PurchaseService {
       logger.debug('Transaction items created', { count: transactionItems.length });
 
       // ------------------------------------------------------------------
-      // STEP 3: Update Stock for Each Variant (CRITICAL)
+      // STEP 3: Update Cost Price for Each Variant
       // ------------------------------------------------------------------
+      // P0 FIX: Stock update (current_stock) and stock_movements are handled
+      // AUTOMATICALLY by the DB trigger `update_stock_on_transaction_item()`
+      // which fires on the inventory_transaction_items INSERT above.
+      // We MUST NOT update current_stock manually or it causes DOUBLE COUNTING.
+      // We only update cost_price here (trigger does not handle this).
       
-      const stockMovements = [];
-      const stockUpdateErrors = [];
-
       for (const item of processedItems) {
-        const variant = item.variant;
-        const stockBefore = variant.current_stock;
-        const stockAfter = stockBefore + item.quantity;
-
-        // Update variant stock and cost price
         const { error: updateError } = await supabaseAdmin
           .from('product_variants')
           .update({
-            current_stock: stockAfter,
-            cost_price: item.unit_cost, // Update to latest cost
-            updated_at: new Date().toISOString(),
+            cost_price: item.unit_cost,
           })
           .eq('id', item.variant_id);
 
         if (updateError) {
-          stockUpdateErrors.push({
+          logger.warn('Failed to update cost_price for variant', {
             variant_id: item.variant_id,
-            sku: variant.sku,
             error: updateError.message,
           });
-          continue;
-        }
-
-        // Prepare stock movement log
-        stockMovements.push({
-          variant_id: item.variant_id,
-          movement_type: 'inward',
-          quantity: item.quantity,
-          vendor_id,
-          stock_before: stockBefore,
-          stock_after: stockAfter,
-          reason: `Purchase ${supplyNumber} from ${vendor.name}`,
-          created_by: userId,
-        });
-
-        logger.debug('Stock updated', {
-          sku: variant.sku,
-          before: stockBefore,
-          after: stockAfter,
-          quantity: item.quantity,
-        });
-      }
-
-      // Check for stock update errors
-      if (stockUpdateErrors.length > 0) {
-        logger.error('Some stock updates failed', { errors: stockUpdateErrors });
-        // Continue - partial success is acceptable for now
-        // In production, you might want to rollback entirely
-      }
-
-      // ------------------------------------------------------------------
-      // STEP 4: Log Stock Movements
-      // ------------------------------------------------------------------
-      
-      if (stockMovements.length > 0) {
-        const { error: movementError } = await supabaseAdmin
-          .from('stock_movements')
-          .insert(stockMovements);
-
-        if (movementError) {
-          logger.error('Failed to log stock movements', { error: movementError });
-          // Non-critical - don't fail the transaction
-        } else {
-          logger.debug('Stock movements logged', { count: stockMovements.length });
         }
       }
 
       // ------------------------------------------------------------------
-      // STEP 5: Update Vendor Balance (Credit - We owe them)
+      // STEP 4: Update Vendor Balance (Credit - We owe them)
       // SECURITY: Uses atomic RPC with row-level locking to prevent race conditions
       // ------------------------------------------------------------------
       
@@ -436,8 +386,7 @@ class PurchaseService {
       // THROW errors instead of swallowing them
       if (balanceError) {
         logger.error('Failed to update vendor balance (RPC error)', { error: balanceError.message });
-        // Rollback: Delete stock movements and transaction record
-        await supabaseAdmin.from('stock_movements').delete().eq('reference_id', transaction.id);
+        // Rollback: Delete transaction items (trigger will reverse stock) and transaction record
         await supabaseAdmin.from('inventory_transaction_items').delete().eq('transaction_id', transaction.id);
         await supabaseAdmin.from('inventory_transactions').delete().eq('id', transaction.id);
         throw new DatabaseError(`Failed to update vendor balance: ${balanceError.message}`, balanceError);
@@ -445,8 +394,7 @@ class PurchaseService {
       
       if (balanceResult && !balanceResult.success) {
         logger.error('Vendor balance update failed', { error: balanceResult.error });
-        // Rollback: Delete stock movements and transaction record
-        await supabaseAdmin.from('stock_movements').delete().eq('reference_id', transaction.id);
+        // Rollback: Delete transaction items (trigger will reverse stock) and transaction record
         await supabaseAdmin.from('inventory_transaction_items').delete().eq('transaction_id', transaction.id);
         await supabaseAdmin.from('inventory_transactions').delete().eq('id', transaction.id);
         throw new DatabaseError(`Vendor balance update failed: ${balanceResult.error}`);
@@ -469,8 +417,6 @@ class PurchaseService {
         vendorName: vendor.name,
         itemCount: items.length,
         totalAmount,
-        stockUpdated: stockMovements.length,
-        errors: stockUpdateErrors.length,
       });
 
       // Return the complete purchase with items
@@ -490,8 +436,6 @@ class PurchaseService {
           total_items: items.length,
           total_quantity: items.reduce((sum, i) => sum + i.quantity, 0),
           total_amount: totalAmount,
-          stock_updates_successful: stockMovements.length,
-          stock_updates_failed: stockUpdateErrors.length,
         },
       };
 

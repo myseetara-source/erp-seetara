@@ -140,6 +140,7 @@ export function useOrders(initialFilters: OrderFilters = {}) {
   // =========================================================================
   
   // P1 PERFORMANCE FIX: Default 50 rows for optimal pagination
+  // Internal state only manages pagination & sorting
   const [filters, setFilters] = useState<OrderFilters>({
     page: 1,
     limit: 50,
@@ -147,6 +148,30 @@ export function useOrders(initialFilters: OrderFilters = {}) {
     sortOrder: 'desc',
     ...initialFilters,
   });
+  
+  // =========================================================================
+  // P0 FIX: Sync external filter changes into internal state
+  // Without this, tab/date/location changes from parent component are ignored
+  // because useState only reads initialFilters on the FIRST render.
+  // =========================================================================
+  useEffect(() => {
+    setFilters(prev => ({
+      ...prev,
+      status: initialFilters.status,
+      fulfillmentType: initialFilters.fulfillmentType,
+      startDate: initialFilters.startDate,
+      endDate: initialFilters.endDate,
+      page: 1, // Reset to first page when filters change
+    }));
+  }, [initialFilters.status, initialFilters.fulfillmentType, initialFilters.startDate, initialFilters.endDate]);
+
+  // Sync search separately (no page reset — debounce handles it)
+  useEffect(() => {
+    setFilters(prev => ({
+      ...prev,
+      search: initialFilters.search,
+    }));
+  }, [initialFilters.search]);
   
   // New order notification state
   const [newOrderNotification, setNewOrderNotification] = useState<NewOrderNotification>({

@@ -1058,6 +1058,271 @@ export const deleteOrder = asyncHandler(async (req, res) => {
   });
 });
 
+// =============================================================================
+// ORDER ITEMS MANAGEMENT (P1: Editable until converted)
+// =============================================================================
+
+// Statuses where items can be edited
+const ITEM_EDITABLE_STATUSES = ['intake', 'follow_up', 'hold'];
+
+/**
+ * Add item to existing order
+ * POST /orders/:id/items
+ */
+export const addOrderItem = asyncHandler(async (req, res) => {
+  const { id: orderId } = req.params;
+  const { variant_id, quantity, unit_price } = req.body;
+  const context = extractContext(req);
+
+  // 1. Get order and validate status
+  const { data: order, error: orderError } = await supabaseAdmin
+    .from('orders')
+    .select('id, status, order_number')
+    .eq('id', orderId)
+    .eq('is_deleted', false)
+    .single();
+
+  if (orderError || !order) {
+    return res.status(404).json({ success: false, message: 'Order not found' });
+  }
+
+  if (!ITEM_EDITABLE_STATUSES.includes(order.status)) {
+    return res.status(400).json({
+      success: false,
+      message: `Cannot modify items when order is "${order.status}". Only editable in: ${ITEM_EDITABLE_STATUSES.join(', ')}`,
+    });
+  }
+
+  // 2. Get variant details for snapshot
+  const { data: variant, error: variantError } = await supabaseAdmin
+    .from('product_variants')
+    .select('id, sku, color, size, selling_price, cost_price, product:products(id, name, image_url)')
+    .eq('id', variant_id)
+    .single();
+
+  if (variantError || !variant) {
+    return res.status(404).json({ success: false, message: 'Product variant not found' });
+  }
+
+  const finalPrice = unit_price ?? variant.selling_price ?? 0;
+  const productName = variant.product?.name || 'Unknown Product';
+  const variantName = [variant.color, variant.size].filter(Boolean).join(' / ') || null;
+
+  // 3. Check if this variant already exists in the order
+  const { data: existingItem } = await supabaseAdmin
+    .from('order_items')
+    .select('id, quantity')
+    .eq('order_id', orderId)
+    .eq('variant_id', variant_id)
+    .maybeSingle();
+
+  let itemData;
+
+  if (existingItem) {
+    // Update existing item quantity
+    const newQty = existingItem.quantity + (quantity || 1);
+    const { data: updated, error: updateError } = await supabaseAdmin
+      .from('order_items')
+      .update({
+        quantity: newQty,
+        total_price: newQty * finalPrice,
+      })
+      .eq('id', existingItem.id)
+      .select()
+      .single();
+
+    if (updateError) {
+      return res.status(500).json({ success: false, message: 'Failed to update item' });
+    }
+    itemData = updated;
+  } else {
+    // Insert new item
+    const { data: newItem, error: insertError } = await supabaseAdmin
+      .from('order_items')
+      .insert({
+        order_id: orderId,
+        variant_id,
+        product_name: productName,
+        variant_name: variantName,
+        sku: variant.sku,
+        quantity: quantity || 1,
+        unit_price: finalPrice,
+        unit_cost: variant.cost_price || 0,
+        total_price: (quantity || 1) * finalPrice,
+      })
+      .select()
+      .single();
+
+    if (insertError) {
+      return res.status(500).json({ success: false, message: 'Failed to add item', error: insertError.message });
+    }
+    itemData = newItem;
+  }
+
+  // 4. Recalculate order totals
+  await recalculateOrderTotals(orderId);
+
+  res.status(201).json({ success: true, data: itemData });
+});
+
+/**
+ * Update order item (quantity/price)
+ * PATCH /orders/:id/items/:itemId
+ */
+export const updateOrderItem = asyncHandler(async (req, res) => {
+  const { id: orderId, itemId } = req.params;
+  const { quantity, unit_price } = req.body;
+
+  // 1. Validate order status
+  const { data: order, error: orderError } = await supabaseAdmin
+    .from('orders')
+    .select('id, status')
+    .eq('id', orderId)
+    .eq('is_deleted', false)
+    .single();
+
+  if (orderError || !order) {
+    return res.status(404).json({ success: false, message: 'Order not found' });
+  }
+
+  if (!ITEM_EDITABLE_STATUSES.includes(order.status)) {
+    return res.status(400).json({
+      success: false,
+      message: `Cannot modify items when order is "${order.status}"`,
+    });
+  }
+
+  // 2. Get existing item
+  const { data: item, error: itemError } = await supabaseAdmin
+    .from('order_items')
+    .select('id, quantity, unit_price')
+    .eq('id', itemId)
+    .eq('order_id', orderId)
+    .single();
+
+  if (itemError || !item) {
+    return res.status(404).json({ success: false, message: 'Order item not found' });
+  }
+
+  // 3. Update item
+  const newQty = quantity ?? item.quantity;
+  const newPrice = unit_price ?? item.unit_price;
+
+  const { data: updated, error: updateError } = await supabaseAdmin
+    .from('order_items')
+    .update({
+      quantity: newQty,
+      unit_price: newPrice,
+      total_price: newQty * newPrice,
+    })
+    .eq('id', itemId)
+    .select()
+    .single();
+
+  if (updateError) {
+    return res.status(500).json({ success: false, message: 'Failed to update item' });
+  }
+
+  // 4. Recalculate order totals
+  await recalculateOrderTotals(orderId);
+
+  res.json({ success: true, data: updated });
+});
+
+/**
+ * Remove item from order
+ * DELETE /orders/:id/items/:itemId
+ */
+export const removeOrderItem = asyncHandler(async (req, res) => {
+  const { id: orderId, itemId } = req.params;
+
+  // 1. Validate order status
+  const { data: order, error: orderError } = await supabaseAdmin
+    .from('orders')
+    .select('id, status')
+    .eq('id', orderId)
+    .eq('is_deleted', false)
+    .single();
+
+  if (orderError || !order) {
+    return res.status(404).json({ success: false, message: 'Order not found' });
+  }
+
+  if (!ITEM_EDITABLE_STATUSES.includes(order.status)) {
+    return res.status(400).json({
+      success: false,
+      message: `Cannot modify items when order is "${order.status}"`,
+    });
+  }
+
+  // 2. Check item count (must have at least 1 item)
+  const { count: itemCount } = await supabaseAdmin
+    .from('order_items')
+    .select('id', { count: 'exact', head: true })
+    .eq('order_id', orderId);
+
+  if (itemCount <= 1) {
+    return res.status(400).json({
+      success: false,
+      message: 'Cannot remove the last item. Order must have at least one item.',
+    });
+  }
+
+  // 3. Delete item
+  const { error: deleteError } = await supabaseAdmin
+    .from('order_items')
+    .delete()
+    .eq('id', itemId)
+    .eq('order_id', orderId);
+
+  if (deleteError) {
+    return res.status(500).json({ success: false, message: 'Failed to remove item' });
+  }
+
+  // 4. Recalculate order totals
+  await recalculateOrderTotals(orderId);
+
+  res.json({ success: true, message: 'Item removed' });
+});
+
+/**
+ * Recalculate order subtotal and total after item changes
+ */
+async function recalculateOrderTotals(orderId) {
+  const { data: items } = await supabaseAdmin
+    .from('order_items')
+    .select('quantity, unit_price, discount_per_unit')
+    .eq('order_id', orderId);
+
+  if (!items) return;
+
+  const subtotal = items.reduce((sum, item) => {
+    const itemTotal = (item.quantity || 0) * (item.unit_price || 0);
+    const discount = (item.quantity || 0) * (item.discount_per_unit || 0);
+    return sum + (itemTotal - discount);
+  }, 0);
+
+  const { data: order } = await supabaseAdmin
+    .from('orders')
+    .select('discount_amount, shipping_charges, cod_charges')
+    .eq('id', orderId)
+    .single();
+
+  const discountAmount = order?.discount_amount || 0;
+  const shippingCharges = order?.shipping_charges || 0;
+  const codCharges = order?.cod_charges || 0;
+  const totalAmount = subtotal - discountAmount + shippingCharges + codCharges;
+
+  await supabaseAdmin
+    .from('orders')
+    .update({
+      subtotal,
+      total_amount: totalAmount,
+      updated_at: new Date().toISOString(),
+    })
+    .eq('id', orderId);
+}
+
 /**
  * Get order logs
  * GET /orders/:id/logs

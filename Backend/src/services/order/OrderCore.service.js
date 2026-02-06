@@ -491,6 +491,7 @@ class OrderCoreService {
       order_number: orderNumber,
       customer_id: customer.id,
       source: orderData.source || 'manual',
+      source_id: orderData.source_id || null,
       source_order_id: orderData.source_order_id,
       status: orderData.status || 'intake',
       fulfillment_type: orderData.fulfillment_type || 'inside_valley',
@@ -707,6 +708,7 @@ class OrderCoreService {
       .select(`
         *,
         customer:customers(*),
+        order_source:order_sources(id, name),
         items:order_items(*, variant:product_variants(id, sku, color, size, current_stock, product:products(id, name, image_url))),
         logs:order_logs(id, old_status, new_status, action, description, created_at)
       `)
@@ -895,7 +897,7 @@ class OrderCoreService {
     let query = supabaseAdmin
       .from('orders')
       .select(`
-        id, order_number, readable_id, status, fulfillment_type, location, source,
+        id, order_number, readable_id, status, fulfillment_type, location, source, source_id,
         subtotal, discount_amount, shipping_charges, total_amount,
         payment_status, payment_method, paid_amount, advance_paid,
         shipping_name, shipping_phone,
@@ -912,6 +914,7 @@ class OrderCoreService {
         logistics_synced_at,
         created_at, updated_at,
         customer:customers(id, name, phone, email, tier),
+        order_source:order_sources(id, name),
         rider:riders(id, full_name, phone, rider_code),
         items:order_items(
           id,

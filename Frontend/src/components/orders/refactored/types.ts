@@ -28,7 +28,10 @@ export interface OrderItem {
   unit_price: number;
   total_price: number;
   sku?: string;
+  variant_id?: string;
+  discount_per_unit?: number;
   variant?: {
+    id?: string;
     sku?: string;
     color?: string;
     size?: string;
@@ -85,6 +88,9 @@ export interface Order {
   logistics_synced_at?: string;
   delivery_type?: 'D2D' | 'D2B' | null;
   staff_remarks?: string;
+  // Order source (page/brand)
+  source_id?: string | null;
+  order_source?: { id: string; name: string } | null;
   // Exchange/refund fields
   exchange_status?: string;
   parent_order_id?: string;

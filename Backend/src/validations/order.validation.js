@@ -193,6 +193,7 @@ export const createOrderSchema = z.object({
   
   // Order Details
   source: orderSourceSchema.default('manual'),
+  source_id: uuidSchema.optional().nullable(),  // FK to order_sources (page/brand)
   source_order_id: z.string().max(100).optional().nullable(),
   
   // Fulfillment & Status (for Store POS, etc.)
@@ -258,6 +259,9 @@ export const updateOrderSchema = z.object({
   // Payment
   payment_method: paymentMethodSchema.optional(),
   paid_amount: priceSchema.optional(),
+  
+  // Source / Page
+  source_id: uuidSchema.optional().nullable(),
   
   // Logistics
   courier_partner: z.string().max(100).optional().nullable(),

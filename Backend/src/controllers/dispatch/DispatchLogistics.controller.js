@@ -325,7 +325,8 @@ export async function createNCMOrder(req, res, next) {
       .select(`
         *,
         customer:customers(name, phone, email, address_line1, city),
-        items:order_items(product_name, variant_name, quantity, unit_price)
+        items:order_items(product_name, variant_name, quantity, unit_price),
+        order_source:order_sources(id, name)
       `)
       .eq('id', order_id)
       .single();
@@ -395,7 +396,8 @@ export async function createNCMOrdersBulk(req, res, next) {
       .select(`
         *,
         customer:customers(name, phone, email, address_line1, city),
-        items:order_items(product_name, variant_name, quantity, unit_price)
+        items:order_items(product_name, variant_name, quantity, unit_price),
+        order_source:order_sources(id, name)
       `)
       .in('id', order_ids);
 

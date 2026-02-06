@@ -47,6 +47,8 @@ export const QuickOrderSchema = z.object({
   courier_partner: z.string().optional().nullable(),
   // P0 FIX: NCM delivery type (D2D = Home Delivery, D2B = Branch Pickup)
   delivery_type: z.enum(['D2D', 'D2B']).optional().nullable(),
+  // P1: Order Source (page/brand) - passed to courier as vendor reference
+  source_id: z.string().optional().nullable(),
   items: z.array(z.object({
     variant_id: z.string().min(1, 'Select a product'),
     product_name: z.string().optional(),
@@ -144,6 +146,7 @@ export const fullOrderDefaults: FullOrderFormData = {
   fulfillment_type: 'inside_valley',
   status: 'intake',
   source: 'manual',
+  source_id: '',
   items: [],
   delivery_charge: 100,
   discount_amount: 0,
@@ -242,6 +245,7 @@ function transformToPayload(data: QuickOrderFormData | FullOrderFormData, mode: 
     
     // Order config
     source: 'manual',
+    source_id: (data as any).source_id || null,
     source_order_id: null,
     
     // CRITICAL: Include fulfillment_type and status from form selection

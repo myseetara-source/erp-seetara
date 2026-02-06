@@ -44,14 +44,17 @@ import {
   Check,
   Info,
 } from 'lucide-react';
+import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Switch } from '@/components/ui/switch';
 import { ImageUploader } from '@/components/common/ImageUploader';
-import { CreatableCategorySelect } from '@/components/common/CreatableCategorySelect';
+import { SearchableSelect } from '@/components/common/SearchableSelect';
 import { TagInput } from '@/components/common/TagInput';
 import { createProduct, updateProduct, type Product, type ProductVariant } from '@/lib/api/products';
+import { getCategories, type Category } from '@/lib/api/categories';
+import { getBrands, type Brand } from '@/lib/api/brands';
 import { cn } from '@/lib/utils';
 import type { AttributeField } from '@/types';
 
@@ -243,6 +246,12 @@ export function ProductForm({ initialData, onSuccess }: ProductFormProps) {
   const [submitSuccess, setSubmitSuccess] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [imageUrl, setImageUrl] = useState<string | null>(initialData?.image_url || null);
+
+  // Categories & Brands for strict selection
+  const [categoryOptions, setCategoryOptions] = useState<{ id: string; name: string }[]>([]);
+  const [brandOptions, setBrandOptions] = useState<{ id: string; name: string }[]>([]);
+  const [isCategoriesLoading, setIsCategoriesLoading] = useState(true);
+  const [isBrandsLoading, setIsBrandsLoading] = useState(true);
   
   // Product Options (for live variant generation)
   const [productOptions, setProductOptions] = useState<ProductOption[]>([]);
@@ -318,6 +327,42 @@ export function ProductForm({ initialData, onSuccess }: ProductFormProps) {
       setHasCustomShipping(hasCustom);
     }
   }, [initialData]);
+
+  // Fetch categories & brands for strict selection dropdowns
+  useEffect(() => {
+    async function loadCategories() {
+      try {
+        setIsCategoriesLoading(true);
+        const response = await getCategories({ limit: 100, is_active: 'true' });
+        setCategoryOptions(
+          response.data.map((c: Category) => ({ id: c.id, name: c.name }))
+        );
+      } catch (error) {
+        console.error('Failed to load categories:', error);
+        setCategoryOptions([]);
+      } finally {
+        setIsCategoriesLoading(false);
+      }
+    }
+
+    async function loadBrands() {
+      try {
+        setIsBrandsLoading(true);
+        const response = await getBrands({ limit: 100, is_active: 'true' });
+        setBrandOptions(
+          response.data.map((b: Brand) => ({ id: b.id, name: b.name }))
+        );
+      } catch (error) {
+        console.error('Failed to load brands:', error);
+        setBrandOptions([]);
+      } finally {
+        setIsBrandsLoading(false);
+      }
+    }
+
+    loadCategories();
+    loadBrands();
+  }, []);
 
   const {
     register,
@@ -666,29 +711,53 @@ export function ProductForm({ initialData, onSuccess }: ProductFormProps) {
                   </div>
 
                   <div>
-                    <label className="flex items-center gap-2 text-sm font-semibold text-gray-700 mb-2">
-                      Brand
+                    <label className="flex items-center justify-between text-sm font-semibold text-gray-700 mb-2">
+                      <span>Brand</span>
+                      <Link
+                        href="/dashboard/products/brands"
+                        className="text-xs font-medium text-indigo-600 hover:text-indigo-700 hover:underline"
+                      >
+                        Manage Brands
+                      </Link>
                     </label>
-                    <Input
-                      {...register('brand')}
-                      placeholder="e.g., Apple"
-                      className="h-12 text-base rounded-xl border-gray-200 focus:border-purple-400 focus:ring-purple-400/20"
+                    <Controller
+                      name="brand"
+                      control={control}
+                      render={({ field }) => (
+                        <SearchableSelect
+                          value={field.value || ''}
+                          onChange={field.onChange}
+                          options={brandOptions}
+                          isLoading={isBrandsLoading}
+                          placeholder="Select a brand..."
+                          emptyMessage="No brands found. Add brands in the Brands page."
+                        />
+                      )}
                     />
                   </div>
                 </div>
 
                 <div>
-                  <label className="flex items-center gap-2 text-sm font-semibold text-gray-700 mb-2">
-                    Category
+                  <label className="flex items-center justify-between text-sm font-semibold text-gray-700 mb-2">
+                    <span>Category</span>
+                    <Link
+                      href="/dashboard/products/categories"
+                      className="text-xs font-medium text-orange-600 hover:text-orange-700 hover:underline"
+                    >
+                      Manage Categories
+                    </Link>
                   </label>
                   <Controller
                     name="category"
                     control={control}
                     render={({ field }) => (
-                      <CreatableCategorySelect
+                      <SearchableSelect
                         value={field.value || ''}
                         onChange={field.onChange}
-                        placeholder="Select or create category..."
+                        options={categoryOptions}
+                        isLoading={isCategoriesLoading}
+                        placeholder="Select a category..."
+                        emptyMessage="No categories found. Add categories in the Categories page."
                       />
                     )}
                   />
