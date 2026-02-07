@@ -399,10 +399,13 @@ class LogisticsOrderService {
       );
     }
 
-    // STEP 1: Fetch order (without customer join - use shipping_* columns directly)
+    // STEP 1: Fetch order with source relation (for vendor reference on courier label)
     const { data: order, error } = await supabase
       .from('orders')
-      .select('*')
+      .select(`
+        *,
+        order_source:order_sources(id, name)
+      `)
       .eq('id', cleanOrderId)
       .single();
 

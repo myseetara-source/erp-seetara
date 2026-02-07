@@ -78,7 +78,7 @@ export interface BulkCreateResult {
 const NCM_STORAGE_KEY = 'ncm_master_branches';
 const NCM_STORAGE_EXPIRY_KEY = 'ncm_master_expiry';
 const NCM_STORAGE_VERSION_KEY = 'ncm_master_version';
-const NCM_CACHE_VERSION = 'v3_full_branch_data'; // Bump this to invalidate cache
+const NCM_CACHE_VERSION = 'v4_real_prices'; // Bumped to invalidate stale cache with fake 220/170 prices
 const NCM_CACHE_DURATION = 24 * 60 * 60 * 1000; // 24 hours
 
 const GAAUBESI_STORAGE_KEY = 'gaaubesi_master_branches';

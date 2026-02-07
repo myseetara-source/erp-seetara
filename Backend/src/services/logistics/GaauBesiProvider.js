@@ -20,6 +20,7 @@ import axios from 'axios';
 import { LogisticsAdapter, LogisticsAdapterFactory } from './LogisticsAdapter.js';
 import logger from '../../utils/logger.js';
 import { AppError } from '../../utils/errors.js';
+import { formatPackageDescription, getVendorReference, formatInstruction } from '../../utils/logisticsHelper.js';
 import {
   GAAUBESI_STATUS_MAP,
   ORDER_STATUS,
@@ -207,12 +208,15 @@ export class GaauBesiProvider extends LogisticsAdapter {
       console.log(`💰 [GaauBesi] COD: isCOD=${isCOD}, amount=${codAmount}`);
 
       // =========================================================================
-      // STEP 3: Generate Product & Package Strings
+      // STEP 3: Generate CLEAN Product & Package Descriptions
+      // Format: "Ladies Work Bag * 3, Macbook Air * 2" (NO variants, NO SKUs)
       // =========================================================================
-      const productString = this._generateProductString(order.items);
-      const packageString = this._generatePackageString(order);
-      console.log(`📦 [GaauBesi] Product Description: "${productString.substring(0, 100)}..."`);
-      console.log(`📦 [GaauBesi] Package Type: "${packageString.substring(0, 100)}..."`);
+      const productDescription = formatPackageDescription(order.items, 250);
+      const vendorRef = getVendorReference(order);
+      const instructionText = formatInstruction(order);
+      console.log(`📦 [GaauBesi] Description: "${productDescription}"`);
+      console.log(`🏷️ [GaauBesi] Vendor Ref: "${vendorRef}"`);
+      console.log(`📝 [GaauBesi] Instruction: "${instructionText}"`);
 
       // =========================================================================
       // STEP 4: Delivery Type (HARDCODED to "Pickup" per business requirement)
@@ -236,13 +240,13 @@ export class GaauBesiProvider extends LogisticsAdapter {
         cod_charge: codAmount,                    // COD amount (NUMBER, not string)
         delivery_type: gblDeliveryType,           // HARDCODED: 'Pickup' (Branch Pickup)
         
-        // OPTIONAL FIELDS
-        product_name: productString,              // ✅ FIX: Detailed product info for Description field
+        // OPTIONAL FIELDS — P0 FIX: Clean, readable data for courier labels
+        product_name: productDescription,         // "Ladies Work Bag * 3, Macbook Air * 2"
         alt_receiver_number: phone2Value,         // Secondary phone
-        package_type: packageString,              // Package description
+        package_type: productDescription,         // Same clean format for package field
         package_access: isCOD ? "Can't Open" : 'Can Open', // Package inspection rule
-        remarks: `Order #${order.readable_id || order.order_number} | Handle with care`,
-        order_contact_name: 'Seetara Support',
+        remarks: instructionText,                 // "Order #26-02-06-104 | Handle with care"
+        order_contact_name: vendorRef,            // Source name: "Seetara" or "Today Trend"
         order_contact_number: process.env.COMPANY_PHONE || '9802359033',
       };
 

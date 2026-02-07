@@ -225,6 +225,15 @@ class OrderStateService {
       });
     }
 
+    // =========================================================================
+    // P1: Auto-create Ticket on key status transitions
+    // - DELIVERED -> Review ticket (experience feedback)
+    // - CANCELLED/REJECTED/RETURNED -> Investigation ticket
+    // =========================================================================
+    await this.autoCreateTicket(order, newStatus).catch(err => {
+      logger.warn('[Tickets] Auto-ticket creation failed (non-blocking)', { orderId, newStatus, error: err.message });
+    });
+
     // Create status change log (legacy order_logs table)
     await orderCoreService.createOrderLog({
       order_id: orderId,
@@ -379,6 +388,81 @@ class OrderStateService {
     });
 
     return orderCoreService.getOrderById(orderId);
+  }
+
+  // ===========================================================================
+  // AUTO-CREATE TICKET ON STATUS TRANSITIONS
+  // ===========================================================================
+
+  async autoCreateTicket(order, newStatus) {
+    const REVIEW_STATUSES = ['delivered'];
+    const INVESTIGATION_STATUSES = ['cancelled', 'rejected', 'returned', 'return_initiated'];
+
+    let ticketData = null;
+
+    if (REVIEW_STATUSES.includes(newStatus)) {
+      ticketData = {
+        type: 'review',
+        category: 'feedback',
+        priority: 'low',
+        status: 'open',
+        source: 'auto_delivered',
+        subject: `Delivery review - ${order.readable_id || order.order_number}`,
+        description: `Automated review request for delivered order ${order.readable_id || order.order_number}`,
+        order_id: order.id,
+        customer_name: order.shipping_name || order.customer?.name,
+        customer_phone: order.shipping_phone || order.customer?.phone,
+        metadata: { auto_trigger: 'delivered', order_number: order.order_number },
+      };
+    } else if (INVESTIGATION_STATUSES.includes(newStatus)) {
+      ticketData = {
+        type: 'investigation',
+        category: newStatus === 'rejected' ? 'wrong_item' : 'other',
+        priority: 'high',
+        status: 'open',
+        source: 'auto_rejected',
+        subject: `Investigation: ${newStatus.replace('_', ' ')} - ${order.readable_id || order.order_number}`,
+        description: `Auto-created investigation for order ${order.readable_id || order.order_number} (status: ${newStatus})`,
+        order_id: order.id,
+        customer_name: order.shipping_name || order.customer?.name,
+        customer_phone: order.shipping_phone || order.customer?.phone,
+        metadata: { auto_trigger: newStatus, order_number: order.order_number },
+      };
+    }
+
+    if (!ticketData) return;
+
+    // Check for duplicate (don't create if same type+order already exists & is open)
+    const { data: existing } = await supabaseAdmin
+      .from('tickets')
+      .select('id')
+      .eq('order_id', order.id)
+      .eq('type', ticketData.type)
+      .in('status', ['open', 'processing'])
+      .maybeSingle();
+
+    if (existing) {
+      logger.debug('[Tickets] Skipping auto-ticket (duplicate exists)', { orderId: order.id, type: ticketData.type });
+      return;
+    }
+
+    const { data: ticket, error } = await supabaseAdmin
+      .from('tickets')
+      .insert(ticketData)
+      .select('id, readable_id, type')
+      .single();
+
+    if (error) {
+      logger.error('[Tickets] Auto-ticket creation failed', { error, orderId: order.id });
+      return;
+    }
+
+    logger.info('[Tickets] Auto-ticket created', {
+      ticketId: ticket.id,
+      readableId: ticket.readable_id,
+      type: ticket.type,
+      orderId: order.id,
+    });
   }
 }
 

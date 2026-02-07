@@ -1,594 +1,522 @@
 /**
  * Ticket Controller
+ * Handles HTTP requests for the Ticket & Support System
  * 
- * Handles HTTP endpoints for the ticket/support system.
- * Implements role-based access control.
- * 
- * @module controllers/ticket.controller
+ * 3 Workspaces:
+ *   - Priority Desk (type: support) - Manual complaints
+ *   - Experience Center (type: review) - Auto post-delivery
+ *   - Return Lab (type: investigation) - Auto on cancel/reject/return
  */
 
-import { TicketService } from '../services/ticket.service.js';
-import { maskSensitiveData } from '../utils/dataMasking.js';
-import asyncHandler from 'express-async-handler';
+import { asyncHandler } from '../middleware/error.middleware.js';
+import { extractContext } from '../middleware/auth.middleware.js';
+import { supabaseAdmin } from '../config/supabase.js';
+import { createLogger } from '../utils/logger.js';
+import { logActivity, ACTIVITY_TYPES } from '../services/ActivityLogger.service.js';
+
+const logger = createLogger('Tickets');
 
 // =============================================================================
-// TICKET CRUD
+// LIST TICKETS (with filters, search, pagination)
+// GET /tickets
 // =============================================================================
 
-/**
- * Create a new ticket
- * POST /tickets
- */
-export const createTicket = asyncHandler(async (req, res) => {
-  const userId = req.user.id;
-  const ticket = await TicketService.createTicket(req.body, userId);
-
-  res.status(201).json({
-    success: true,
-    message: `Ticket ${ticket.ticket_number} created successfully`,
-    data: ticket,
-  });
-});
-
-/**
- * Get ticket by ID
- * GET /tickets/:id
- */
-export const getTicketById = asyncHandler(async (req, res) => {
-  const { id } = req.params;
-  const userRole = req.user.role;
-  const userVendorId = req.user.vendor_id;
-
-  const ticket = await TicketService.getTicketById(id);
-
-  // Vendor access check - can only see their own tickets
-  if (userRole === 'vendor' && ticket.vendor_id !== userVendorId) {
-    return res.status(403).json({
-      success: false,
-      message: 'Access denied to this ticket',
-    });
-  }
-
-  // Filter internal messages for non-staff
-  if (userRole === 'vendor') {
-    ticket.messages = ticket.messages?.filter(m => !m.is_internal);
-  }
-
-  // Mask sensitive data for non-admin
-  const maskedTicket = maskSensitiveData(ticket, userRole);
-
-  res.json({
-    success: true,
-    data: maskedTicket,
-  });
-});
-
-/**
- * List tickets with filters
- * GET /tickets
- */
 export const listTickets = asyncHandler(async (req, res) => {
-  const userRole = req.user.role;
-  const userId = req.user.id;
-  const userVendorId = req.user.vendor_id;
-
   const {
+    page = 1,
+    limit = 50,
+    type,
     status,
     priority,
-    type,
+    category,
+    source,
     assigned_to,
-    unassigned,
-    customer_id,
-    vendor_id,
-    order_id,
     search,
-    tags,
-    sla_breached,
-    date_from,
-    date_to,
-    page = 1,
-    limit = 20,
-    sort_by = 'created_at',
-    sort_order = 'desc',
+    sortBy = 'created_at',
+    sortOrder = 'desc',
   } = req.query;
 
-  // Build filters based on role
-  const filters = {
-    status: status ? (status.includes(',') ? status.split(',') : status) : undefined,
-    priority,
-    type,
-    customer_id,
-    order_id,
-    search,
-    tags: tags ? tags.split(',') : undefined,
-    sla_breached: sla_breached === 'true' ? true : sla_breached === 'false' ? false : undefined,
-    date_from,
-    date_to,
-  };
+  const offset = (page - 1) * limit;
 
-  // Role-based filtering
-  if (userRole === 'vendor') {
-    // Vendors can ONLY see their own tickets
-    filters.vendor_id = userVendorId;
-  } else if (userRole === 'staff' || userRole === 'operator') {
-    // Staff can see assigned to them OR unassigned
-    if (assigned_to === 'me') {
-      filters.assigned_to = userId;
-    } else if (unassigned === 'true') {
-      filters.unassigned = true;
-    } else if (assigned_to) {
-      filters.assigned_to = assigned_to;
-    }
-    // Staff can also filter by vendor if specified
-    if (vendor_id) {
-      filters.vendor_id = vendor_id;
-    }
-  } else if (userRole === 'admin') {
-    // Admin can see all, apply filters as provided
-    if (assigned_to === 'me') {
-      filters.assigned_to = userId;
-    } else if (assigned_to) {
-      filters.assigned_to = assigned_to;
-    }
-    if (unassigned === 'true') {
-      filters.unassigned = true;
-    }
-    if (vendor_id) {
-      filters.vendor_id = vendor_id;
-    }
+  let query = supabaseAdmin
+    .from('tickets')
+    .select(`
+      *,
+      comments:ticket_comments(count)
+    `, { count: 'exact' });
+
+  // Filters
+  if (type) query = query.eq('type', type);
+  if (status) {
+    const statuses = status.split(',').map(s => s.trim());
+    query = query.in('status', statuses);
+  }
+  if (priority) query = query.eq('priority', priority);
+  if (category) query = query.eq('category', category);
+  if (source) query = query.eq('source', source);
+  if (assigned_to === 'unassigned') {
+    query = query.is('assigned_to', null);
+  } else if (assigned_to) {
+    query = query.eq('assigned_to', assigned_to);
+  }
+  if (search) {
+    query = query.or(`subject.ilike.%${search}%,customer_name.ilike.%${search}%,customer_phone.ilike.%${search}%,readable_id.eq.${parseInt(search) || 0}`);
   }
 
-  const options = {
-    page: parseInt(page),
-    limit: parseInt(limit),
-    sort_by,
-    sort_order,
-  };
+  // Sort & paginate
+  query = query.order(sortBy, { ascending: sortOrder === 'asc' });
+  query = query.range(offset, offset + limit - 1);
 
-  const result = await TicketService.listTickets(filters, options);
+  const { data: tickets, error, count } = await query;
 
-  // Mask sensitive data
-  result.tickets = result.tickets.map(t => maskSensitiveData(t, userRole));
+  if (error) {
+    logger.error('[Tickets] Failed to list tickets', { error });
+    return res.status(500).json({ success: false, message: 'Failed to list tickets' });
+  }
 
   res.json({
     success: true,
-    data: result.tickets,
+    data: tickets || [],
     pagination: {
-      page: result.page,
-      limit: result.limit,
-      total: result.total,
-      totalPages: result.totalPages,
+      page: Number(page),
+      limit: Number(limit),
+      total: count || 0,
+      totalPages: Math.ceil((count || 0) / limit),
     },
   });
 });
 
-/**
- * Update ticket
- * PATCH /tickets/:id
- */
+// =============================================================================
+// GET TICKET STATS (counts per type/status)
+// GET /tickets/stats
+// =============================================================================
+
+export const getTicketStats = asyncHandler(async (req, res) => {
+  // Get counts by type
+  const { data: typeStats } = await supabaseAdmin.rpc('get_ticket_stats_by_type').catch(() => ({ data: null }));
+
+  // Fallback: manual queries
+  const [supportQ, reviewQ, investigationQ, openQ, urgentQ] = await Promise.all([
+    supabaseAdmin.from('tickets').select('id', { count: 'exact', head: true }).eq('type', 'support').in('status', ['open', 'processing']),
+    supabaseAdmin.from('tickets').select('id', { count: 'exact', head: true }).eq('type', 'review').in('status', ['open', 'processing']),
+    supabaseAdmin.from('tickets').select('id', { count: 'exact', head: true }).eq('type', 'investigation').in('status', ['open', 'processing']),
+    supabaseAdmin.from('tickets').select('id', { count: 'exact', head: true }).in('status', ['open']),
+    supabaseAdmin.from('tickets').select('id', { count: 'exact', head: true }).eq('priority', 'urgent').in('status', ['open', 'processing']),
+  ]);
+
+  res.json({
+    success: true,
+    data: {
+      support: supportQ.count || 0,
+      review: reviewQ.count || 0,
+      investigation: investigationQ.count || 0,
+      open: openQ.count || 0,
+      urgent: urgentQ.count || 0,
+    },
+  });
+});
+
+// =============================================================================
+// GET SINGLE TICKET
+// GET /tickets/:id
+// =============================================================================
+
+export const getTicket = asyncHandler(async (req, res) => {
+  const { id } = req.params;
+
+  const { data: ticket, error } = await supabaseAdmin
+    .from('tickets')
+    .select(`
+      *,
+      comments:ticket_comments(*, user:user_name)
+    `)
+    .eq('id', id)
+    .order('created_at', { referencedTable: 'ticket_comments', ascending: true })
+    .single();
+
+  if (error || !ticket) {
+    return res.status(404).json({ success: false, message: 'Ticket not found' });
+  }
+
+  // If ticket has an order, fetch order summary
+  let orderSummary = null;
+  if (ticket.order_id) {
+    const { data: order } = await supabaseAdmin
+      .from('orders')
+      .select('id, readable_id, order_number, status, total_amount, shipping_name, shipping_phone, shipping_address, created_at, items:order_items(product_name, quantity, unit_price)')
+      .eq('id', ticket.order_id)
+      .single();
+    orderSummary = order;
+  }
+
+  res.json({
+    success: true,
+    data: { ...ticket, order: orderSummary },
+  });
+});
+
+// =============================================================================
+// LOOKUP ORDER (for ticket creation form)
+// GET /tickets/lookup-order/:orderId
+// Accepts readable_id (e.g. "25-01-15-001") or UUID
+// =============================================================================
+
+export const lookupOrder = asyncHandler(async (req, res) => {
+  const { orderId } = req.params;
+
+  if (!orderId || !orderId.trim()) {
+    return res.status(400).json({ success: false, message: 'Order ID is required' });
+  }
+
+  const trimmed = orderId.trim();
+
+  // Build query - select full order details + items
+  let query = supabaseAdmin
+    .from('orders')
+    .select(`
+      id, readable_id, order_number, status, fulfillment_type,
+      subtotal, total_amount, discount, shipping_cost,
+      shipping_name, shipping_phone, shipping_address, shipping_city, shipping_state,
+      alt_phone, remarks, payment_method, payment_status, paid_amount,
+      source, created_at,
+      items:order_items(id, product_name, variant_name, sku, quantity, unit_price, total_price)
+    `);
+
+  // Detect if it's a UUID (contains hyphens and is 36 chars) or readable_id
+  const isUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(trimmed);
+
+  if (isUUID) {
+    query = query.eq('id', trimmed);
+  } else {
+    // Try readable_id first, then order_number
+    query = query.eq('readable_id', trimmed);
+  }
+
+  const { data: order, error } = await query.single();
+
+  // If not found by readable_id, try order_number
+  if ((error || !order) && !isUUID) {
+    const { data: orderByNum, error: numError } = await supabaseAdmin
+      .from('orders')
+      .select(`
+        id, readable_id, order_number, status, fulfillment_type,
+        subtotal, total_amount, discount, shipping_cost,
+        shipping_name, shipping_phone, shipping_address, shipping_city, shipping_state,
+        alt_phone, remarks, payment_method, payment_status, paid_amount,
+        source, created_at,
+        items:order_items(id, product_name, variant_name, sku, quantity, unit_price, total_price)
+      `)
+      .eq('order_number', trimmed)
+      .single();
+
+    if (!numError && orderByNum) {
+      return res.json({ success: true, data: orderByNum });
+    }
+  }
+
+  if (error || !order) {
+    return res.status(404).json({
+      success: false,
+      message: 'Order not found. Please check the Order ID.',
+    });
+  }
+
+  res.json({ success: true, data: order });
+});
+
+// =============================================================================
+// CREATE TICKET (Internal - Staff)
+// POST /tickets
+// =============================================================================
+
+export const createTicket = asyncHandler(async (req, res) => {
+  const context = extractContext(req);
+  const ticketData = { ...req.body };
+
+  // If order_id provided, snapshot customer info from order
+  if (ticketData.order_id) {
+    const { data: order } = await supabaseAdmin
+      .from('orders')
+      .select('id, shipping_name, shipping_phone, readable_id')
+      .eq('id', ticketData.order_id)
+      .single();
+
+    if (order) {
+      ticketData.customer_name = ticketData.customer_name || order.shipping_name;
+      ticketData.customer_phone = ticketData.customer_phone || order.shipping_phone;
+    }
+  }
+
+  const { data: ticket, error } = await supabaseAdmin
+    .from('tickets')
+    .insert(ticketData)
+    .select()
+    .single();
+
+  if (error) {
+    logger.error('[Tickets] Failed to create ticket', { error });
+    return res.status(500).json({ success: false, message: 'Failed to create ticket', error: error.message });
+  }
+
+  // Log activity on the linked order's timeline
+  if (ticket.order_id) {
+    try {
+      await logActivity(supabaseAdmin, {
+        orderId: ticket.order_id,
+        user: req.user,
+        message: `Support ticket #TK-${ticket.readable_id} created: "${ticket.subject}"`,
+        type: ACTIVITY_TYPES.SYSTEM_LOG,
+        metadata: {
+          action: 'ticket_created',
+          ticket_id: ticket.id,
+          ticket_readable_id: ticket.readable_id,
+          ticket_type: ticket.type,
+          ticket_priority: ticket.priority,
+          ticket_category: ticket.category,
+        },
+      });
+    } catch (actErr) {
+      logger.warn('[Tickets] Failed to log activity on order', { error: actErr.message });
+    }
+  }
+
+  logger.info('[Tickets] Ticket created', {
+    ticketId: ticket.id,
+    readableId: ticket.readable_id,
+    type: ticket.type,
+    source: ticket.source,
+    userId: context.userId,
+  });
+
+  res.status(201).json({ success: true, data: ticket });
+});
+
+// =============================================================================
+// UPDATE TICKET
+// PATCH /tickets/:id
+// =============================================================================
+
 export const updateTicket = asyncHandler(async (req, res) => {
   const { id } = req.params;
-  const userId = req.user.id;
-  const userRole = req.user.role;
+  const updates = { ...req.body };
+  const context = extractContext(req);
 
-  // Vendors cannot update tickets
-  if (userRole === 'vendor') {
-    return res.status(403).json({
+  // Fetch current ticket for change comparison
+  const { data: existingTicket } = await supabaseAdmin
+    .from('tickets')
+    .select('status, priority, type, order_id, readable_id')
+    .eq('id', id)
+    .single();
+
+  // Auto-set resolved_at / closed_at timestamps
+  if (updates.status === 'resolved' && !updates.resolved_at) {
+    updates.resolved_at = new Date().toISOString();
+  }
+  if (updates.status === 'closed' && !updates.closed_at) {
+    updates.closed_at = new Date().toISOString();
+  }
+
+  const { data: ticket, error } = await supabaseAdmin
+    .from('tickets')
+    .update(updates)
+    .eq('id', id)
+    .select()
+    .single();
+
+  if (error || !ticket) {
+    return res.status(error ? 500 : 404).json({
       success: false,
-      message: 'Vendors cannot modify tickets',
+      message: error ? 'Failed to update ticket' : 'Ticket not found',
     });
   }
 
-  const ticket = await TicketService.updateTicket(id, req.body, userId);
-
-  res.json({
-    success: true,
-    message: 'Ticket updated successfully',
-    data: ticket,
-  });
-});
-
-// =============================================================================
-// TICKET ACTIONS
-// =============================================================================
-
-/**
- * Assign ticket to a user
- * POST /tickets/:id/assign
- */
-export const assignTicket = asyncHandler(async (req, res) => {
-  const { id } = req.params;
-  const { assignee_id } = req.body;
-  const userId = req.user.id;
-
-  if (!assignee_id) {
-    return res.status(400).json({
-      success: false,
-      message: 'Assignee ID is required',
-    });
+  // Log status change on linked order's timeline
+  if (ticket.order_id && updates.status && existingTicket?.status !== updates.status) {
+    try {
+      const statusLabels = { open: 'Open', processing: 'In Progress', resolved: 'Resolved', closed: 'Closed' };
+      await logActivity(supabaseAdmin, {
+        orderId: ticket.order_id,
+        user: req.user,
+        message: `Ticket #TK-${ticket.readable_id} status changed: ${statusLabels[existingTicket?.status] || existingTicket?.status} → ${statusLabels[updates.status] || updates.status}`,
+        type: ACTIVITY_TYPES.SYSTEM_LOG,
+        metadata: {
+          action: 'ticket_status_change',
+          ticket_id: ticket.id,
+          ticket_readable_id: ticket.readable_id,
+          old_status: existingTicket?.status,
+          new_status: updates.status,
+        },
+      });
+    } catch (actErr) {
+      logger.warn('[Tickets] Failed to log status change activity', { error: actErr.message });
+    }
   }
 
-  const ticket = await TicketService.assignTicket(id, assignee_id, userId);
-
-  res.json({
-    success: true,
-    message: 'Ticket assigned successfully',
-    data: ticket,
+  logger.info('[Tickets] Ticket updated', {
+    ticketId: id,
+    updates: Object.keys(updates),
+    userId: context.userId,
   });
+
+  res.json({ success: true, data: ticket });
 });
 
-/**
- * Escalate ticket
- * POST /tickets/:id/escalate
- */
+// =============================================================================
+// ADD COMMENT
+// POST /tickets/:id/comments
+// =============================================================================
+
+export const addComment = asyncHandler(async (req, res) => {
+  const { id: ticketId } = req.params;
+  const { content, is_internal = true, attachments = [] } = req.body;
+  const context = extractContext(req);
+
+  // Get user name for snapshot
+  const userName = req.user?.user_metadata?.name || req.user?.email || 'Staff';
+
+  const { data: comment, error } = await supabaseAdmin
+    .from('ticket_comments')
+    .insert({
+      ticket_id: ticketId,
+      user_id: context.userId,
+      user_name: userName,
+      content,
+      is_internal,
+      attachments,
+    })
+    .select()
+    .single();
+
+  if (error) {
+    logger.error('[Tickets] Failed to add comment', { error });
+    return res.status(500).json({ success: false, message: 'Failed to add comment' });
+  }
+
+  // Auto-set ticket to "processing" if it was "open"
+  await supabaseAdmin
+    .from('tickets')
+    .update({ status: 'processing' })
+    .eq('id', ticketId)
+    .eq('status', 'open');
+
+  res.status(201).json({ success: true, data: comment });
+});
+
+// =============================================================================
+// ESCALATE TICKET (Review -> Support)
+// POST /tickets/:id/escalate
+// =============================================================================
+
 export const escalateTicket = asyncHandler(async (req, res) => {
   const { id } = req.params;
-  const { escalate_to, reason } = req.body;
-  const userId = req.user.id;
+  const context = extractContext(req);
 
-  if (!reason) {
-    return res.status(400).json({
-      success: false,
-      message: 'Escalation reason is required',
-    });
+  const { data: ticket, error } = await supabaseAdmin
+    .from('tickets')
+    .update({
+      type: 'support',
+      priority: 'high',
+      status: 'open',
+      metadata: supabaseAdmin.rpc ? undefined : undefined, // Keep existing metadata
+    })
+    .eq('id', id)
+    .select()
+    .single();
+
+  if (error || !ticket) {
+    return res.status(404).json({ success: false, message: 'Ticket not found' });
   }
 
-  const ticket = await TicketService.escalateTicket(id, escalate_to, reason, userId);
-
-  res.json({
-    success: true,
-    message: 'Ticket escalated successfully',
-    data: ticket,
+  // Add escalation comment
+  await supabaseAdmin.from('ticket_comments').insert({
+    ticket_id: id,
+    user_id: context.userId,
+    user_name: req.user?.user_metadata?.name || 'Staff',
+    content: 'Ticket escalated from Review to Priority Desk',
+    is_internal: true,
   });
-});
 
-/**
- * Resolve ticket
- * POST /tickets/:id/resolve
- */
-export const resolveTicket = asyncHandler(async (req, res) => {
-  const { id } = req.params;
-  const { resolution } = req.body;
-  const userId = req.user.id;
+  logger.info('[Tickets] Ticket escalated', { ticketId: id, userId: context.userId });
 
-  if (!resolution) {
-    return res.status(400).json({
-      success: false,
-      message: 'Resolution description is required',
-    });
-  }
-
-  const ticket = await TicketService.resolveTicket(id, resolution, userId);
-
-  res.json({
-    success: true,
-    message: 'Ticket resolved successfully',
-    data: ticket,
-  });
-});
-
-/**
- * Close ticket
- * POST /tickets/:id/close
- */
-export const closeTicket = asyncHandler(async (req, res) => {
-  const { id } = req.params;
-  const userId = req.user.id;
-
-  const ticket = await TicketService.closeTicket(id, userId);
-
-  res.json({
-    success: true,
-    message: 'Ticket closed successfully',
-    data: ticket,
-  });
-});
-
-/**
- * Reopen ticket
- * POST /tickets/:id/reopen
- */
-export const reopenTicket = asyncHandler(async (req, res) => {
-  const { id } = req.params;
-  const { reason } = req.body;
-  const userId = req.user.id;
-
-  const ticket = await TicketService.reopenTicket(id, reason, userId);
-
-  res.json({
-    success: true,
-    message: 'Ticket reopened successfully',
-    data: ticket,
-  });
+  res.json({ success: true, data: ticket });
 });
 
 // =============================================================================
-// MESSAGES
+// PUBLIC COMPLAINT (No auth - phone verification)
+// POST /tickets/public/complaint
 // =============================================================================
 
-/**
- * Add message to ticket
- * POST /tickets/:id/messages
- */
-export const addMessage = asyncHandler(async (req, res) => {
-  const { id } = req.params;
-  const userId = req.user.id;
-  const userRole = req.user.role;
+export const submitPublicComplaint = asyncHandler(async (req, res) => {
+  const { order_id, phone, category, subject, description, photo_url } = req.body;
 
-  const { message, source, attachments, is_internal } = req.body;
+  // 1. Find order by readable_id or UUID
+  let orderQuery = supabaseAdmin.from('orders').select('id, readable_id, shipping_name, shipping_phone, order_number');
 
-  if (!message) {
-    return res.status(400).json({
+  // Check if it looks like a UUID or a readable ID
+  if (order_id.includes('-')) {
+    orderQuery = orderQuery.eq('id', order_id);
+  } else {
+    orderQuery = orderQuery.eq('readable_id', order_id);
+  }
+
+  const { data: order, error: orderError } = await orderQuery.single();
+
+  if (orderError || !order) {
+    return res.status(404).json({
       success: false,
-      message: 'Message content is required',
+      message: 'Order not found. Please check your Order ID.',
     });
   }
 
-  // Vendors cannot post internal notes
-  const internal = userRole === 'vendor' ? false : is_internal;
+  // 2. Verify phone matches
+  const cleanPhone = phone.replace(/\D/g, '').slice(-10);
+  const orderPhone = (order.shipping_phone || '').replace(/\D/g, '').slice(-10);
 
-  const msg = await TicketService.addMessage(id, {
-    message,
-    source: source || (userRole === 'vendor' ? 'vendor' : 'staff'),
-    attachments,
-    is_internal: internal,
-  }, userId);
+  if (cleanPhone !== orderPhone) {
+    return res.status(403).json({
+      success: false,
+      message: 'Phone number does not match our records for this order.',
+    });
+  }
+
+  // 3. Create ticket
+  const metadata = {};
+  if (photo_url) metadata.photo_url = photo_url;
+
+  const { data: ticket, error } = await supabaseAdmin
+    .from('tickets')
+    .insert({
+      type: 'support',
+      category: category || 'complaint',
+      priority: 'medium',
+      status: 'open',
+      source: 'public_form',
+      subject,
+      description,
+      order_id: order.id,
+      customer_name: order.shipping_name,
+      customer_phone: order.shipping_phone,
+      metadata,
+    })
+    .select('id, readable_id, subject, status, created_at')
+    .single();
+
+  if (error) {
+    logger.error('[Tickets] Public complaint failed', { error });
+    return res.status(500).json({ success: false, message: 'Failed to submit complaint' });
+  }
+
+  logger.info('[Tickets] Public complaint created', {
+    ticketId: ticket.id,
+    orderId: order.id,
+  });
 
   res.status(201).json({
     success: true,
-    message: 'Message added successfully',
-    data: msg,
-  });
-});
-
-/**
- * Get messages for a ticket
- * GET /tickets/:id/messages
- */
-export const getMessages = asyncHandler(async (req, res) => {
-  const { id } = req.params;
-  const userRole = req.user.role;
-
-  // Vendors should not see internal notes
-  const includeInternal = userRole !== 'vendor';
-
-  const messages = await TicketService.getMessages(id, includeInternal);
-
-  res.json({
-    success: true,
-    data: messages,
-  });
-});
-
-// =============================================================================
-// FEEDBACK
-// =============================================================================
-
-/**
- * Submit feedback for a ticket
- * POST /tickets/:id/submit-feedback
- */
-export const submitFeedback = asyncHandler(async (req, res) => {
-  const { id } = req.params;
-  const userId = req.user?.id; // May be null for public feedback
-
-  const { rating, comment, delivery_rating, product_rating, service_rating } = req.body;
-
-  if (!rating || rating < 1 || rating > 5) {
-    return res.status(400).json({
-      success: false,
-      message: 'Rating must be between 1 and 5',
-    });
-  }
-
-  const result = await TicketService.submitFeedback(id, {
-    rating,
-    comment,
-    delivery_rating,
-    product_rating,
-    service_rating,
-  }, userId);
-
-  res.json({
-    success: true,
-    message: rating >= 4 ? 'Thank you for your positive feedback!' : 'Thank you for your feedback. Our team will follow up.',
+    message: 'Your complaint has been submitted successfully.',
     data: {
-      ticket: result.ticket,
-      review: result.review,
+      ticket_id: ticket.readable_id,
+      status: ticket.status,
     },
   });
 });
-
-// =============================================================================
-// ORDER ISSUES
-// =============================================================================
-
-/**
- * Create issue ticket from order
- * POST /orders/:orderId/issue
- */
-export const createOrderIssue = asyncHandler(async (req, res) => {
-  const { orderId } = req.params;
-  const userId = req.user.id;
-
-  const ticket = await TicketService.createOrderIssue(orderId, req.body, userId);
-
-  res.status(201).json({
-    success: true,
-    message: `Issue ticket ${ticket.ticket_number} created`,
-    data: ticket,
-  });
-});
-
-// =============================================================================
-// ACTIVITY LOG
-// =============================================================================
-
-/**
- * Get activity log for a ticket
- * GET /tickets/:id/activity
- */
-export const getActivityLog = asyncHandler(async (req, res) => {
-  const { id } = req.params;
-
-  const activities = await TicketService.getActivityLog(id);
-
-  res.json({
-    success: true,
-    data: activities,
-  });
-});
-
-// =============================================================================
-// STATISTICS
-// =============================================================================
-
-/**
- * Get ticket statistics
- * GET /tickets/stats
- */
-export const getStatistics = asyncHandler(async (req, res) => {
-  const { date_from, date_to, assigned_to } = req.query;
-  const userId = req.user.id;
-  const userRole = req.user.role;
-
-  const filters = {
-    date_from,
-    date_to,
-  };
-
-  // Staff sees their own stats by default
-  if (userRole === 'staff' || userRole === 'operator') {
-    filters.assigned_to = assigned_to === 'all' && userRole === 'admin' ? undefined : userId;
-  } else if (assigned_to && assigned_to !== 'all') {
-    filters.assigned_to = assigned_to;
-  }
-
-  const stats = await TicketService.getStatistics(filters);
-
-  res.json({
-    success: true,
-    data: stats,
-  });
-});
-
-// =============================================================================
-// REVIEWS
-// =============================================================================
-
-/**
- * Get reviews for a product
- * GET /products/:productId/reviews
- */
-export const getProductReviews = asyncHandler(async (req, res) => {
-  const { productId } = req.params;
-  const { page = 1, limit = 10, rating } = req.query;
-
-  // This would go to a review service, but for now inline query
-  const { supabase } = await import('../config/supabase.js');
-
-  let query = supabase
-    .from('reviews')
-    .select(`
-      id,
-      rating,
-      title,
-      comment,
-      delivery_rating,
-      product_rating,
-      service_rating,
-      images,
-      is_verified,
-      response,
-      response_at,
-      created_at,
-      customer:customers(id, name)
-    `, { count: 'exact' })
-    .eq('product_id', productId)
-    .eq('is_published', true);
-
-  if (rating) {
-    query = query.eq('rating', parseInt(rating));
-  }
-
-  const from = (parseInt(page) - 1) * parseInt(limit);
-  const to = from + parseInt(limit) - 1;
-
-  const { data: reviews, count } = await query
-    .order('created_at', { ascending: false })
-    .range(from, to);
-
-  res.json({
-    success: true,
-    data: reviews,
-    pagination: {
-      page: parseInt(page),
-      limit: parseInt(limit),
-      total: count || 0,
-    },
-  });
-});
-
-/**
- * Get review summary for a product
- * GET /products/:productId/reviews/summary
- */
-export const getReviewSummary = asyncHandler(async (req, res) => {
-  const { productId } = req.params;
-
-  const { supabase } = await import('../config/supabase.js');
-
-  const { data: reviews } = await supabase
-    .from('reviews')
-    .select('rating')
-    .eq('product_id', productId)
-    .eq('is_published', true);
-
-  if (!reviews || reviews.length === 0) {
-    return res.json({
-      success: true,
-      data: {
-        average: 0,
-        count: 0,
-        distribution: { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 },
-      },
-    });
-  }
-
-  const distribution = { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 };
-  let total = 0;
-
-  for (const review of reviews) {
-    distribution[review.rating]++;
-    total += review.rating;
-  }
-
-  res.json({
-    success: true,
-    data: {
-      average: (total / reviews.length).toFixed(1),
-      count: reviews.length,
-      distribution,
-    },
-  });
-});
-
-export default {
-  createTicket,
-  getTicketById,
-  listTickets,
-  updateTicket,
-  assignTicket,
-  escalateTicket,
-  resolveTicket,
-  closeTicket,
-  reopenTicket,
-  addMessage,
-  getMessages,
-  submitFeedback,
-  createOrderIssue,
-  getActivityLog,
-  getStatistics,
-  getProductReviews,
-  getReviewSummary,
-};
